@@ -1,0 +1,33 @@
+export const ptBR = {
+  appName: "GeoGestao",
+  nav: {
+    dashboard: "Dashboard",
+    clients: "Clientes",
+    proposals: "Propostas",
+    contracts: "Contratos",
+    services: "Servicos",
+    finance: "Financeiro",
+    documents: "Documentos",
+    legislation: "Legislacao",
+    attachments: "Anexos",
+  },
+  proposalStages: {
+    todo: "Propostas a Fazer",
+    sent: "Propostas Enviadas",
+    negotiation: "Propostas em Negociacao",
+    execution: "Propostas em Execucao",
+    finished: "Propostas Finalizadas",
+    lost: "Propostas Perdidas",
+  },
+  priorities: {
+    low: "Baixa",
+    medium: "Media",
+    high: "Alta",
+    urgent: "Urgente",
+  },
+  financeStatus: {
+    pending: "Pendente",
+    paid: "Pago",
+    overdue: "Vencido",
+  },
+};
