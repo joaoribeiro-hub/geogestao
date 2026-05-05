@@ -2,6 +2,8 @@ export const ptBR = {
   appName: "GeoGestao",
   nav: {
     dashboard: "Dashboard",
+    company: "Minha Empresa",
+    map: "Mapa",
     clients: "Clientes",
     proposals: "Propostas",
     contracts: "Contratos",

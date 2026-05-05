@@ -4,11 +4,13 @@ import {
   Archive,
   BookOpen,
   BriefcaseBusiness,
+  Building2,
   FileSignature,
   FileText,
   GanttChartSquare,
   Home,
   Landmark,
+  Map,
   Paperclip,
   Users,
 } from "lucide-react";
@@ -18,6 +20,8 @@ import { SignOutButton } from "@/components/layout/sign-out-button";
 
 const nav = [
   { href: "/", label: ptBR.nav.dashboard, icon: Home },
+  { href: "/minha-empresa", label: ptBR.nav.company, icon: Building2 },
+  { href: "/mapa", label: ptBR.nav.map, icon: Map },
   { href: "/clientes", label: ptBR.nav.clients, icon: Users },
   { href: "/propostas", label: ptBR.nav.proposals, icon: GanttChartSquare },
   { href: "/contratos", label: ptBR.nav.contracts, icon: FileSignature },

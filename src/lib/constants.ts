@@ -16,10 +16,23 @@ export const serviceBoardSlugs = [
   "outros-servicos",
 ] as const;
 
+export const proposalServiceTypes = [
+  { id: "georreferenciamento", label: "Georreferenciamento" },
+  { id: "car", label: "CAR" },
+  { id: "itr_ccir", label: "ITR/CCIR" },
+  { id: "outros_servicos", label: "Outros Servicos" },
+] as const;
+
+export const paymentStatuses = [
+  { id: "pagamento_nao_efetuado", label: "Pagamento nao efetuado" },
+  { id: "pagamento_efetuado", label: "Pagamento efetuado" },
+] as const;
+
 export const entityTypes = [
   "client",
   "proposal",
   "service_card",
+  "contract",
   "revenue",
   "expense",
   "document_template",

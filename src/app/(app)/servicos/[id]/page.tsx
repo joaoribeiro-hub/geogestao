@@ -11,6 +11,11 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { createServerSupabase } from "@/lib/supabase/server";
 import { formatDate } from "@/lib/utils";
 
+const paymentStatusLabels = {
+  pagamento_nao_efetuado: "Pagamento nao efetuado",
+  pagamento_efetuado: "Pagamento efetuado",
+} as const;
+
 export default async function ServiceDetailPage({
   params,
 }: {
@@ -61,6 +66,13 @@ export default async function ServiceDetailPage({
               <div className="flex flex-wrap gap-2">
                 <Badge variant="secondary">{column?.name ?? "Sem coluna"}</Badge>
                 <Badge variant="outline">Prioridade {card.priority}</Badge>
+                <Badge
+                  variant={
+                    card.payment_status === "pagamento_efetuado" ? "secondary" : "outline"
+                  }
+                >
+                  {paymentStatusLabels[card.payment_status ?? "pagamento_nao_efetuado"]}
+                </Badge>
                 <Badge variant="outline">{Number(card.checklist_percent).toFixed(0)}% concluido</Badge>
               </div>
               <p className="text-muted-foreground">{card.description ?? "Sem descricao."}</p>

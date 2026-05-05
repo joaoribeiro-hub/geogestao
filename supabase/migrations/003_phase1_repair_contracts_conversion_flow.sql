@@ -58,9 +58,6 @@ exception
   when duplicate_object then null;
 end $$;
 
--- If a previous manual attempt created duplicated contracts before the unique
--- guard existed, keep one canonical contract per proposal and preserve the
--- extras without the proposal link.
 with ranked_contracts as (
   select
     id,
@@ -91,10 +88,6 @@ alter table public.service_cards
 alter table public.revenues
   add column if not exists contract_id uuid references public.contracts(id) on delete set null;
 
--- Normalize legacy service cards before adding the unique proposal link.
--- Some existing databases may already have more than one service card created
--- from the same proposal. Keep one canonical card linked to the proposal and
--- leave the extra cards intact, but without the new unique proposal_id link.
 with ranked_service_cards as (
   select
     sc.id,
@@ -135,9 +128,6 @@ where sc.id = ranked_service_cards.id
     end
   );
 
--- Normalize duplicated automatic revenues before adding the idempotency index.
--- The canonical record remains linked to the proposal; extra records are kept
--- for audit/history but no longer block one automatic revenue per proposal.
 with ranked_revenues as (
   select
     id,

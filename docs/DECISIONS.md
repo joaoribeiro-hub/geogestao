@@ -1,6 +1,6 @@
 # GeoGestao - Decisoes do Projeto
 
-Data do checkpoint: 2026-04-30
+Data do checkpoint: 2026-05-05
 
 ## Decisoes registradas
 
@@ -33,9 +33,9 @@ Data do checkpoint: 2026-04-30
    - Opcoes de contratos;
    - Armazenamento.
 
-8. O sistema deve futuramente ter mapa com upload KML/KMZ.
+8. O sistema tem uma area de mapa com upload KML/KMZ.
 
-9. O mapa futuro deve permitir vincular perimetros a cliente, imovel e servico.
+9. O mapa deve vincular perimetros a cliente, imovel e servico.
 
 10. Supabase Auth, Supabase Database e Supabase Storage permanecem como base tecnica do projeto.
 
@@ -54,3 +54,15 @@ Data do checkpoint: 2026-04-30
 17. O fluxo de conversao de proposta deve ser idempotente: clique duplo nao pode duplicar contrato, servico ou receita.
 
 18. A Fase 1 prioriza contrato, conversao proposta -> servico e receita automatica. Minha Empresa, Propostas v2, documentos por imovel, dashboard avancado e mapa ficam para fases posteriores.
+
+19. A implementacao inicial do mapa deve usar Leaflet.
+
+20. A camada inicial do mapa deve usar OpenStreetMap.
+
+21. O mapa nao deve depender inicialmente de Google Earth.
+
+22. A arquitetura do mapa deve ficar preparada para uma camada de satelite futura via provedor com API adequada.
+
+23. KML/KMZ devem permanecer vinculados a cliente, imovel e servico/card tecnico.
+
+24. O arquivo KML/KMZ original deve ser mantido no Storage privado quando possivel, e o GeoJSON derivado pode ser salvo no banco para renderizacao.

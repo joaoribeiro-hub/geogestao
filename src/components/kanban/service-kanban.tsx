@@ -1,13 +1,18 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { DndContext, type DragEndEvent, useDraggable, useDroppable } from "@dnd-kit/core";
-import { CalendarDays, GripVertical } from "lucide-react";
-import { moveServiceCardAction } from "@/app/(app)/servicos/actions";
+import { CalendarDays, GripVertical, RotateCcw } from "lucide-react";
+import {
+  moveServiceCardAction,
+  revertServiceToProposal,
+} from "@/app/(app)/servicos/actions";
 import { formatDate } from "@/lib/utils";
 import type { Client, Priority, ServiceCard, ServiceColumn } from "@/types/database";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 
 type ServiceCardWithClient = ServiceCard & {
   client?: Pick<Client, "id" | "name"> | null;
@@ -20,6 +25,11 @@ const priorityLabels: Record<Priority, string> = {
   urgent: "Urgente",
 };
 
+const paymentStatusLabels = {
+  pagamento_nao_efetuado: "Pagamento nao efetuado",
+  pagamento_efetuado: "Pagamento efetuado",
+} as const;
+
 export function ServiceKanban({
   columns,
   cards,
@@ -29,6 +39,10 @@ export function ServiceKanban({
 }) {
   const [items, setItems] = useState(cards);
   const [, startTransition] = useTransition();
+
+  useEffect(() => {
+    setItems(cards);
+  }, [cards]);
 
   const grouped = useMemo(() => {
     return columns.reduce<Record<string, ServiceCardWithClient[]>>((acc, column) => {
@@ -93,9 +107,15 @@ function ServiceColumnView({
 }
 
 function ServiceCardView({ card }: { card: ServiceCardWithClient }) {
+  const router = useRouter();
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: card.id,
   });
+  const [pending, startTransition] = useTransition();
+  const [feedback, setFeedback] = useState<{
+    type: "success" | "error";
+    message: string;
+  } | null>(null);
   const style = transform
     ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)` }
     : undefined;
@@ -129,7 +149,56 @@ function ServiceCardView({ card }: { card: ServiceCardWithClient }) {
           </Badge>
         ) : null}
         <Badge variant="outline">{Number(card.checklist_percent ?? 0).toFixed(0)}%</Badge>
+        <Badge
+          variant={
+            card.payment_status === "pagamento_efetuado" ? "secondary" : "outline"
+          }
+        >
+          {paymentStatusLabels[card.payment_status ?? "pagamento_nao_efetuado"]}
+        </Badge>
       </div>
+      {card.proposal_id || card.created_from_proposal_id ? (
+        <Button
+          size="sm"
+          variant="outline"
+          className="mt-3 w-full"
+          disabled={pending}
+          onClick={() =>
+            startTransition(() => {
+              void (async () => {
+                setFeedback(null);
+                try {
+                  const result = await revertServiceToProposal(card.id);
+                  setFeedback({ type: "success", message: result.message });
+                  router.refresh();
+                } catch (error) {
+                  setFeedback({
+                    type: "error",
+                    message:
+                      error instanceof Error
+                        ? error.message
+                        : "Nao foi possivel voltar o servico.",
+                  });
+                }
+              })();
+            })
+          }
+        >
+          <RotateCcw aria-hidden="true" />
+          {pending ? "Voltando..." : "Voltar servico"}
+        </Button>
+      ) : null}
+      {feedback ? (
+        <p
+          className={`mt-2 rounded-md p-2 text-xs ${
+            feedback.type === "success"
+              ? "bg-primary/10 text-primary"
+              : "bg-destructive/10 text-destructive"
+          }`}
+        >
+          {feedback.message}
+        </p>
+      ) : null}
       <Link
         href={`/servicos/${card.id}`}
         className="mt-3 inline-flex text-sm font-medium text-primary hover:underline"

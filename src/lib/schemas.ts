@@ -33,14 +33,109 @@ export const interactionSchema = z.object({
   description: z.string().trim().min(3, "Descreva a interacao."),
 });
 
+export const companySettingsSchema = z.object({
+  trade_name: optionalText,
+  legal_name: optionalText,
+  cnpj: optionalText,
+  phone: optionalText,
+  email: z
+    .string()
+    .trim()
+    .optional()
+    .transform((value) => (value ? value : null))
+    .pipe(z.string().email("E-mail invalido.").nullable()),
+  website: z
+    .string()
+    .trim()
+    .optional()
+    .transform((value) => (value ? value : null))
+    .pipe(z.string().url("Site invalido.").nullable()),
+  address: optionalText,
+  city: optionalText,
+  state: optionalText,
+  logo_url: optionalText,
+  notes: optionalText,
+});
+
+export const companyServiceSchema = z.object({
+  niche: z.string().trim().min(2, "Informe o nicho de atuacao."),
+  name: z.string().trim().min(2, "Informe o servico oferecido."),
+  base_price: z
+    .string()
+    .optional()
+    .transform((value) => (value ? Number(value) : null))
+    .pipe(z.number().nonnegative("Informe um preco valido.").nullable()),
+  billing_unit: optionalText,
+  description: optionalText,
+  is_active: z
+    .enum(["true", "false"])
+    .default("true")
+    .transform((value) => value === "true"),
+});
+
+export const propertyMapSchema = z.object({
+  client_id: z.string().uuid("Selecione um cliente."),
+  service_card_id: z
+    .string()
+    .optional()
+    .transform((value) => (value ? value : null)),
+  name: z.string().trim().min(2, "Informe o nome do imovel."),
+  area: z
+    .string()
+    .optional()
+    .transform((value) => (value ? Number(value) : null))
+    .pipe(z.number().nonnegative("Informe uma area valida.").nullable()),
+  registry_number: optionalText,
+  registry_date: dateString,
+  car_state: optionalText,
+  car_federal: optionalText,
+  city: optionalText,
+  state: optionalText,
+  notes: optionalText,
+  file_path: z.string().min(1, "Envie um arquivo KML ou KMZ."),
+  file_name: z.string().min(1),
+  mime_type: optionalText,
+  size_bytes: z.coerce.number().nullable().optional(),
+  geojson: z.string().min(1, "GeoJSON nao foi gerado."),
+});
+
 export const proposalSchema = z.object({
   client_id: z.string().uuid("Selecione um cliente."),
   title: z.string().trim().min(3, "Informe o titulo."),
   description: optionalText,
+  service_type: z.enum(["georreferenciamento", "car", "itr_ccir", "outros_servicos"], {
+    required_error: "Selecione o tipo de servico.",
+  }),
   value: z.coerce.number().nonnegative().nullable().optional(),
   sent_at: dateString,
   valid_until: dateString,
   comments: optionalText,
+});
+
+export const proposalPdfSchema = z.object({
+  client_id: z.string().uuid("Selecione um cliente."),
+  title: z.string().trim().min(3, "Informe o titulo."),
+  value: z.coerce.number().nonnegative().nullable().optional(),
+  valid_until: dateString,
+  stage: z.enum(["todo", "sent", "negotiation", "execution", "finished", "lost"]),
+  service_type: z.enum(["georreferenciamento", "car", "itr_ccir", "outros_servicos"]),
+  comments: optionalText,
+  file_path: z.string().min(1, "Envie o PDF da proposta."),
+  file_name: z.string().min(1),
+  mime_type: optionalText,
+  size_bytes: z.coerce.number().nullable().optional(),
+});
+
+export const proposalModelDraftSchema = z.object({
+  client_id: z.string().uuid("Selecione um cliente."),
+  title: z.string().trim().min(3, "Informe o titulo."),
+  service_type: z.enum(["georreferenciamento", "car", "itr_ccir", "outros_servicos"]),
+  demand: optionalText,
+  sent_at: dateString,
+  valid_until: dateString,
+  value: z.coerce.number().nonnegative().nullable().optional(),
+  sections: optionalText,
+  model_name: optionalText,
 });
 
 export const serviceCardSchema = z.object({
@@ -51,6 +146,13 @@ export const serviceCardSchema = z.object({
     .transform((value) => (value ? value : null)),
   title: z.string().trim().min(3, "Informe o titulo."),
   description: optionalText,
+  service_type: z
+    .enum(["georreferenciamento", "car", "itr_ccir", "outros_servicos"])
+    .nullable()
+    .optional(),
+  payment_status: z
+    .enum(["pagamento_nao_efetuado", "pagamento_efetuado"])
+    .default("pagamento_nao_efetuado"),
   priority: z.enum(["low", "medium", "high", "urgent"]),
   due_date: dateString,
   custom_fields_json: z
@@ -144,6 +246,11 @@ export const attachmentSchema = z.object({
 });
 
 export type ClientFormValues = z.input<typeof clientSchema>;
+export type CompanySettingsFormValues = z.input<typeof companySettingsSchema>;
+export type CompanyServiceFormValues = z.input<typeof companyServiceSchema>;
+export type PropertyMapFormValues = z.input<typeof propertyMapSchema>;
 export type ProposalFormValues = z.input<typeof proposalSchema>;
+export type ProposalPdfFormValues = z.input<typeof proposalPdfSchema>;
+export type ProposalModelDraftFormValues = z.input<typeof proposalModelDraftSchema>;
 export type ServiceCardFormValues = z.input<typeof serviceCardSchema>;
 export type FinanceFormValues = z.input<typeof financeSchema>;

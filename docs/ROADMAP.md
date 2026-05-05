@@ -1,6 +1,6 @@
 # GeoGestao - Roadmap
 
-Data do checkpoint: 2026-04-30
+Data do checkpoint: 2026-05-05
 
 ## Fase 1: Contratos + conversao proposta -> servico + receita automatica
 
@@ -17,13 +17,16 @@ Escopo:
   - atualizar status/coluna da proposta para execucao;
   - criar ou reaproveitar contrato;
   - criar ou reaproveitar service card;
-  - criar ou reaproveitar receita pendente;
   - registrar audit log;
   - evitar duplicidade em clique duplo;
   - mostrar feedback visual.
+- Adicionar tipo de servico obrigatorio em propostas.
+- Disparar a conversao tambem ao arrastar proposta para "Propostas em Execucao".
+- Criar receita somente no botao "Pagamento efetuado".
+- Permitir "Voltar" na proposta e "Voltar servico" no card tecnico.
 - Atualizar README com o fluxo.
 
-Status: implementado no codigo. Pendente validar no Supabase real depois de aplicar a migration correspondente, se ela ainda nao estiver aplicada.
+Status: parcial. O codigo passa nas validacoes locais, mas a validacao manual ainda depende de aplicar `supabase/migrations/004_phase1_payment_and_service_repair.sql` no Supabase real para reparar o fluxo completo de conversao, pagamento e retorno.
 
 ## Fase 2: Minha Empresa
 
@@ -44,6 +47,10 @@ Escopo previsto:
   - Opcoes de contratos;
   - Armazenamento.
 - Mover ou espelhar acesso a Clientes dentro de "Minha Empresa", sem destruir a rota atual `/clientes`.
+- Implementar informacoes da empresa.
+- Implementar cadastro basico de servicos e nichos.
+
+Status: implementado no codigo. Pendente aplicar `supabase/migrations/005_company_area.sql` no Supabase real e validar manualmente.
 
 ## Fase 3: Propostas v2 com Nova Proposta, upload PDF e modelo
 
@@ -58,6 +65,8 @@ Escopo previsto:
   - anexar proposta em PDF existente;
   - criar proposta usando modelo do sistema.
 - Preparar arquitetura para geracao futura de PDF.
+
+Status: implementado no codigo. A tela de Propostas tem cards de resumo, grafico simples, botao "Nova Proposta", fluxo de anexar PDF existente e inicio do wizard por modelo salvando rascunho.
 
 ## Fase 4: Gerador de proposta por etapas e pre-visualizacao
 
@@ -137,4 +146,13 @@ Escopo previsto:
   - UF;
   - observacoes.
 
-Status: backlog tecnico. Nao implementar mapa completo antes das fases anteriores.
+Status: parcial. Implementado no codigo e validado com typecheck, lint e build; pendente aplicar `supabase/migrations/006_map_properties_geometries.sql` no Supabase real e validar manualmente com um KML/KMZ simples.
+
+Melhorias futuras:
+
+- Camada de satelite via provedor com API adequada.
+- Edicao de imoveis ja cadastrados.
+- Controle avancado de versoes de perimetros.
+- Suporte visual a multiplas camadas por propriedade.
+- Validacao geoespacial mais robusta para KML/KMZ complexos.
+- Medicao/calculo automatico de area a partir da geometria.

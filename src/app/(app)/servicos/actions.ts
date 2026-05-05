@@ -10,6 +10,11 @@ import {
   serviceCardSchema,
 } from "@/lib/schemas";
 import { createServerSupabase } from "@/lib/supabase/server";
+import { revertServiceToProposal as revertServiceToProposalAction } from "@/app/(app)/propostas/actions";
+
+export async function revertServiceToProposal(cardId: string) {
+  return revertServiceToProposalAction(cardId);
+}
 
 export async function createServiceCardAction(formData: FormData) {
   const supabase = await createServerSupabase();
@@ -18,7 +23,12 @@ export async function createServiceCardAction(formData: FormData) {
 
   const { data, error } = await supabase
     .from("service_cards")
-    .insert({ ...parsed, owner_id: user.id })
+    .insert({
+      ...parsed,
+      service_type: parsed.service_type ?? null,
+      payment_status: parsed.payment_status ?? "pagamento_nao_efetuado",
+      owner_id: user.id,
+    })
     .select("id")
     .single();
 

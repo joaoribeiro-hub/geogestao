@@ -46,14 +46,15 @@ values
   ('20000000-0000-4000-8000-000000000002', 'email', now() - interval '2 days', 'Enviou matriculas atualizadas para revisao.'),
   ('20000000-0000-4000-8000-000000000003', 'ligacao', now() - interval '1 day', 'Informada pendencia de assinatura do confrontante.');
 
-insert into public.proposals (id, client_id, title, description, value, sent_at, valid_until, comments, stage, position)
+insert into public.proposals (id, client_id, title, description, value, sent_at, valid_until, comments, service_type, stage, position)
 values
-  ('30000000-0000-4000-8000-000000000001', '20000000-0000-4000-8000-000000000001', 'Georreferenciamento de imovel rural', 'Area estimada de 120 ha com certificacao SIGEF.', 18500.00, current_date - 5, current_date + 10, 'Cliente pediu parcelamento.', 'negotiation', 1),
-  ('30000000-0000-4000-8000-000000000002', '20000000-0000-4000-8000-000000000002', 'Retificacao de CAR', 'Ajuste de reserva legal e areas consolidadas.', 4200.00, current_date - 3, current_date + 12, null, 'sent', 1),
-  ('30000000-0000-4000-8000-000000000003', '20000000-0000-4000-8000-000000000004', 'Regularizacao fundiaria preliminar', 'Diagnostico documental e plano de acao.', 9600.00, null, null, 'Preparar proposta detalhada.', 'todo', 1)
+  ('30000000-0000-4000-8000-000000000001', '20000000-0000-4000-8000-000000000001', 'Georreferenciamento de imovel rural', 'Area estimada de 120 ha com certificacao SIGEF.', 18500.00, current_date - 5, current_date + 10, 'Cliente pediu parcelamento.', 'georreferenciamento', 'negotiation', 1),
+  ('30000000-0000-4000-8000-000000000002', '20000000-0000-4000-8000-000000000002', 'Retificacao de CAR', 'Ajuste de reserva legal e areas consolidadas.', 4200.00, current_date - 3, current_date + 12, null, 'car', 'sent', 1),
+  ('30000000-0000-4000-8000-000000000003', '20000000-0000-4000-8000-000000000004', 'Regularizacao fundiaria preliminar', 'Diagnostico documental e plano de acao.', 9600.00, null, null, 'Preparar proposta detalhada.', 'outros_servicos', 'todo', 1)
 on conflict (id) do update
 set title = excluded.title,
     value = excluded.value,
+    service_type = excluded.service_type,
     stage = excluded.stage;
 
 insert into public.service_cards (id, column_id, client_id, title, description, priority, due_date, checklist_percent, custom_fields_json, position)

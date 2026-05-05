@@ -16,6 +16,12 @@ export type ProposalStage =
   | "execution"
   | "finished"
   | "lost";
+export type ProposalServiceType =
+  | "georreferenciamento"
+  | "car"
+  | "itr_ccir"
+  | "outros_servicos";
+export type PaymentStatus = "pagamento_nao_efetuado" | "pagamento_efetuado";
 export type Priority = "low" | "medium" | "high" | "urgent";
 export type FinanceStatus = "pending" | "paid" | "overdue";
 export type DocumentStatus = "vigente" | "obsoleto";
@@ -137,6 +143,175 @@ export type Database = {
         };
         Relationships: [];
       };
+      company_settings: {
+        Row: BaseRow & {
+          singleton_key: string;
+          trade_name: string | null;
+          legal_name: string | null;
+          cnpj: string | null;
+          phone: string | null;
+          email: string | null;
+          website: string | null;
+          address: string | null;
+          city: string | null;
+          state: string | null;
+          logo_url: string | null;
+          notes: string | null;
+        };
+        Insert: {
+          id?: string;
+          singleton_key?: string;
+          trade_name?: string | null;
+          legal_name?: string | null;
+          cnpj?: string | null;
+          phone?: string | null;
+          email?: string | null;
+          website?: string | null;
+          address?: string | null;
+          city?: string | null;
+          state?: string | null;
+          logo_url?: string | null;
+          notes?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          singleton_key?: string;
+          trade_name?: string | null;
+          legal_name?: string | null;
+          cnpj?: string | null;
+          phone?: string | null;
+          email?: string | null;
+          website?: string | null;
+          address?: string | null;
+          city?: string | null;
+          state?: string | null;
+          logo_url?: string | null;
+          notes?: string | null;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      company_services: {
+        Row: BaseRow & {
+          niche: string;
+          name: string;
+          base_price: number | null;
+          billing_unit: string | null;
+          description: string | null;
+          is_active: boolean;
+        };
+        Insert: {
+          id?: string;
+          niche: string;
+          name: string;
+          base_price?: number | null;
+          billing_unit?: string | null;
+          description?: string | null;
+          is_active?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          niche?: string;
+          name?: string;
+          base_price?: number | null;
+          billing_unit?: string | null;
+          description?: string | null;
+          is_active?: boolean;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      properties: {
+        Row: BaseRow & {
+          client_id: string;
+          service_card_id: string | null;
+          name: string;
+          area: number | null;
+          registry_number: string | null;
+          registry_date: string | null;
+          car_state: string | null;
+          car_federal: string | null;
+          city: string | null;
+          state: string | null;
+          notes: string | null;
+        };
+        Insert: {
+          id?: string;
+          client_id: string;
+          service_card_id?: string | null;
+          name: string;
+          area?: number | null;
+          registry_number?: string | null;
+          registry_date?: string | null;
+          car_state?: string | null;
+          car_federal?: string | null;
+          city?: string | null;
+          state?: string | null;
+          notes?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          client_id?: string;
+          service_card_id?: string | null;
+          name?: string;
+          area?: number | null;
+          registry_number?: string | null;
+          registry_date?: string | null;
+          car_state?: string | null;
+          car_federal?: string | null;
+          city?: string | null;
+          state?: string | null;
+          notes?: string | null;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      property_geometries: {
+        Row: {
+          id: string;
+          property_id: string;
+          client_id: string;
+          service_card_id: string | null;
+          file_path: string;
+          file_name: string;
+          mime_type: string | null;
+          size_bytes: number | null;
+          geojson: Json;
+          uploaded_by: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          property_id: string;
+          client_id: string;
+          service_card_id?: string | null;
+          file_path: string;
+          file_name: string;
+          mime_type?: string | null;
+          size_bytes?: number | null;
+          geojson: Json;
+          uploaded_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          property_id?: string;
+          client_id?: string;
+          service_card_id?: string | null;
+          file_path?: string;
+          file_name?: string;
+          mime_type?: string | null;
+          size_bytes?: number | null;
+          geojson?: Json;
+          uploaded_by?: string | null;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
       proposals: {
         Row: BaseRow & {
           client_id: string;
@@ -147,6 +322,11 @@ export type Database = {
           sent_at: string | null;
           valid_until: string | null;
           comments: string | null;
+          service_type: ProposalServiceType;
+          payment_status: PaymentStatus;
+          converted_at: string | null;
+          contract_id: string | null;
+          service_card_id: string | null;
           stage: ProposalStage;
           position: number;
           converted_service_card_id: string | null;
@@ -161,6 +341,11 @@ export type Database = {
           sent_at?: string | null;
           valid_until?: string | null;
           comments?: string | null;
+          service_type: ProposalServiceType;
+          payment_status?: PaymentStatus;
+          converted_at?: string | null;
+          contract_id?: string | null;
+          service_card_id?: string | null;
           stage?: ProposalStage;
           position?: number;
           converted_service_card_id?: string | null;
@@ -176,6 +361,11 @@ export type Database = {
           sent_at?: string | null;
           valid_until?: string | null;
           comments?: string | null;
+          service_type?: ProposalServiceType;
+          payment_status?: PaymentStatus;
+          converted_at?: string | null;
+          contract_id?: string | null;
+          service_card_id?: string | null;
           stage?: ProposalStage;
           position?: number;
           converted_service_card_id?: string | null;
@@ -240,6 +430,8 @@ export type Database = {
           owner_id: string | null;
           proposal_id: string | null;
           contract_id: string | null;
+          service_type: ProposalServiceType | null;
+          payment_status: PaymentStatus;
           title: string;
           description: string | null;
           priority: Priority;
@@ -256,6 +448,8 @@ export type Database = {
           owner_id?: string | null;
           proposal_id?: string | null;
           contract_id?: string | null;
+          service_type?: ProposalServiceType | null;
+          payment_status?: PaymentStatus;
           title: string;
           description?: string | null;
           priority?: Priority;
@@ -273,6 +467,8 @@ export type Database = {
           owner_id?: string | null;
           proposal_id?: string | null;
           contract_id?: string | null;
+          service_type?: ProposalServiceType | null;
+          payment_status?: PaymentStatus;
           title?: string;
           description?: string | null;
           priority?: Priority;
@@ -452,6 +648,7 @@ export type Database = {
           proposal_id: string | null;
           service_card_id: string | null;
           contract_id: string | null;
+          auto_generated: boolean;
           description: string;
           category: string;
           amount: number;
@@ -465,6 +662,7 @@ export type Database = {
           proposal_id?: string | null;
           service_card_id?: string | null;
           contract_id?: string | null;
+          auto_generated?: boolean;
           description: string;
           category: string;
           amount: number;
@@ -479,6 +677,7 @@ export type Database = {
           proposal_id?: string | null;
           service_card_id?: string | null;
           contract_id?: string | null;
+          auto_generated?: boolean;
           description?: string;
           category?: string;
           amount?: number;
@@ -622,6 +821,10 @@ export type Database = {
 };
 
 export type Client = Database["public"]["Tables"]["clients"]["Row"];
+export type CompanySettings = Database["public"]["Tables"]["company_settings"]["Row"];
+export type CompanyService = Database["public"]["Tables"]["company_services"]["Row"];
+export type Property = Database["public"]["Tables"]["properties"]["Row"];
+export type PropertyGeometry = Database["public"]["Tables"]["property_geometries"]["Row"];
 export type Proposal = Database["public"]["Tables"]["proposals"]["Row"];
 export type ServiceBoard = Database["public"]["Tables"]["service_boards"]["Row"];
 export type ServiceColumn = Database["public"]["Tables"]["service_columns"]["Row"];

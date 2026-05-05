@@ -5,6 +5,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { Loader2, Plus } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { createServiceCardAction } from "@/app/(app)/servicos/actions";
+import { paymentStatuses } from "@/lib/constants";
 import { serviceCardSchema, type ServiceCardFormValues } from "@/lib/schemas";
 import type { Client, ServiceColumn } from "@/types/database";
 import { Button } from "@/components/ui/button";
@@ -28,6 +29,7 @@ export function ServiceCardForm({
       title: "",
       description: "",
       priority: "medium",
+      payment_status: "pagamento_nao_efetuado",
       due_date: "",
       custom_fields_json: "{}",
     },
@@ -105,6 +107,21 @@ export function ServiceCardForm({
           <Label htmlFor="service-due-date">Data prevista</Label>
           <Input id="service-due-date" type="date" {...form.register("due_date")} />
         </div>
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="service-payment-status">Status de pagamento</Label>
+        <select
+          id="service-payment-status"
+          className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+          {...form.register("payment_status")}
+        >
+          {paymentStatuses.map((status) => (
+            <option key={status.id} value={status.id}>
+              {status.label}
+            </option>
+          ))}
+        </select>
       </div>
 
       <div className="space-y-2">

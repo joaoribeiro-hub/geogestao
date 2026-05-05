@@ -1,6 +1,6 @@
 # GeoGestao - Estado Atual do Projeto
 
-Data do checkpoint: 2026-04-30
+Data do checkpoint: 2026-05-05
 
 ## Visao geral
 
@@ -23,6 +23,10 @@ O projeto nao deve ser recriado do zero. A base atual ja esta funcional, com Sup
 - Zod para validacao
 - React Hook Form para formularios
 - ESLint e TypeScript para validacao
+- Leaflet para mapa interativo
+- OpenStreetMap como camada inicial do mapa
+- `@tmcw/togeojson` para converter KML em GeoJSON
+- `jszip` para extrair KML de arquivos KMZ
 
 ## Variaveis de ambiente
 
@@ -91,9 +95,11 @@ No ultimo ciclo de implementacao da Fase 1, essas validacoes passaram.
 
 - `/login` - tela de login.
 - `/` - dashboard.
+- `/minha-empresa` - area central de configuracoes e cadastros internos.
+- `/mapa` - mapa de imoveis/projetos com KML/KMZ e perimetros.
 - `/clientes` - lista e busca de clientes.
 - `/clientes/[id]` - detalhe de cliente.
-- `/propostas` - Kanban de propostas.
+- `/propostas` - dashboard comercial, criacao de propostas e Kanban de propostas.
 - `/servicos` - quadros e cards de servicos tecnicos.
 - `/servicos/[id]` - detalhe de card/servico tecnico.
 - `/financeiro` - receitas, despesas e resumos basicos.
@@ -118,12 +124,51 @@ No ultimo ciclo de implementacao da Fase 1, essas validacoes passaram.
 - Detalhe de cliente.
 - Historico de interacoes com cliente.
 
+### Minha Empresa
+
+- Rota `/minha-empresa`.
+- Item "Minha Empresa" no menu lateral.
+- Abas iniciais:
+  - Informacoes;
+  - Equipe;
+  - Clientes;
+  - Variaveis financeiras;
+  - Documentos internos;
+  - Servicos e nichos;
+  - Opcoes de propostas;
+  - Opcoes de contratos;
+  - Bancos;
+  - Armazenamento.
+- Informacoes da empresa editaveis.
+- Clientes espelhados dentro da area, reaproveitando o modulo existente.
+- Cadastro basico de servicos e nichos com preco base opcional, unidade de cobranca, descricao e status ativo/inativo.
+- Abas avancadas permanecem marcadas como "em breve".
+
 ### Propostas
 
 - Kanban com colunas comerciais.
+- Cards de resumo da aba Propostas:
+  - propostas enviadas;
+  - propostas aprovadas;
+  - propostas em espera/negociacao;
+  - propostas nao aprovadas;
+  - valor total enviado;
+  - valor total aprovado.
+- Grafico simples por status da proposta.
+- Botao "Nova Proposta" com dois caminhos:
+  - anexar proposta existente em PDF;
+  - criar proposta usando modelo do sistema.
+- Fluxo de anexar PDF cria proposta, registra anexo e aparece no Kanban.
+- Fluxo por modelo cria rascunho inicial em Propostas a Fazer com etapas Registro, Demanda, Prazos, Financeiro, Secoes e Modelo.
 - Cards com cliente, titulo, descricao, valor e responsavel.
 - Drag and drop com persistencia.
+- Campo obrigatorio de tipo de servico: Georreferenciamento, CAR, ITR/CCIR ou Outros Servicos.
+- Criacao de proposta atualiza a tela e mostra feedback visual.
 - Fluxo de conversao de proposta em servico foi ajustado na Fase 1.
+- Arrastar para "Propostas em Execucao" dispara o mesmo fluxo de conversao do botao.
+- Conversao cria/reaproveita contrato e card tecnico, mas nao cria receita automaticamente.
+- Botao "Pagamento efetuado" cria/reaproveita uma receita paga e atualiza status de pagamento.
+- Botao "Voltar" retorna a proposta para "Propostas Enviadas" e remove o servico/receita automatica.
 
 ### Servicos tecnicos
 
@@ -139,7 +184,7 @@ No ultimo ciclo de implementacao da Fase 1, essas validacoes passaram.
 - Despesas.
 - Status pendente, pago e vencido.
 - Resumos basicos.
-- Receita pendente automatica no fluxo de conversao de proposta.
+- Regra atual da Fase 1: receita automatica so e criada quando o usuario clica em "Pagamento efetuado".
 
 ### Anexos
 
@@ -156,6 +201,32 @@ No ultimo ciclo de implementacao da Fase 1, essas validacoes passaram.
 
 - Biblioteca de normas/legislacao.
 - Busca e campos de apoio tecnico.
+
+### Mapa
+
+- Rota `/mapa`.
+- Item "Mapa" no menu lateral.
+- Tabelas `properties` e `property_geometries`.
+- Upload de arquivo KML/KMZ vinculado a cliente, imovel e servico/card tecnico.
+- Conversao de KML/KMZ para GeoJSON no cliente.
+- Arquivo original salvo no bucket privado `attachments`.
+- GeoJSON salvo em `property_geometries`.
+- Visualizacao interativa com Leaflet e OpenStreetMap.
+- Popup do perimetro com:
+  - nome do imovel;
+  - cliente;
+  - servico;
+  - area;
+  - matricula;
+  - data da matricula;
+  - CAR Estadual;
+  - CAR Federal;
+  - municipio/UF;
+  - status do servico;
+  - link para abrir o servico.
+- Arquitetura preparada para camada de satelite futura via provedor adequado.
+
+Status da Fase 7: parcial. Implementada no codigo e validada por typecheck, lint e build; ainda depende de aplicar a migration `006_map_properties_geometries.sql` no Supabase real e testar com um KML/KMZ simples.
 
 ### Contratos
 
@@ -196,11 +267,58 @@ Cria a base inicial:
 Adiciona a Fase 1:
 
 - tabela `contracts`
+- coluna `service_type` em `proposals`
 - vinculos `proposal_id` e `contract_id` em `service_cards`
 - vinculo `contract_id` em `revenues`
 - indices para idempotencia do fluxo de conversao
 - RLS para contratos
 - suporte a `contract` em `attachments.entity_type`
+
+### `supabase/migrations/003_phase1_repair_contracts_conversion_flow.sql`
+
+Migration segura de reparo para banco real quando a 002 falhou ou quando ja existem dados parciais/duplicados:
+
+- cria `contracts`, se ainda nao existir;
+- adiciona e preenche `proposals.service_type`;
+- normaliza contratos, cards e receitas duplicados antes dos indices unicos;
+- cria indices de idempotencia;
+- recria policy RLS de contratos;
+- recarrega schema cache do Supabase/PostgREST com `notify pgrst, 'reload schema';`.
+
+### `supabase/migrations/004_phase1_payment_and_service_repair.sql`
+
+Migration segura para a regra atual da Fase 1:
+
+- padroniza `proposals.service_type` em `georreferenciamento`, `car`, `itr_ccir` e `outros_servicos`;
+- adiciona `proposals.payment_status`, `converted_at`, `contract_id` e `service_card_id`;
+- adiciona `service_cards.service_type` e `service_cards.payment_status`;
+- adiciona `revenues.auto_generated`;
+- remove receitas automaticas pendentes criadas pela regra antiga de conversao;
+- cria indices de idempotencia para contrato, service card e receita automatica;
+- recarrega schema cache do Supabase/PostgREST.
+
+### `supabase/migrations/005_company_area.sql`
+
+Adiciona a Fase 2:
+
+- tabela `company_settings` para informacoes cadastrais da empresa;
+- tabela `company_services` para nichos e servicos oferecidos;
+- triggers de `updated_at`;
+- RLS habilitado;
+- policies CRUD para usuarios autenticados;
+- recarrega schema cache do Supabase/PostgREST.
+
+### `supabase/migrations/006_map_properties_geometries.sql`
+
+Adiciona a Fase 7:
+
+- tabela `properties` para imoveis;
+- tabela `property_geometries` para KML/KMZ, GeoJSON e vinculos;
+- vinculos com cliente e service card;
+- triggers de `updated_at`;
+- RLS habilitado;
+- policies CRUD para usuarios autenticados;
+- recarrega schema cache do Supabase/PostgREST.
 
 ## Tipos principais
 
@@ -208,8 +326,14 @@ O arquivo `src/types/database.ts` concentra os tipos TypeScript principais, incl
 
 - `Profile`
 - `Client`
+- `CompanySettings`
+- `CompanyService`
+- `Property`
+- `PropertyGeometry`
 - `ClientInteraction`
 - `Proposal`
+- `ProposalServiceType`
+- `PaymentStatus`
 - `ServiceBoard`
 - `ServiceColumn`
 - `ServiceCard`
@@ -234,11 +358,16 @@ O arquivo `src/types/database.ts` concentra os tipos TypeScript principais, incl
 - Propostas visiveis.
 - Servicos visiveis.
 - Dados seedados disponiveis.
+- Em 2026-05-04, o teste manual da Fase 1 encontrou erro de schema cache em `public.contracts`; a causa esperada e migration da Fase 1 nao aplicada com sucesso no Supabase real apos falha por duplicidade.
+- Em 2026-05-05, a Fase 7 foi implementada no codigo. Pendencia: aplicar a migration `006_map_properties_geometries.sql` no Supabase real antes de testar `/mapa`.
 
 ## Problemas conhecidos
 
 - O comando `git` nao esta disponivel no PATH deste ambiente no momento do checkpoint; por isso o commit/push automatico nao pode ser executado ate o Git ficar disponivel.
-- A migration `002_contracts_conversion_flow.sql` precisa estar aplicada no Supabase real antes de validar o fluxo completo de contratos/conversao/receita em producao local conectada ao banco real.
+- A migration `004_phase1_payment_and_service_repair.sql` precisa ser aplicada no Supabase real antes de validar novamente o fluxo completo de conversao, pagamento e retorno.
+- A migration `006_map_properties_geometries.sql` precisa ser aplicada no Supabase real antes de usar a aba Mapa.
+- O mapa usa OpenStreetMap; camada de satelite ainda e futura e depende de provedor/API apropriado.
+- O upload KML/KMZ foi preparado para arquivos simples com geometrias suportadas por KML/GeoJSON; arquivos complexos devem ser testados caso a caso.
 - Em PowerShell, `npm.ps1` pode ser bloqueado por politica de execucao; `npm.cmd` funciona como alternativa.
 - Botoes e telas futuras devem ser marcados como "em breve" ou ocultos quando ainda nao houver implementacao real.
 
@@ -248,25 +377,23 @@ O arquivo `src/types/database.ts` concentra os tipos TypeScript principais, incl
 - Undesk pode servir como referencia de UX, mas sem copiar marca, logo, nomes protegidos ou layout identico.
 - O fluxo central desejado e: Proposta -> Contrato -> Servico -> Financeiro.
 - O Kanban tecnico deve continuar sendo parte central do produto.
-- Deve existir uma area futura chamada "Minha Empresa".
+- A area "Minha Empresa" existe e concentra informacoes da empresa, clientes e servicos/nichos basicos.
 - O sistema deve evoluir para documentos por cliente/imovel.
-- Deve existir futuramente uma area de mapa com upload KML/KMZ e visualizacao de perimetros.
+- Existe area de mapa com upload KML/KMZ, GeoJSON e visualizacao de perimetros.
 - Supabase Auth, Database e Storage permanecem como fundacao.
 - Chaves secretas nunca devem ser expostas.
 - `.env.local` nao deve ser commitado.
 
 ## Proximos passos planejados
 
-1. Aplicar a migration `002_contracts_conversion_flow.sql` no Supabase real, se ainda nao aplicada.
-2. Testar manualmente a Fase 1:
-   - criar proposta;
-   - converter proposta;
-   - verificar contrato;
-   - verificar card em servicos;
-   - verificar receita pendente no financeiro;
-   - clicar duas vezes e confirmar que nao duplica.
-3. Evoluir para Fase 2: area "Minha Empresa".
-4. Evoluir propostas v2 com botao "Nova Proposta", upload PDF e criacao por modelo.
-5. Preparar documentos de cliente/imovel.
-6. Evoluir dashboard gerencial.
-7. Preparar mapa com KML/KMZ.
+1. Aplicar a migration `006_map_properties_geometries.sql` no Supabase real.
+2. Testar manualmente a Fase 7:
+   - abrir `/mapa`;
+   - enviar KML/KMZ simples;
+   - verificar perimetro no mapa;
+   - clicar no perimetro e conferir dados do projeto;
+   - abrir servico vinculado pelo popup.
+3. Evoluir o wizard de propostas ate pre-visualizacao e geracao de PDF.
+4. Preparar documentos de cliente/imovel.
+5. Evoluir dashboard gerencial.
+6. Adicionar camada de satelite ao mapa via provedor com API adequada.

@@ -47,7 +47,11 @@ export default async function ContractsPage() {
           <CardTitle>Contratos cadastrados</CardTitle>
         </CardHeader>
         <CardContent>
-          {contracts.length ? (
+          {contractsResult.error ? (
+            <EmptyState
+              title="Nao foi possivel carregar contratos. Verifique se a migration da Fase 1 foi aplicada no Supabase real."
+            />
+          ) : contracts.length ? (
             <div className="overflow-hidden rounded-lg border">
               <table className="w-full text-sm">
                 <thead className="bg-secondary text-left">
@@ -56,6 +60,7 @@ export default async function ContractsPage() {
                     <th className="px-4 py-3 font-medium">Cliente</th>
                     <th className="px-4 py-3 font-medium">Valor</th>
                     <th className="px-4 py-3 font-medium">Status</th>
+                    <th className="px-4 py-3 font-medium">Servico</th>
                     <th className="px-4 py-3 font-medium">Datas</th>
                   </tr>
                 </thead>
@@ -73,16 +78,8 @@ export default async function ContractsPage() {
                         <td className="px-4 py-3">
                           <p className="font-medium">{contract.title}</p>
                           <p className="mt-1 text-xs text-muted-foreground">
-                            {proposal ? `Proposta: ${proposal.title}` : "Sem proposta vinculada"}
+                          {proposal ? `Proposta: ${proposal.title}` : "Sem proposta vinculada"}
                           </p>
-                          {serviceCard ? (
-                            <Link
-                              href={`/servicos/${serviceCard.id}`}
-                              className="mt-1 inline-flex text-xs font-medium text-primary hover:underline"
-                            >
-                              Servico: {serviceCard.title}
-                            </Link>
-                          ) : null}
                         </td>
                         <td className="px-4 py-3">
                           {clientMap.get(contract.client_id)?.name ?? "-"}
@@ -93,7 +90,20 @@ export default async function ContractsPage() {
                             {statusLabels[contract.status]}
                           </Badge>
                         </td>
+                        <td className="px-4 py-3">
+                          {serviceCard ? (
+                            <Link
+                              href={`/servicos/${serviceCard.id}`}
+                              className="font-medium text-primary hover:underline"
+                            >
+                              {serviceCard.title}
+                            </Link>
+                          ) : (
+                            <span className="text-muted-foreground">Sem servico vinculado</span>
+                          )}
+                        </td>
                         <td className="px-4 py-3 text-muted-foreground">
+                          <p>Criado: {formatDate(contract.created_at)}</p>
                           <p>Envio: {formatDate(contract.sent_at)}</p>
                           <p>Assinatura: {formatDate(contract.signed_at)}</p>
                           <p>Inicio: {formatDate(contract.starts_at)}</p>
