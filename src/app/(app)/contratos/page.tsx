@@ -42,7 +42,7 @@ export default async function ContractsPage() {
         description="Contratos vinculados a clientes, propostas, servicos e receitas previstas."
       />
 
-      <Card>
+      <Card data-testid="contracts-card">
         <CardHeader>
           <CardTitle>Contratos cadastrados</CardTitle>
         </CardHeader>

@@ -16,6 +16,8 @@ Sistema web para gestao de escritorio de agrimensura com CRM, propostas em Kanba
 - OpenStreetMap
 - @tmcw/togeojson
 - JSZip
+- Vitest
+- Playwright
 
 ## Como rodar
 
@@ -86,7 +88,35 @@ npm run build
 npm run start
 npm run lint
 npm run typecheck
+npm run test
+npm run test:coverage
+npm run test:e2e
 ```
+
+## Testes
+
+A Fase QA-1 adiciona testes automatizados em camadas:
+
+- Vitest para unidade e regras puras;
+- Playwright para E2E;
+- GitHub Actions para typecheck, build e testes em push/pull request.
+
+Comandos principais:
+
+```bash
+npm run test
+npm run test:coverage
+npm run test:e2e
+```
+
+Para E2E autenticado, configure um usuario de teste no Supabase e defina:
+
+```env
+E2E_TEST_EMAIL=
+E2E_TEST_PASSWORD=
+```
+
+Fluxos E2E com escrita no banco so rodam com `E2E_RUN_MUTATION_TESTS=true` e devem ser usados apenas em projeto Supabase separado para testes. Veja detalhes em `docs/TESTING.md`.
 
 ## Estrutura principal
 
@@ -96,8 +126,13 @@ npm run typecheck
 - `src/components/kanban`: Kanbans com dnd-kit.
 - `src/components/ui`: componentes base no estilo shadcn/ui.
 - `src/lib/supabase`: clientes Supabase server/browser e middleware.
+- `src/lib/services`: regras puras testaveis de propostas, contratos, servicos e financeiro.
 - `src/lib/schemas.ts`: validacoes Zod.
+- `src/test`: setup do Vitest.
 - `src/types/database.ts`: tipos TypeScript das entidades principais.
+- `tests/unit`: testes unitarios.
+- `tests/integration`: testes de regras criticas.
+- `tests/e2e`: testes Playwright.
 - `supabase/migrations`: schema, RLS, policies e storage.
 - `supabase/seed.sql`: dados de exemplo.
 

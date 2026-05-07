@@ -1,6 +1,6 @@
 # GeoGestao - Estado Atual do Projeto
 
-Data do checkpoint: 2026-05-05
+Data do checkpoint: 2026-05-07
 
 ## Visao geral
 
@@ -27,6 +27,8 @@ O projeto nao deve ser recriado do zero. A base atual ja esta funcional, com Sup
 - OpenStreetMap como camada inicial do mapa
 - `@tmcw/togeojson` para converter KML em GeoJSON
 - `jszip` para extrair KML de arquivos KMZ
+- Vitest para testes unitarios e de regras
+- Playwright para testes E2E
 
 ## Variaveis de ambiente
 
@@ -36,6 +38,9 @@ Variaveis publicas usadas pelo frontend:
 NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=
 NEXT_PUBLIC_SUPABASE_ANON_KEY=
+E2E_TEST_EMAIL=
+E2E_TEST_PASSWORD=
+E2E_RUN_MUTATION_TESTS=false
 ```
 
 Observacoes:
@@ -45,6 +50,8 @@ Observacoes:
 - Nenhuma `service_role key` deve ser usada ou exposta no frontend.
 - `.env.local` deve permanecer fora do Git.
 - `.env.local` esta listado no `.gitignore`.
+- `E2E_TEST_EMAIL` e `E2E_TEST_PASSWORD` sao opcionais e devem apontar para usuario de teste.
+- `E2E_RUN_MUTATION_TESTS=true` deve ser usado apenas em Supabase dedicado a testes.
 
 ## Status da integracao Supabase
 
@@ -87,6 +94,9 @@ Validacoes usadas no projeto:
 npm run typecheck
 npm run lint
 npm run build
+npm run test
+npm run test:coverage
+npm run test:e2e
 ```
 
 No ultimo ciclo de implementacao da Fase 1, essas validacoes passaram.
@@ -236,6 +246,35 @@ Status da Fase 7: parcial. Implementada no codigo e validada por typecheck, lint
 - Status iniciais de contrato modelados.
 - Criacao/reaproveitamento automatico no fluxo de conversao.
 
+### Qualidade e testes automatizados
+
+- Fase QA-1 criada como fase tecnica, sem novas funcionalidades de produto.
+- Scripts adicionados:
+  - `npm run test`;
+  - `npm run test:watch`;
+  - `npm run test:coverage`;
+  - `npm run test:e2e`;
+  - `npm run test:e2e:ui`;
+  - `npm run test:e2e:report`.
+- Vitest configurado em `vitest.config.ts`.
+- Playwright configurado em `playwright.config.ts`.
+- Setup de teste criado em `src/test/setup.ts`.
+- Estrutura criada:
+  - `tests/unit`;
+  - `tests/integration`;
+  - `tests/e2e`;
+  - `tests/helpers`;
+  - `src/lib/services`.
+- Services puros criados para regras de propostas, contratos, cards tecnicos e financeiro.
+- Testes unitarios cobrem schemas Zod e utilitarios.
+- Testes de integracao cobrem regras puras do fluxo proposta -> contrato -> servico -> financeiro.
+- E2E inicial cobre a pagina de login.
+- E2E autenticado e E2E com escrita no banco estao preparados, mas condicionais a variaveis de ambiente e banco Supabase de teste.
+- GitHub Actions criado em `.github/workflows/ci.yml` para typecheck, build e Vitest em push/pull request.
+- Job E2E no CI fica manual via `workflow_dispatch` e depende de secrets.
+
+Status da Fase QA-1: parcial. Infraestrutura criada e validada localmente com `typecheck`, `test` e `test:e2e` basico; ainda falta rodar E2E autenticado/destrutivo em projeto Supabase dedicado a testes e confirmar secrets no GitHub.
+
 ## Migrations existentes
 
 ### `supabase/migrations/001_initial_schema.sql`
@@ -360,12 +399,16 @@ O arquivo `src/types/database.ts` concentra os tipos TypeScript principais, incl
 - Dados seedados disponiveis.
 - Em 2026-05-04, o teste manual da Fase 1 encontrou erro de schema cache em `public.contracts`; a causa esperada e migration da Fase 1 nao aplicada com sucesso no Supabase real apos falha por duplicidade.
 - Em 2026-05-05, a Fase 7 foi implementada no codigo. Pendencia: aplicar a migration `006_map_properties_geometries.sql` no Supabase real antes de testar `/mapa`.
+- Em 2026-05-07, a Fase QA-1 foi criada com Vitest, Playwright, services puros, testes iniciais, documentacao e CI.
 
 ## Problemas conhecidos
 
-- O comando `git` nao esta disponivel no PATH deste ambiente no momento do checkpoint; por isso o commit/push automatico nao pode ser executado ate o Git ficar disponivel.
+- O comando `git` esta disponivel neste ambiente, mas nenhum commit deve ser feito automaticamente.
 - A migration `004_phase1_payment_and_service_repair.sql` precisa ser aplicada no Supabase real antes de validar novamente o fluxo completo de conversao, pagamento e retorno.
 - A migration `006_map_properties_geometries.sql` precisa ser aplicada no Supabase real antes de usar a aba Mapa.
+- Os testes E2E autenticados dependem de `E2E_TEST_EMAIL`, `E2E_TEST_PASSWORD` e de usuario criado no Supabase Auth.
+- Os testes E2E que escrevem no banco dependem de `E2E_RUN_MUTATION_TESTS=true` e devem rodar apenas em banco de teste.
+- O CI precisa de secrets `NEXT_PUBLIC_SUPABASE_URL` e `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` ou `NEXT_PUBLIC_SUPABASE_ANON_KEY` para validar build/E2E em ambiente GitHub quando necessario.
 - O mapa usa OpenStreetMap; camada de satelite ainda e futura e depende de provedor/API apropriado.
 - O upload KML/KMZ foi preparado para arquivos simples com geometrias suportadas por KML/GeoJSON; arquivos complexos devem ser testados caso a caso.
 - Em PowerShell, `npm.ps1` pode ser bloqueado por politica de execucao; `npm.cmd` funciona como alternativa.
@@ -393,7 +436,9 @@ O arquivo `src/types/database.ts` concentra os tipos TypeScript principais, incl
    - verificar perimetro no mapa;
    - clicar no perimetro e conferir dados do projeto;
    - abrir servico vinculado pelo popup.
-3. Evoluir o wizard de propostas ate pre-visualizacao e geracao de PDF.
-4. Preparar documentos de cliente/imovel.
-5. Evoluir dashboard gerencial.
-6. Adicionar camada de satelite ao mapa via provedor com API adequada.
+3. Criar usuario/projeto Supabase dedicado para E2E e rodar os testes autenticados da Fase QA-1.
+4. Configurar secrets no GitHub Actions para build/E2E quando desejado.
+5. Evoluir o wizard de propostas ate pre-visualizacao e geracao de PDF.
+6. Preparar documentos de cliente/imovel.
+7. Evoluir dashboard gerencial.
+8. Adicionar camada de satelite ao mapa via provedor com API adequada.

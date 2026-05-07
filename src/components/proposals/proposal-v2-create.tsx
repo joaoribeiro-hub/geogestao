@@ -31,6 +31,7 @@ export function ProposalV2Create({ clients }: { clients: Client[] }) {
     <div className="relative">
       <Button
         type="button"
+        data-testid="new-proposal-button"
         disabled={!clients.length}
         onClick={() => setMode((current) => (current === "closed" ? "pdf" : "closed"))}
       >
@@ -47,6 +48,7 @@ export function ProposalV2Create({ clients }: { clients: Client[] }) {
             <div className="mb-4 grid gap-2 sm:grid-cols-2">
               <Button
                 type="button"
+                data-testid="proposal-pdf-mode"
                 variant={mode === "pdf" ? "default" : "outline"}
                 onClick={() => setMode("pdf")}
               >
@@ -55,6 +57,7 @@ export function ProposalV2Create({ clients }: { clients: Client[] }) {
               </Button>
               <Button
                 type="button"
+                data-testid="proposal-model-mode"
                 variant={mode === "model" ? "default" : "outline"}
                 onClick={() => setMode("model")}
               >
@@ -155,11 +158,12 @@ function ProposalPdfForm({ clients }: { clients: Client[] }) {
   }
 
   return (
-    <form className="grid gap-4" onSubmit={form.handleSubmit(submit)}>
+    <form className="grid gap-4" data-testid="proposal-pdf-form" onSubmit={form.handleSubmit(submit)}>
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="Cliente">
           <select
             className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+            data-testid="proposal-pdf-client"
             {...form.register("client_id")}
           >
             {clients.map((client) => (
@@ -172,6 +176,7 @@ function ProposalPdfForm({ clients }: { clients: Client[] }) {
         <Field label="Status inicial">
           <select
             className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+            data-testid="proposal-pdf-stage"
             {...form.register("stage")}
           >
             {proposalStages.map((stage) => (
@@ -184,19 +189,20 @@ function ProposalPdfForm({ clients }: { clients: Client[] }) {
       </div>
 
       <Field label="Titulo/nome do empreendimento">
-        <Input {...form.register("title")} />
+        <Input data-testid="proposal-pdf-title" {...form.register("title")} />
       </Field>
 
       <div className="grid gap-4 sm:grid-cols-3">
         <Field label="Valor">
-          <Input type="number" step="0.01" {...form.register("value")} />
+          <Input data-testid="proposal-pdf-value" type="number" step="0.01" {...form.register("value")} />
         </Field>
         <Field label="Validade">
-          <Input type="date" {...form.register("valid_until")} />
+          <Input data-testid="proposal-pdf-valid-until" type="date" {...form.register("valid_until")} />
         </Field>
         <Field label="Tipo de servico">
           <select
             className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+            data-testid="proposal-pdf-service-type"
             {...form.register("service_type")}
           >
             {proposalServiceTypes.map((serviceType) => (
@@ -209,14 +215,20 @@ function ProposalPdfForm({ clients }: { clients: Client[] }) {
       </div>
 
       <Field label="Arquivo PDF">
-        <input ref={fileRef} type="file" accept="application/pdf,.pdf" className="text-sm" />
+        <input
+          ref={fileRef}
+          type="file"
+          accept="application/pdf,.pdf"
+          className="text-sm"
+          data-testid="proposal-pdf-file"
+        />
       </Field>
 
       <Field label="Observacoes">
-        <Textarea {...form.register("comments")} />
+        <Textarea data-testid="proposal-pdf-comments" {...form.register("comments")} />
       </Field>
 
-      <Button disabled={pending}>
+      <Button data-testid="proposal-pdf-submit" disabled={pending}>
         {pending ? <Loader2 className="animate-spin" aria-hidden="true" /> : <FileUp aria-hidden="true" />}
         Salvar PDF
       </Button>
@@ -285,11 +297,12 @@ function ProposalModelDraftForm({ clients }: { clients: Client[] }) {
   }
 
   return (
-    <form className="grid gap-4" onSubmit={form.handleSubmit(submit)}>
+    <form className="grid gap-4" data-testid="proposal-model-form" onSubmit={form.handleSubmit(submit)}>
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="Registro">
           <select
             className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+            data-testid="proposal-model-client"
             {...form.register("client_id")}
           >
             {clients.map((client) => (
@@ -300,20 +313,24 @@ function ProposalModelDraftForm({ clients }: { clients: Client[] }) {
           </select>
         </Field>
         <Field label="Modelo">
-          <Input {...form.register("model_name")} />
+          <Input data-testid="proposal-model-name" {...form.register("model_name")} />
         </Field>
       </div>
 
       <Field label="Registro - titulo">
-        <Input {...form.register("title")} />
+        <Input data-testid="proposal-model-title" {...form.register("title")} />
       </Field>
 
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="Demanda">
-          <Textarea {...form.register("demand")} />
+          <Textarea data-testid="proposal-model-demand" {...form.register("demand")} />
         </Field>
         <Field label="Secoes">
-          <Textarea placeholder="Escopo, entregaveis, condicoes..." {...form.register("sections")} />
+          <Textarea
+            data-testid="proposal-model-sections"
+            placeholder="Escopo, entregaveis, condicoes..."
+            {...form.register("sections")}
+          />
         </Field>
       </div>
 
@@ -321,6 +338,7 @@ function ProposalModelDraftForm({ clients }: { clients: Client[] }) {
         <Field label="Tipo de servico">
           <select
             className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+            data-testid="proposal-model-service-type"
             {...form.register("service_type")}
           >
             {proposalServiceTypes.map((serviceType) => (
@@ -331,17 +349,17 @@ function ProposalModelDraftForm({ clients }: { clients: Client[] }) {
           </select>
         </Field>
         <Field label="Prazos - envio">
-          <Input type="date" {...form.register("sent_at")} />
+          <Input data-testid="proposal-model-sent-at" type="date" {...form.register("sent_at")} />
         </Field>
         <Field label="Prazos - validade">
-          <Input type="date" {...form.register("valid_until")} />
+          <Input data-testid="proposal-model-valid-until" type="date" {...form.register("valid_until")} />
         </Field>
         <Field label="Financeiro - valor">
-          <Input type="number" step="0.01" {...form.register("value")} />
+          <Input data-testid="proposal-model-value" type="number" step="0.01" {...form.register("value")} />
         </Field>
       </div>
 
-      <Button disabled={pending}>
+      <Button data-testid="proposal-model-submit" disabled={pending}>
         {pending ? <Loader2 className="animate-spin" aria-hidden="true" /> : <Wand2 aria-hidden="true" />}
         Salvar rascunho
       </Button>

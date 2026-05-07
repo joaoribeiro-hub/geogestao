@@ -1,0 +1,95 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  quality:
+    name: Typecheck, build and unit tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Build
+        run: npm run build
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+
+      - name: Vitest
+        run: npm run test
+
+  e2e:
+    name: Playwright E2E manual
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch'
+
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+      NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+      E2E_TEST_EMAIL: ${{ secrets.E2E_TEST_EMAIL }}
+      E2E_TEST_PASSWORD: ${{ secrets.E2E_TEST_PASSWORD }}
+      E2E_RUN_MUTATION_TESTS: ${{ vars.E2E_RUN_MUTATION_TESTS }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check E2E configuration
+        id: e2e-config
+        shell: bash
+        run: |
+          if [ -z "$NEXT_PUBLIC_SUPABASE_URL" ] || { [ -z "$NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY" ] && [ -z "$NEXT_PUBLIC_SUPABASE_ANON_KEY" ]; }; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "Supabase public env vars are missing; skipping Playwright E2E."
+          elif [ -z "$E2E_TEST_EMAIL" ] || [ -z "$E2E_TEST_PASSWORD" ]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "E2E test credentials are missing; skipping Playwright E2E."
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Setup Node
+        if: steps.e2e-config.outputs.skip != 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        if: steps.e2e-config.outputs.skip != 'true'
+        run: npm ci
+
+      - name: Install Playwright browsers
+        if: steps.e2e-config.outputs.skip != 'true'
+        run: npx playwright install --with-deps chromium
+
+      - name: Playwright
+        if: steps.e2e-config.outputs.skip != 'true'
+        run: npm run test:e2e
+
+      - name: Upload Playwright report
+        if: always() && steps.e2e-config.outputs.skip != 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7

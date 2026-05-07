@@ -1,6 +1,27 @@
 # GeoGestao - Roadmap
 
-Data do checkpoint: 2026-05-05
+Data do checkpoint: 2026-05-07
+
+## Qualidade tecnica
+
+### Fase QA-1: Infraestrutura de Testes Automatizados
+
+Objetivo: criar uma base profissional de testes automatizados para proteger o GeoGestao contra regressoes nos fluxos criticos.
+
+Escopo:
+
+- Configurar Vitest para unidade e regras puras.
+- Criar `tests/unit`, `tests/integration`, `tests/helpers` e `src/test`.
+- Criar camada minima de services puros em `src/lib/services`.
+- Testar schemas Zod, utilitarios e regras do fluxo proposta -> contrato -> servico -> financeiro.
+- Configurar Playwright e `tests/e2e`.
+- Criar E2E inicial da pagina de login.
+- Preparar E2E autenticado de dashboard/mapa.
+- Preparar E2E com escrita no banco para cliente, proposta, conversao, contrato, servico, pagamento e financeiro.
+- Criar `docs/TESTING.md`.
+- Criar workflow `.github/workflows/ci.yml`.
+
+Status: parcial. Infraestrutura, scripts, testes iniciais, E2E basico e CI foram criados. Pendente rodar E2E autenticado/destrutivo em Supabase separado de teste e configurar secrets no GitHub.
 
 ## Fase 1: Contratos + conversao proposta -> servico + receita automatica
 

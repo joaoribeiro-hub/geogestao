@@ -71,12 +71,13 @@ export function PropertyUploadForm({
   }
 
   return (
-    <form action={submit} className="grid gap-4">
+    <form action={submit} className="grid gap-4" data-testid="property-upload-form">
       <div className="grid gap-4 md:grid-cols-2">
         <Field label="Cliente">
           <select
             name="client_id"
             className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+            data-testid="property-client"
             required
           >
             {clients.map((client) => (
@@ -90,6 +91,7 @@ export function PropertyUploadForm({
           <select
             name="service_card_id"
             className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+            data-testid="property-service-card"
           >
             <option value="">Nao vincular</option>
             {serviceCards.map((card) => (
@@ -102,48 +104,54 @@ export function PropertyUploadForm({
       </div>
 
       <Field label="Nome do imovel">
-        <Input name="name" required />
+        <Input name="name" data-testid="property-name" required />
       </Field>
 
       <div className="grid gap-4 md:grid-cols-3">
         <Field label="Area">
-          <Input name="area" type="number" step="0.0001" />
+          <Input name="area" data-testid="property-area" type="number" step="0.0001" />
         </Field>
         <Field label="Matricula">
-          <Input name="registry_number" />
+          <Input name="registry_number" data-testid="property-registry-number" />
         </Field>
         <Field label="Data da matricula">
-          <Input name="registry_date" type="date" />
+          <Input name="registry_date" data-testid="property-registry-date" type="date" />
         </Field>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">
         <Field label="CAR Estadual">
-          <Input name="car_state" />
+          <Input name="car_state" data-testid="property-car-state" />
         </Field>
         <Field label="CAR Federal">
-          <Input name="car_federal" />
+          <Input name="car_federal" data-testid="property-car-federal" />
         </Field>
       </div>
 
       <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_120px]">
         <Field label="Municipio">
-          <Input name="city" />
+          <Input name="city" data-testid="property-city" />
         </Field>
         <Field label="UF">
-          <Input name="state" maxLength={2} />
+          <Input name="state" data-testid="property-state" maxLength={2} />
         </Field>
       </div>
 
       <Field label="Observacoes">
-        <Textarea name="notes" />
+        <Textarea name="notes" data-testid="property-notes" />
       </Field>
 
       <Field label="Arquivo KML/KMZ">
-        <input ref={fileRef} type="file" accept=".kml,.kmz" className="text-sm" />
+        <input
+          ref={fileRef}
+          type="file"
+          accept=".kml,.kmz"
+          className="text-sm"
+          data-testid="property-file"
+        />
       </Field>
 
-      <Button disabled={pending || !clients.length}>
+      <Button data-testid="property-submit" disabled={pending || !clients.length}>
         {pending ? <Loader2 className="animate-spin" aria-hidden="true" /> : <FileUp aria-hidden="true" />}
         Enviar e exibir no mapa
       </Button>

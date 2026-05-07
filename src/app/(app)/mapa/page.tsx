@@ -59,7 +59,7 @@ export default async function MapPage() {
   });
 
   return (
-    <div>
+    <div data-testid="map-page">
       <PageHeader
         title="Mapa"
         description="Perimetros KML/KMZ vinculados a clientes, imoveis e servicos tecnicos."

@@ -45,10 +45,16 @@ export function LoginForm() {
   }
 
   return (
-    <form className="space-y-4" onSubmit={form.handleSubmit(onSubmit)}>
+    <form className="space-y-4" data-testid="login-form" onSubmit={form.handleSubmit(onSubmit)}>
       <div className="space-y-2">
         <Label htmlFor="email">E-mail</Label>
-        <Input id="email" type="email" autoComplete="email" {...form.register("email")} />
+        <Input
+          id="email"
+          type="email"
+          autoComplete="email"
+          data-testid="login-email"
+          {...form.register("email")}
+        />
         {form.formState.errors.email ? (
           <p className="text-xs text-destructive">{form.formState.errors.email.message}</p>
         ) : null}
@@ -59,6 +65,7 @@ export function LoginForm() {
           id="password"
           type="password"
           autoComplete="current-password"
+          data-testid="login-password"
           {...form.register("password")}
         />
         {form.formState.errors.password ? (
@@ -68,7 +75,7 @@ export function LoginForm() {
         ) : null}
       </div>
       {error ? <p className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">{error}</p> : null}
-      <Button className="w-full" disabled={loading}>
+      <Button className="w-full" data-testid="login-submit" disabled={loading}>
         {loading ? <Loader2 className="animate-spin" aria-hidden="true" /> : null}
         Entrar
       </Button>

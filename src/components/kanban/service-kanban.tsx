@@ -96,6 +96,8 @@ function ServiceColumnView({
   return (
     <section
       ref={setNodeRef}
+      data-testid="service-column"
+      data-service-column-name={column.name}
       className={`min-h-80 rounded-lg border bg-card p-3 transition-colors ${
         isOver ? "border-primary bg-primary/5" : ""
       }`}
@@ -124,6 +126,8 @@ function ServiceCardView({ card }: { card: ServiceCardWithClient }) {
     <article
       ref={setNodeRef}
       style={style}
+      data-testid="service-card"
+      data-service-card-title={card.title}
       className={`rounded-lg border bg-background p-3 shadow-sm ${
         isDragging ? "opacity-70 shadow-soft" : ""
       }`}
@@ -162,6 +166,7 @@ function ServiceCardView({ card }: { card: ServiceCardWithClient }) {
           size="sm"
           variant="outline"
           className="mt-3 w-full"
+          data-testid="service-revert-button"
           disabled={pending}
           onClick={() =>
             startTransition(() => {

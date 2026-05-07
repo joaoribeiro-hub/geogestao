@@ -44,12 +44,13 @@ export function ClientForm({ client }: { client?: Client }) {
   }
 
   return (
-    <form className="grid gap-4" onSubmit={form.handleSubmit(submit)}>
+    <form className="grid gap-4" data-testid="client-form" onSubmit={form.handleSubmit(submit)}>
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2">
           <Label htmlFor="kind">Tipo</Label>
           <select
             id="kind"
+            data-testid="client-kind"
             className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
             {...form.register("kind")}
           >
@@ -59,13 +60,13 @@ export function ClientForm({ client }: { client?: Client }) {
         </div>
         <div className="space-y-2">
           <Label htmlFor="document">CPF/CNPJ</Label>
-          <Input id="document" {...form.register("document")} />
+          <Input id="document" data-testid="client-document" {...form.register("document")} />
         </div>
       </div>
 
       <div className="space-y-2">
         <Label htmlFor="name">Nome</Label>
-        <Input id="name" {...form.register("name")} />
+        <Input id="name" data-testid="client-name" {...form.register("name")} />
         {form.formState.errors.name ? (
           <p className="text-xs text-destructive">{form.formState.errors.name.message}</p>
         ) : null}
@@ -74,7 +75,7 @@ export function ClientForm({ client }: { client?: Client }) {
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2">
           <Label htmlFor="email">E-mail</Label>
-          <Input id="email" type="email" {...form.register("email")} />
+          <Input id="email" type="email" data-testid="client-email" {...form.register("email")} />
           {form.formState.errors.email ? (
             <p className="text-xs text-destructive">
               {form.formState.errors.email.message}
@@ -83,21 +84,21 @@ export function ClientForm({ client }: { client?: Client }) {
         </div>
         <div className="space-y-2">
           <Label htmlFor="phone">Telefone</Label>
-          <Input id="phone" {...form.register("phone")} />
+          <Input id="phone" data-testid="client-phone" {...form.register("phone")} />
         </div>
       </div>
 
       <div className="space-y-2">
         <Label htmlFor="address">Endereco</Label>
-        <Input id="address" {...form.register("address")} />
+        <Input id="address" data-testid="client-address" {...form.register("address")} />
       </div>
 
       <div className="space-y-2">
         <Label htmlFor="notes">Observacoes</Label>
-        <Textarea id="notes" {...form.register("notes")} />
+        <Textarea id="notes" data-testid="client-notes" {...form.register("notes")} />
       </div>
 
-      <Button disabled={pending}>
+      <Button data-testid="client-submit" disabled={pending}>
         {pending ? <Loader2 className="animate-spin" aria-hidden="true" /> : <Save aria-hidden="true" />}
         {client ? "Salvar cliente" : "Criar cliente"}
       </Button>

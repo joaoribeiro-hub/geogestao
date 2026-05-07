@@ -9,25 +9,36 @@ import {
   proposalPdfSchema,
   proposalSchema,
 } from "@/lib/schemas";
+import {
+  buildContractCancelUpdate,
+  buildContractExecutionUpdate,
+  buildContractInsertFromProposal,
+} from "@/lib/services/contracts";
+import {
+  buildPaidRevenueInsertFromProposal,
+  buildPaidRevenueUpdate,
+} from "@/lib/services/finance";
+import {
+  buildPaymentStatusUpdate,
+  buildProposalExecutionUpdate,
+  buildProposalRevertUpdate,
+} from "@/lib/services/proposals";
+import {
+  buildServiceCardInsertFromProposal,
+  buildServiceCardUpdateFromProposal,
+  chooseFirstActiveServiceColumn,
+  resolveBoardSlugForProposal,
+} from "@/lib/services/service-cards";
 import { createServerSupabase } from "@/lib/supabase/server";
 import type {
-  Json,
   PaymentStatus,
   Proposal,
-  ProposalServiceType,
   ProposalStage,
   ServiceBoard,
   ServiceColumn,
 } from "@/types/database";
 
 type ServerSupabase = Awaited<ReturnType<typeof createServerSupabase>>;
-
-const serviceTypeToBoardSlug: Record<ProposalServiceType, string> = {
-  georreferenciamento: "georreferenciamento",
-  car: "car",
-  itr_ccir: "itr-ccir",
-  outros_servicos: "outros-servicos",
-};
 
 export async function createProposalAction(formData: FormData) {
   const supabase = await createServerSupabase();
@@ -222,21 +233,21 @@ export async function convertProposalToService(proposalId: string) {
   if (contract.service_card_id !== card.id || contract.status !== "em_execucao") {
     const { error: contractUpdateError } = await supabase
       .from("contracts")
-      .update({ service_card_id: card.id, status: "em_execucao" })
+      .update(buildContractExecutionUpdate(card.id))
       .eq("id", contract.id);
     if (contractUpdateError) throw new Error(contractUpdateError.message);
   }
 
   const { error: updateError } = await supabase
     .from("proposals")
-    .update({
-      stage: "execution",
-      contract_id: contract.id,
-      service_card_id: card.id,
-      converted_service_card_id: card.id,
-      converted_at: proposal.converted_at ?? new Date().toISOString(),
-      payment_status: proposal.payment_status ?? "pagamento_nao_efetuado",
-    })
+    .update(
+      buildProposalExecutionUpdate({
+        proposal,
+        contractId: contract.id,
+        serviceCardId: card.id,
+        convertedAt: new Date().toISOString(),
+      }),
+    )
     .eq("id", proposal.id);
   if (updateError) throw new Error(updateError.message);
 
@@ -319,7 +330,7 @@ export async function revertProposalFromService(proposalId: string) {
   if (contractId) {
     const { error: contractError } = await supabase
       .from("contracts")
-      .update({ status: "cancelado", service_card_id: null })
+      .update(buildContractCancelUpdate())
       .eq("id", contractId);
     if (contractError) throw new Error(contractError.message);
   }
@@ -337,13 +348,7 @@ export async function revertProposalFromService(proposalId: string) {
 
   const { error: proposalError } = await supabase
     .from("proposals")
-    .update({
-      stage: "sent",
-      service_card_id: null,
-      converted_service_card_id: null,
-      converted_at: null,
-      payment_status: "pagamento_nao_efetuado",
-    })
+    .update(buildProposalRevertUpdate())
     .eq("id", proposal.id);
   if (proposalError) throw new Error(proposalError.message);
 
@@ -399,38 +404,11 @@ async function getProposal(supabase: ServerSupabase, proposalId: string): Promis
   return proposal;
 }
 
-function normalizeServiceType(proposal: Proposal): ProposalServiceType {
-  if (
-    proposal.service_type === "georreferenciamento" ||
-    proposal.service_type === "car" ||
-    proposal.service_type === "itr_ccir" ||
-    proposal.service_type === "outros_servicos"
-  ) {
-    return proposal.service_type;
-  }
-
-  const legacyType = String(proposal.service_type);
-  if (legacyType === "itr-ccir") return "itr_ccir";
-  if (legacyType === "outros-servicos") return "outros_servicos";
-
-  const text = [proposal.title, proposal.description, proposal.comments]
-    .filter(Boolean)
-    .join(" ")
-    .toLowerCase();
-
-  if (/\bcar\b|cadastro ambiental/.test(text)) return "car";
-  if (/\bitr\b|ccir/.test(text)) return "itr_ccir";
-  if (/geo|georreferenciamento|sigef|incra/.test(text)) return "georreferenciamento";
-
-  return "outros_servicos";
-}
-
 async function resolveTargetServiceColumn(
   supabase: ServerSupabase,
   proposal: Proposal,
 ): Promise<ServiceColumn> {
-  const serviceType = normalizeServiceType(proposal);
-  const desiredSlug = serviceTypeToBoardSlug[serviceType];
+  const desiredSlug = resolveBoardSlugForProposal(proposal);
   const { data: desiredBoard } = await supabase
     .from("service_boards")
     .select("*")
@@ -458,10 +436,7 @@ async function resolveTargetServiceColumn(
     .order("position");
   if (error) throw new Error(error.message);
 
-  const activeColumn = (columns ?? []).find(
-    (column) =>
-      !/conclu|finaliz|cancelad/.test(`${column.slug} ${column.name}`.toLowerCase()),
-  );
+  const activeColumn = chooseFirstActiveServiceColumn(columns ?? []);
 
   if (!activeColumn) {
     throw new Error(`Nenhuma coluna ativa encontrada para o quadro ${board.name}.`);
@@ -483,24 +458,15 @@ async function getOrCreateContract(
   if (existingError) throw new Error(existingError.message);
   if (existing) return existing;
 
-  const serviceType = normalizeServiceType(proposal);
   const { data, error } = await supabase
     .from("contracts")
-    .insert({
-      client_id: proposal.client_id,
-      proposal_id: proposal.id,
-      title: `Contrato - ${proposal.title}`,
-      description: proposal.description,
-      amount: proposal.value,
-      status: "contrato_a_gerar",
-      starts_at: new Date().toISOString().slice(0, 10),
-      ends_at: proposal.valid_until,
-      important_dates_json: {
-        proposal_valid_until: proposal.valid_until,
-        service_type: serviceType,
-      },
-      created_by: userId,
-    })
+    .insert(
+      buildContractInsertFromProposal({
+        proposal,
+        userId,
+        startsAt: new Date().toISOString().slice(0, 10),
+      }),
+    )
     .select("*")
     .single();
 
@@ -531,7 +497,6 @@ async function getOrCreateServiceCard(
   columnId: string,
   userId: string,
 ) {
-  const serviceType = normalizeServiceType(proposal);
   const { data: existingRows, error: existingError } = await supabase
     .from("service_cards")
     .select("*")
@@ -541,27 +506,17 @@ async function getOrCreateServiceCard(
   const existing = existingRows?.[0] ?? null;
 
   if (existing) {
-    const customFields = asRecord(existing.custom_fields_json);
     const { data: updated, error: updateError } = await supabase
       .from("service_cards")
-      .update({
-        proposal_id: proposal.id,
-        contract_id: contractId,
-        client_id: proposal.client_id,
-        owner_id: existing.owner_id ?? userId,
-        column_id: columnId,
-        service_type: serviceType,
-        payment_status: proposal.payment_status ?? "pagamento_nao_efetuado",
-        title: existing.title || proposal.title,
-        description: existing.description ?? proposal.description,
-        due_date: existing.due_date ?? proposal.valid_until,
-        custom_fields_json: {
-          ...customFields,
-          valor_proposta: proposal.value,
-          contract_id: contractId,
-          tipo_servico: serviceType,
-        },
-      })
+      .update(
+        buildServiceCardUpdateFromProposal({
+          existing,
+          proposal,
+          contractId,
+          columnId,
+          userId,
+        }),
+      )
       .eq("id", existing.id)
       .select("*")
       .single();
@@ -571,25 +526,14 @@ async function getOrCreateServiceCard(
 
   const { data, error } = await supabase
     .from("service_cards")
-    .insert({
-      column_id: columnId,
-      client_id: proposal.client_id,
-      owner_id: userId,
-      proposal_id: proposal.id,
-      contract_id: contractId,
-      service_type: serviceType,
-      payment_status: "pagamento_nao_efetuado",
-      title: proposal.title,
-      description: proposal.description,
-      priority: "medium",
-      due_date: proposal.valid_until,
-      created_from_proposal_id: proposal.id,
-      custom_fields_json: {
-        valor_proposta: proposal.value,
-        contract_id: contractId,
-        tipo_servico: serviceType,
-      },
-    })
+    .insert(
+      buildServiceCardInsertFromProposal({
+        proposal,
+        contractId,
+        columnId,
+        userId,
+      }),
+    )
     .select("*")
     .single();
 
@@ -626,12 +570,7 @@ async function getOrCreatePaidRevenue(
   if (existing) {
     const { data: updated, error: updateError } = await supabase
       .from("revenues")
-      .update({
-        contract_id: contractId,
-        service_card_id: serviceCardId,
-        status: "paid",
-        paid_at: existing.paid_at ?? paidAt,
-      })
+      .update(buildPaidRevenueUpdate({ existing, contractId, serviceCardId, paidAt }))
       .eq("id", existing.id)
       .select("*")
       .single();
@@ -641,19 +580,14 @@ async function getOrCreatePaidRevenue(
 
   const { data, error } = await supabase
     .from("revenues")
-    .insert({
-      client_id: proposal.client_id,
-      proposal_id: proposal.id,
-      contract_id: contractId,
-      service_card_id: serviceCardId,
-      description: `Pagamento recebido - ${proposal.title}`,
-      category: "Pagamento de proposta",
-      amount: proposal.value ?? 0,
-      due_date: paidAt,
-      paid_at: paidAt,
-      status: "paid",
-      auto_generated: true,
-    })
+    .insert(
+      buildPaidRevenueInsertFromProposal({
+        proposal,
+        contractId,
+        serviceCardId,
+        paidAt,
+      }),
+    )
     .select("*")
     .single();
 
@@ -680,7 +614,7 @@ async function updatePaymentStatus(
 ) {
   const { error: proposalError } = await supabase
     .from("proposals")
-    .update({ payment_status: paymentStatus })
+    .update(buildPaymentStatusUpdate(paymentStatus))
     .eq("id", proposalId);
   if (proposalError) throw new Error(proposalError.message);
 
@@ -698,11 +632,4 @@ async function deleteAutomaticRevenues(supabase: ServerSupabase, proposalId: str
     .eq("proposal_id", proposalId)
     .eq("auto_generated", true);
   if (error) throw new Error(error.message);
-}
-
-function asRecord(value: Json): Record<string, Json> {
-  if (value && typeof value === "object" && !Array.isArray(value)) {
-    return value as Record<string, Json>;
-  }
-  return {};
 }

@@ -191,7 +191,7 @@ function FinanceTable({
       <CardHeader>
         <CardTitle>{title}</CardTitle>
       </CardHeader>
-      <CardContent>
+      <CardContent data-testid={kind === "revenue" ? "finance-revenues" : "finance-expenses"}>
         {rows.length ? (
           <div className="overflow-hidden rounded-lg border">
             <table className="w-full text-sm">

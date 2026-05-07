@@ -160,6 +160,7 @@ function ProposalColumn({
   return (
     <section
       ref={setNodeRef}
+      data-testid={`proposal-column-${id}`}
       className={`min-h-80 rounded-lg border bg-card p-3 transition-colors ${
         isOver ? "border-primary bg-primary/5" : ""
       }`}
@@ -190,6 +191,8 @@ function ProposalCard({ proposal }: { proposal: ProposalWithClient }) {
     <article
       ref={setNodeRef}
       style={style}
+      data-testid="proposal-card"
+      data-proposal-title={proposal.title}
       className={`rounded-lg border bg-background p-3 shadow-sm ${
         isDragging ? "opacity-70 shadow-soft" : ""
       }`}
@@ -232,6 +235,7 @@ function ProposalCard({ proposal }: { proposal: ProposalWithClient }) {
             size="sm"
             variant="outline"
             className="w-full"
+            data-testid="proposal-payment-button"
             disabled={pending || proposal.payment_status === "pagamento_efetuado"}
             onClick={() =>
               startTransition(() => {
@@ -260,6 +264,7 @@ function ProposalCard({ proposal }: { proposal: ProposalWithClient }) {
             size="sm"
             variant="outline"
             className="w-full"
+            data-testid="proposal-revert-button"
             disabled={pending}
             onClick={() =>
               startTransition(() => {
@@ -290,6 +295,7 @@ function ProposalCard({ proposal }: { proposal: ProposalWithClient }) {
           size="sm"
           variant="outline"
           className="mt-3 w-full"
+          data-testid="proposal-convert-button"
           disabled={pending}
           onClick={() =>
             startTransition(() => {
