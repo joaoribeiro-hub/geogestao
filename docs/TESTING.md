@@ -229,6 +229,48 @@ E2E_RUN_MUTATION_TESTS=true
 
 Use essa opcao apenas em banco de teste. Nao rode esses testes contra producao ou contra um banco real de trabalho sem backup, porque eles criam dados com prefixo `Cliente QA` e `Proposta QA`.
 
+## Workflow manual de E2E destrutivo
+
+O workflow `.github/workflows/e2e-mutation.yml` roda os testes Playwright com escrita no banco somente por acionamento manual (`workflow_dispatch`). Ele nao roda em `push` nem em `pull_request`.
+
+Use esse workflow apenas com um projeto Supabase separado para testes. Nunca configure esses secrets com o Supabase principal ou de producao, porque o fluxo E2E pode criar dados QA, como `Cliente QA` e `Proposta QA`.
+
+Configure em GitHub > Settings > Secrets and variables > Actions > Secrets:
+
+```text
+NEXT_PUBLIC_SUPABASE_URL
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
+NEXT_PUBLIC_SUPABASE_ANON_KEY
+E2E_TEST_EMAIL
+E2E_TEST_PASSWORD
+```
+
+`NEXT_PUBLIC_SUPABASE_ANON_KEY` existe por compatibilidade. Se o app estiver usando somente `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, mantenha a anon key alinhada ao mesmo projeto de teste ou deixe sem valor quando isso for aceito pela configuracao do repositorio.
+
+Configure em GitHub > Settings > Secrets and variables > Actions > Variables:
+
+```text
+E2E_RUN_MUTATION_TESTS=true
+```
+
+Para executar manualmente:
+
+1. Abra a aba Actions do GitHub.
+2. Selecione `E2E Mutation Tests`.
+3. Clique em `Run workflow`.
+4. Escolha a branch desejada.
+5. Confirme a execucao.
+
+O workflow executa:
+
+```bash
+npm ci
+npx playwright install chromium
+npm run test:e2e
+```
+
+Se `E2E_RUN_MUTATION_TESTS` nao estiver como `true`, o workflow falha antes de rodar os testes destrutivos. Isso evita execucoes acidentais com configuracao incompleta.
+
 ## Como interpretar falhas
 
 - Falha de Vitest em schema: regra de validacao mudou ou payload de formulario mudou.

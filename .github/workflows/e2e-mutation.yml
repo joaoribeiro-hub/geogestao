@@ -1,0 +1,73 @@
+name: E2E Mutation Tests
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  e2e-mutation:
+    name: Playwright E2E with test Supabase
+    runs-on: ubuntu-latest
+
+    # Use only a dedicated Supabase test project here.
+    # Never point these secrets to the main/production Supabase project.
+    # These tests can create QA data such as Cliente QA and Proposta QA.
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+      NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+      E2E_TEST_EMAIL: ${{ secrets.E2E_TEST_EMAIL }}
+      E2E_TEST_PASSWORD: ${{ secrets.E2E_TEST_PASSWORD }}
+      E2E_RUN_MUTATION_TESTS: ${{ vars.E2E_RUN_MUTATION_TESTS }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate E2E test environment
+        shell: bash
+        run: |
+          if [ -z "$NEXT_PUBLIC_SUPABASE_URL" ]; then
+            echo "Missing NEXT_PUBLIC_SUPABASE_URL secret."
+            exit 1
+          fi
+
+          if [ -z "$NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY" ] && [ -z "$NEXT_PUBLIC_SUPABASE_ANON_KEY" ]; then
+            echo "Missing Supabase public key secret."
+            exit 1
+          fi
+
+          if [ -z "$E2E_TEST_EMAIL" ] || [ -z "$E2E_TEST_PASSWORD" ]; then
+            echo "Missing E2E test user secrets."
+            exit 1
+          fi
+
+          if [ "$E2E_RUN_MUTATION_TESTS" != "true" ]; then
+            echo "Set GitHub Actions variable E2E_RUN_MUTATION_TESTS=true to run destructive E2E tests."
+            exit 1
+          fi
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright Chromium
+        run: npx playwright install chromium
+
+      - name: Run Playwright E2E mutation tests
+        run: npm run test:e2e
+
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-e2e-mutation-report
+          path: playwright-report/
+          retention-days: 7

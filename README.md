@@ -124,6 +124,8 @@ Fluxos E2E com escrita no banco so rodam com `E2E_RUN_MUTATION_TESTS=true` e dev
 
 O Playwright usa um servidor proprio em `http://127.0.0.1:3100` e nao reutiliza o servidor manual em `localhost:3000`. Isso evita rodar E2E contra um app aberto com `.env.local` apontando para o Supabase principal.
 
+O workflow manual `.github/workflows/e2e-mutation.yml` roda os E2E destrutivos apenas pela aba Actions, com secrets apontando para o Supabase de teste e `E2E_RUN_MUTATION_TESTS=true`. Ele nao roda automaticamente em `push` ou `pull_request`.
+
 ## Estrutura principal
 
 - `src/app/(auth)/login`: login com Supabase Auth.
