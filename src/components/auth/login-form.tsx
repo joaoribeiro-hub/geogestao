@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Loader2 } from "lucide-react";
@@ -22,11 +22,16 @@ export function LoginForm() {
   const router = useRouter();
   const params = useSearchParams();
   const [error, setError] = useState<string | null>(null);
+  const [ready, setReady] = useState(false);
   const [loading, setLoading] = useState(false);
   const form = useForm<LoginValues>({
     resolver: zodResolver(loginSchema),
     defaultValues: { email: "", password: "" },
   });
+
+  useEffect(() => {
+    setReady(true);
+  }, []);
 
   async function onSubmit(values: LoginValues) {
     setLoading(true);
@@ -45,7 +50,12 @@ export function LoginForm() {
   }
 
   return (
-    <form className="space-y-4" data-testid="login-form" onSubmit={form.handleSubmit(onSubmit)}>
+    <form
+      className="space-y-4"
+      data-e2e-ready={ready ? "true" : "false"}
+      data-testid="login-form"
+      onSubmit={form.handleSubmit(onSubmit)}
+    >
       <div className="space-y-2">
         <Label htmlFor="email">E-mail</Label>
         <Input
@@ -74,7 +84,14 @@ export function LoginForm() {
           </p>
         ) : null}
       </div>
-      {error ? <p className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">{error}</p> : null}
+      {error ? (
+        <p
+          className="rounded-md bg-destructive/10 p-3 text-sm text-destructive"
+          data-testid="login-error"
+        >
+          {error}
+        </p>
+      ) : null}
       <Button className="w-full" data-testid="login-submit" disabled={loading}>
         {loading ? <Loader2 className="animate-spin" aria-hidden="true" /> : null}
         Entrar

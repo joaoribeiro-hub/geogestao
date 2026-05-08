@@ -112,11 +112,17 @@ npm run test:e2e
 Para E2E autenticado, configure um usuario de teste no Supabase e defina:
 
 ```env
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=
 E2E_TEST_EMAIL=
 E2E_TEST_PASSWORD=
 ```
 
-Fluxos E2E com escrita no banco so rodam com `E2E_RUN_MUTATION_TESTS=true` e devem ser usados apenas em projeto Supabase separado para testes. Veja detalhes em `docs/TESTING.md`.
+O app manual usa as variaveis disponiveis quando `npm run dev` e iniciado. Se `.env.local` aponta para o Supabase principal, o usuario QA do Supabase de teste nao vai autenticar nesse servidor local. Para testar manualmente com QA, suba o app no terminal com as variaveis do Supabase de teste. Nao crie `qa@geogestao.test` no Supabase principal.
+
+Fluxos E2E com escrita no banco so rodam com `E2E_RUN_MUTATION_TESTS=true` e devem ser usados apenas em projeto Supabase separado para testes. O Playwright repassa as variaveis do terminal/CI para o servidor que ele inicia. Veja detalhes em `docs/TESTING.md`.
+
+O Playwright usa um servidor proprio em `http://127.0.0.1:3100` e nao reutiliza o servidor manual em `localhost:3000`. Isso evita rodar E2E contra um app aberto com `.env.local` apontando para o Supabase principal.
 
 ## Estrutura principal
 

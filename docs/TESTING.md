@@ -67,6 +67,30 @@ Cobertura inicial:
 - rota `/mapa` carrega apos login, quando credenciais forem definidas;
 - fluxo completo com escrita no banco fica preparado e bloqueado por seguranca ate `E2E_RUN_MUTATION_TESTS=true`.
 
+O helper de login comeca explicitamente em `/login`, aguarda o formulario client-side estar hidratado (`data-e2e-ready="true"`), preenche as credenciais de teste, confirma que os campos receberam os valores esperados e valida que o layout autenticado (`app-shell`) ficou disponivel apos o redirecionamento. Testes de paginas autenticadas devem navegar explicitamente para a rota que desejam validar e usar seletores estaveis, como `dashboard-title` e `map-title`.
+
+Durante o login, o Playwright observa a chamada do Supabase Auth para `/auth/v1/token`. Se a autenticacao falhar, a mensagem de erro mostra apenas dados seguros:
+
+- URL atual;
+- host de `NEXT_PUBLIC_SUPABASE_URL`;
+- se o formulario de login estava hidratado;
+- se continuou em `/login`;
+- se `login-error` apareceu;
+- host/status da resposta Supabase Auth;
+- mensagem textual de erro do Auth, quando houver;
+- se `app-shell` apareceu;
+- screenshot anexado ao relatorio.
+
+Senha, tokens e chaves publicas completas nao sao impressos.
+
+O Playwright sobe o Next.js em `http://127.0.0.1:3100`, usando:
+
+```bash
+npm run dev -- --hostname 127.0.0.1 --port 3100
+```
+
+O E2E nao reutiliza servidor existente. Isso evita testar acidentalmente contra um `localhost:3000` manual apontando para outro Supabase.
+
 ## Comandos
 
 ```bash
@@ -158,6 +182,43 @@ NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=
 
 `NEXT_PUBLIC_SUPABASE_ANON_KEY` continua aceito como fallback de compatibilidade.
 
+O Playwright carrega as variaveis do ambiente do shell e tambem os arquivos `.env*` pelo mesmo mecanismo do Next. Assim, para uso local, as variaveis opcionais de E2E podem ficar em `.env.local`, que continua ignorado pelo Git.
+
+Quando a mesma maquina tem um `.env.local` apontando para o Supabase principal, os testes E2E devem ser rodados com as variaveis do Supabase de teste passadas pelo terminal ou pelo CI. Variaveis ja existentes no ambiente do processo tem prioridade sobre os valores carregados de `.env.local`, e o `webServer` do Playwright repassa esse ambiente para o `npm run dev` que ele inicia.
+
+O usuario `qa@geogestao.test` deve existir apenas no Supabase de teste. Nao crie esse usuario no Supabase principal; se o login QA falhar no app manual, o mais provavel e o servidor local estar apontando para o Supabase principal.
+
+Para testar manualmente com o usuario QA, suba o app com as variaveis do Supabase de teste no mesmo terminal:
+
+```powershell
+$env:NEXT_PUBLIC_SUPABASE_URL="https://seu-projeto-de-teste.supabase.co"
+$env:NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY="sua-chave-publica-de-teste"
+$env:E2E_TEST_EMAIL="qa@geogestao.test"
+$env:E2E_TEST_PASSWORD="senha-do-usuario-qa"
+npm run dev
+```
+
+Se o projeto ainda usa anon key como fallback, use:
+
+```powershell
+$env:NEXT_PUBLIC_SUPABASE_ANON_KEY="sua-chave-anon-publica-de-teste"
+```
+
+Para rodar E2E autenticado e o fluxo com escrita no banco de teste:
+
+```powershell
+$env:NEXT_PUBLIC_SUPABASE_URL="https://seu-projeto-de-teste.supabase.co"
+$env:NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY="sua-chave-publica-de-teste"
+$env:E2E_TEST_EMAIL="qa@geogestao.test"
+$env:E2E_TEST_PASSWORD="senha-do-usuario-qa"
+$env:E2E_RUN_MUTATION_TESTS="true"
+npm run test:e2e
+```
+
+Nao grave senhas ou chaves reais em arquivos versionados.
+
+O `npm run test:e2e` deve ser executado sem um servidor manual aberto na porta `3100`. O servidor manual na porta `3000` nao e usado pelo Playwright.
+
 ## Testes com escrita no banco
 
 Os testes que criam cliente, proposta, contrato, card tecnico e receita existem, mas so rodam quando:
@@ -173,7 +234,8 @@ Use essa opcao apenas em banco de teste. Nao rode esses testes contra producao o
 - Falha de Vitest em schema: regra de validacao mudou ou payload de formulario mudou.
 - Falha de service puro: risco de regressao em contrato, card tecnico, pagamento ou retorno.
 - Falha de Playwright antes do login: app nao subiu, rota publica quebrou ou navegador nao foi instalado.
-- Falha de Playwright apos login: credenciais invalidas, migrations ausentes, RLS/policies ou mudanca de UI sem seletor estavel.
+- Falha de Playwright no `app-shell`: credenciais invalidas, sessao nao criada, formulario ainda nao hidratado, middleware bloqueando autenticacao ou app apontando para Supabase diferente daquele onde o usuario QA existe. O erro do helper de login informa a URL atual, host Supabase configurado, status da resposta `/auth/v1/token`, se continuou em `/login`, se houve erro de credenciais, se o `app-shell` apareceu e anexa um screenshot ao relatorio.
+- Falha de Playwright apos navegar para uma rota autenticada: migrations ausentes, RLS/policies ou mudanca de UI sem seletor estavel.
 
 ## Como adicionar novo teste
 

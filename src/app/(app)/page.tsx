@@ -77,9 +77,10 @@ export default async function DashboardPage() {
   });
 
   return (
-    <div>
+    <div data-testid="dashboard-page">
       <PageHeader
         title="Dashboard"
+        titleTestId="dashboard-title"
         description="Visao rapida de clientes, propostas, servicos em andamento e financeiro."
       />
 

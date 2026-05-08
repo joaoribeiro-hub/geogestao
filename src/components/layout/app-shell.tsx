@@ -42,7 +42,7 @@ export async function AppShell({
   const pathname = (await headers()).get("x-pathname") ?? "/";
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background" data-testid="app-shell">
       <aside className="fixed inset-y-0 left-0 z-20 hidden w-64 border-r bg-card lg:block">
         <div className="flex h-16 items-center gap-2 border-b px-5">
           <Archive className="size-6 text-primary" aria-hidden="true" />
@@ -79,7 +79,10 @@ export async function AppShell({
             <p className="text-sm font-semibold">{ptBR.appName}</p>
           </div>
           <div className="ml-auto flex items-center gap-3">
-            <span className="hidden max-w-56 truncate text-sm text-muted-foreground sm:inline">
+            <span
+              className="hidden max-w-56 truncate text-sm text-muted-foreground sm:inline"
+              data-testid="user-email"
+            >
               {userEmail}
             </span>
             <SignOutButton />
