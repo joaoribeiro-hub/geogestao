@@ -12,25 +12,33 @@ import {
   Landmark,
   Map,
   Paperclip,
+  UserCircle,
   Users,
 } from "lucide-react";
 import { ptBR } from "@/lib/i18n/pt-br";
 import { cn } from "@/lib/utils";
+import { AiChatWidget } from "@/components/ai/ai-chat-widget";
 import { SignOutButton } from "@/components/layout/sign-out-button";
 
-const nav = [
+const mainNav = [
   { href: "/", label: ptBR.nav.dashboard, icon: Home },
-  { href: "/minha-empresa", label: ptBR.nav.company, icon: Building2 },
   { href: "/mapa", label: ptBR.nav.map, icon: Map },
-  { href: "/clientes", label: ptBR.nav.clients, icon: Users },
   { href: "/propostas", label: ptBR.nav.proposals, icon: GanttChartSquare },
   { href: "/contratos", label: ptBR.nav.contracts, icon: FileSignature },
   { href: "/servicos", label: ptBR.nav.services, icon: BriefcaseBusiness },
   { href: "/financeiro", label: ptBR.nav.finance, icon: Landmark },
+] as const;
+
+const settingsNav = [
+  { href: "/minha-empresa", label: ptBR.nav.company, icon: Building2 },
+  { href: "/minha-conta", label: "Minha Conta", icon: UserCircle },
+  { href: "/clientes", label: ptBR.nav.clients, icon: Users },
   { href: "/documentos", label: ptBR.nav.documents, icon: FileText },
   { href: "/legislacao", label: ptBR.nav.legislation, icon: BookOpen },
   { href: "/anexos", label: ptBR.nav.attachments, icon: Paperclip },
-];
+] as const;
+
+const mobileNav = [...mainNav, ...settingsNav].slice(0, 8);
 
 export async function AppShell({
   children,
@@ -51,25 +59,9 @@ export async function AppShell({
             <p className="text-xs text-muted-foreground">Agrimensura</p>
           </div>
         </div>
-        <nav className="space-y-1 p-3">
-          {nav.map((item) => {
-            const Icon = item.icon;
-            const active =
-              item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={cn(
-                  "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground",
-                  active && "bg-secondary text-foreground",
-                )}
-              >
-                <Icon className="size-4" aria-hidden="true" />
-                {item.label}
-              </Link>
-            );
-          })}
+        <nav className="space-y-5 p-3">
+          <NavSection label="MENU" pathname={pathname} items={mainNav} />
+          <NavSection label="CONFIGURACOES" pathname={pathname} items={settingsNav} />
         </nav>
       </aside>
 
@@ -91,8 +83,10 @@ export async function AppShell({
         <main className="app-grid min-h-[calc(100vh-4rem)] p-4 pb-24 lg:p-8">{children}</main>
       </div>
 
+      <AiChatWidget />
+
       <nav className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-4 border-t bg-card p-2 lg:hidden">
-        {nav.slice(0, 8).map((item) => {
+        {mobileNav.map((item) => {
           const Icon = item.icon;
           const active =
             item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
@@ -111,6 +105,46 @@ export async function AppShell({
           );
         })}
       </nav>
+    </div>
+  );
+}
+
+type NavItem = (typeof mainNav)[number] | (typeof settingsNav)[number];
+
+function NavSection({
+  label,
+  pathname,
+  items,
+}: {
+  label: string;
+  pathname: string;
+  items: readonly NavItem[];
+}) {
+  return (
+    <div data-testid={`nav-section-${label.toLowerCase()}`}>
+      <p className="mb-2 px-3 text-[11px] font-semibold uppercase tracking-normal text-muted-foreground">
+        {label}
+      </p>
+      <div className="space-y-1">
+        {items.map((item) => {
+          const Icon = item.icon;
+          const active =
+            item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={cn(
+                "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground",
+                active && "bg-secondary text-foreground",
+              )}
+            >
+              <Icon className="size-4" aria-hidden="true" />
+              {item.label}
+            </Link>
+          );
+        })}
+      </div>
     </div>
   );
 }

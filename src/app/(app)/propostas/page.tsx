@@ -1,26 +1,46 @@
+import { PeriodFilter } from "@/components/filters/period-filter";
 import { ProposalKanban } from "@/components/kanban/proposal-kanban";
 import { PageHeader } from "@/components/layout/page-header";
 import { ProposalV2Create } from "@/components/proposals/proposal-v2-create";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { proposalStages } from "@/lib/constants";
+import { filterByPeriod, resolvePeriodRange } from "@/lib/period";
 import { createServerSupabase } from "@/lib/supabase/server";
 import { cn, formatCurrency } from "@/lib/utils";
 import type { Proposal, ProposalStage } from "@/types/database";
 
-export default async function ProposalsPage() {
+export default async function ProposalsPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const resolvedSearchParams = await searchParams;
+  const periodRange = resolvePeriodRange(resolvedSearchParams);
   const supabase = await createServerSupabase();
-  const [clientsResult, proposalsResult] = await Promise.all([
+  const [clientsResult, proposalsResult, attachmentsResult] = await Promise.all([
     supabase.from("clients").select("*").order("name"),
     supabase.from("proposals").select("*").order("position"),
+    supabase
+      .from("attachments")
+      .select("*")
+      .eq("entity_type", "proposal")
+      .order("created_at", { ascending: false }),
   ]);
   const clients = clientsResult.data ?? [];
-  const proposals = proposalsResult.data ?? [];
+  const proposals = filterByPeriod(
+    proposalsResult.data ?? [],
+    periodRange,
+    (proposal) => proposal.sent_at ?? proposal.created_at,
+  );
+  const attachments = attachmentsResult.data ?? [];
+  const proposalPdfUrlMap = await buildProposalPdfUrlMap(supabase, attachments);
 
   const clientMap = new Map(clients.map((client) => [client.id, client]));
   const proposalsWithClients = proposals.map((proposal) => ({
     ...proposal,
     client: clientMap.get(proposal.client_id) ?? null,
+    proposalPdfUrl: proposalPdfUrlMap.get(proposal.id) ?? null,
   }));
   const metrics = buildProposalMetrics(proposals);
 
@@ -33,6 +53,8 @@ export default async function ProposalsPage() {
         />
         <ProposalV2Create clients={clients} />
       </div>
+
+      <PeriodFilter range={periodRange} action="/propostas" />
 
       <div className="mb-6 grid gap-4 md:grid-cols-2 xl:grid-cols-6">
         <SummaryCard title="Enviadas" value={metrics.sentCount.toString()} />
@@ -65,6 +87,26 @@ export default async function ProposalsPage() {
       </div>
     </div>
   );
+}
+
+async function buildProposalPdfUrlMap(
+  supabase: Awaited<ReturnType<typeof createServerSupabase>>,
+  attachments: Array<{ entity_id: string; file_path: string; mime_type: string | null }>,
+) {
+  const pdfAttachments = attachments.filter(
+    (attachment) =>
+      attachment.mime_type === "application/pdf" || attachment.file_path.endsWith(".pdf"),
+  );
+  const entries = await Promise.all(
+    pdfAttachments.map(async (attachment) => {
+      const { data } = await supabase.storage
+        .from("attachments")
+        .createSignedUrl(attachment.file_path, 60 * 60);
+      return [attachment.entity_id, data?.signedUrl ?? null] as const;
+    }),
+  );
+
+  return new Map(entries.filter((entry): entry is readonly [string, string] => Boolean(entry[1])));
 }
 
 function buildProposalMetrics(proposals: Proposal[]) {

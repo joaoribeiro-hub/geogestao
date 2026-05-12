@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
 import { formDataToObject } from "@/lib/form-data";
+import { getCurrentOrganizationForUser } from "@/lib/organization";
 import { propertyMapSchema } from "@/lib/schemas";
 import { createServerSupabase } from "@/lib/supabase/server";
 import type { Json } from "@/types/database";
@@ -11,6 +12,7 @@ import type { Json } from "@/types/database";
 export async function createPropertyGeometryAction(formData: FormData) {
   const supabase = await createServerSupabase();
   const user = await requireUser(supabase);
+  const organization = await getCurrentOrganizationForUser(supabase, user.id);
   const parsed = propertyMapSchema.parse(formDataToObject(formData));
 
   let geojson: Json;
@@ -23,6 +25,7 @@ export async function createPropertyGeometryAction(formData: FormData) {
   const { data: property, error: propertyError } = await supabase
     .from("properties")
     .insert({
+      organization_id: organization.id,
       client_id: parsed.client_id,
       service_card_id: parsed.service_card_id,
       name: parsed.name,
@@ -43,6 +46,7 @@ export async function createPropertyGeometryAction(formData: FormData) {
   const { data: geometry, error: geometryError } = await supabase
     .from("property_geometries")
     .insert({
+      organization_id: organization.id,
       property_id: property.id,
       client_id: parsed.client_id,
       service_card_id: parsed.service_card_id,

@@ -9,6 +9,7 @@ import {
   checklistSchema,
   serviceCardSchema,
 } from "@/lib/schemas";
+import { getCurrentOrganizationForUser } from "@/lib/organization";
 import { createServerSupabase } from "@/lib/supabase/server";
 import { revertServiceToProposal as revertServiceToProposalAction } from "@/app/(app)/propostas/actions";
 
@@ -19,12 +20,14 @@ export async function revertServiceToProposal(cardId: string) {
 export async function createServiceCardAction(formData: FormData) {
   const supabase = await createServerSupabase();
   const user = await requireUser(supabase);
+  const organization = await getCurrentOrganizationForUser(supabase, user.id);
   const parsed = serviceCardSchema.parse(formDataToObject(formData));
 
   const { data, error } = await supabase
     .from("service_cards")
     .insert({
       ...parsed,
+      organization_id: organization.id,
       service_type: parsed.service_type ?? null,
       payment_status: parsed.payment_status ?? "pagamento_nao_efetuado",
       owner_id: user.id,

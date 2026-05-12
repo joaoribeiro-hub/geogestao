@@ -9,6 +9,10 @@ import type { Json } from "@/types/database";
 export type MapFeature = {
   id: string;
   geojson: Json;
+  kind?: "property" | "car" | "incra" | "alert" | "thematic";
+  title?: string;
+  description?: string | null;
+  layerLabel?: string;
   property: {
     name: string;
     area: number | null;
@@ -59,12 +63,7 @@ export function PropertyMap({ features }: { features: MapFeature[] }) {
     stableFeatures.forEach((feature) => {
       const geojson = feature.geojson as unknown as GeoJSON.GeoJsonObject;
       const layer = L.geoJSON(geojson, {
-        style: {
-          color: "#166534",
-          fillColor: "#22c55e",
-          fillOpacity: 0.18,
-          weight: 2,
-        },
+        style: styleForFeature(feature.kind),
       });
 
       layer.bindPopup(renderPopup(feature), {
@@ -95,7 +94,38 @@ export function PropertyMap({ features }: { features: MapFeature[] }) {
   );
 }
 
+function styleForFeature(kind: MapFeature["kind"]) {
+  if (kind === "incra") {
+    return { color: "#1d4ed8", fillColor: "#60a5fa", fillOpacity: 0.14, weight: 2 };
+  }
+  if (kind === "alert") {
+    return { color: "#b91c1c", fillColor: "#ef4444", fillOpacity: 0.2, weight: 2 };
+  }
+  if (kind === "thematic") {
+    return { color: "#7c3aed", fillColor: "#a78bfa", fillOpacity: 0.12, weight: 1 };
+  }
+  if (kind === "car") {
+    return { color: "#15803d", fillColor: "#22c55e", fillOpacity: 0.18, weight: 3 };
+  }
+  return { color: "#166534", fillColor: "#22c55e", fillOpacity: 0.18, weight: 2 };
+}
+
 function renderPopup(feature: MapFeature) {
+  if (feature.kind && feature.kind !== "property") {
+    return `
+      <div style="font-family:Inter,system-ui,sans-serif;min-width:240px">
+        <strong>${escapeHtml(feature.title ?? feature.layerLabel ?? "Camada")}</strong>
+        <div style="margin-top:6px;color:#475569;font-size:12px">
+          <div><b>Tipo:</b> ${escapeHtml(feature.layerLabel ?? feature.kind)}</div>
+          <div><b>Descricao:</b> ${escapeHtml(feature.description ?? "-")}</div>
+          <div><b>Area:</b> ${feature.property.area ?? "-"}</div>
+          <div><b>Municipio/UF:</b> ${escapeHtml([feature.property.city, feature.property.state].filter(Boolean).join("/") || "-")}</div>
+          <div><b>CAR Federal:</b> ${escapeHtml(feature.property.car_federal ?? "-")}</div>
+        </div>
+      </div>
+    `;
+  }
+
   const serviceLink = feature.service
     ? `<a href="/servicos/${feature.service.id}" style="color:#166534;font-weight:600;">Abrir servico</a>`
     : "Sem servico vinculado";

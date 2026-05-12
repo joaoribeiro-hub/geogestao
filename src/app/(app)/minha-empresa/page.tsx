@@ -7,6 +7,8 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
+import { requireUser } from "@/lib/auth";
+import { getCurrentOrganizationForUser } from "@/lib/organization";
 import { createServerSupabase } from "@/lib/supabase/server";
 import { cn, formatCurrency } from "@/lib/utils";
 
@@ -34,6 +36,9 @@ export default async function CompanyPage({
   const activeTab = tabs.some((item) => item.id === tab)
     ? (tab as CompanyTab)
     : "informacoes";
+  const supabase = await createServerSupabase();
+  const user = await requireUser(supabase);
+  const organization = await getCurrentOrganizationForUser(supabase, user.id);
 
   return (
     <div>
@@ -57,9 +62,15 @@ export default async function CompanyPage({
         ))}
       </nav>
 
-      {activeTab === "informacoes" ? <CompanyInfoSection /> : null}
-      {activeTab === "clientes" ? <CompanyClientsSection q={q} /> : null}
-      {activeTab === "servicos-nichos" ? <CompanyServicesSection /> : null}
+      {activeTab === "informacoes" ? (
+        <CompanyInfoSection organizationId={organization.id} />
+      ) : null}
+      {activeTab === "clientes" ? (
+        <CompanyClientsSection q={q} organizationId={organization.id} />
+      ) : null}
+      {activeTab === "servicos-nichos" ? (
+        <CompanyServicesSection organizationId={organization.id} />
+      ) : null}
       {activeTab !== "informacoes" &&
       activeTab !== "clientes" &&
       activeTab !== "servicos-nichos" ? (
@@ -69,11 +80,12 @@ export default async function CompanyPage({
   );
 }
 
-async function CompanyInfoSection() {
+async function CompanyInfoSection({ organizationId }: { organizationId: string }) {
   const supabase = await createServerSupabase();
   const { data: settings } = await supabase
     .from("company_settings")
     .select("*")
+    .eq("organization_id", organizationId)
     .eq("singleton_key", "default")
     .maybeSingle();
 
@@ -89,11 +101,18 @@ async function CompanyInfoSection() {
   );
 }
 
-async function CompanyClientsSection({ q }: { q: string }) {
+async function CompanyClientsSection({
+  q,
+  organizationId,
+}: {
+  q: string;
+  organizationId: string;
+}) {
   const supabase = await createServerSupabase();
   const { data } = await supabase
     .from("clients")
     .select("*")
+    .eq("organization_id", organizationId)
     .order("created_at", { ascending: false });
   const clients = data ?? [];
   const normalized = q.trim().toLowerCase();
@@ -166,11 +185,12 @@ async function CompanyClientsSection({ q }: { q: string }) {
   );
 }
 
-async function CompanyServicesSection() {
+async function CompanyServicesSection({ organizationId }: { organizationId: string }) {
   const supabase = await createServerSupabase();
   const { data } = await supabase
     .from("company_services")
     .select("*")
+    .eq("organization_id", organizationId)
     .order("created_at", { ascending: false });
   const services = data ?? [];
 

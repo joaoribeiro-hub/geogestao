@@ -230,7 +230,7 @@ function ProposalPdfForm({ clients }: { clients: Client[] }) {
 
       <Button data-testid="proposal-pdf-submit" disabled={pending}>
         {pending ? <Loader2 className="animate-spin" aria-hidden="true" /> : <FileUp aria-hidden="true" />}
-        Salvar PDF
+        Salvar proposta com PDF
       </Button>
       <Feedback feedback={feedback} />
     </form>
@@ -298,44 +298,69 @@ function ProposalModelDraftForm({ clients }: { clients: Client[] }) {
 
   return (
     <form className="grid gap-4" data-testid="proposal-model-form" onSubmit={form.handleSubmit(submit)}>
-      <div className="grid gap-4 sm:grid-cols-2">
-        <Field label="Registro">
-          <select
-            className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-            data-testid="proposal-model-client"
-            {...form.register("client_id")}
-          >
-            {clients.map((client) => (
-              <option key={client.id} value={client.id}>
-                {client.name}
-              </option>
-            ))}
-          </select>
-        </Field>
-        <Field label="Modelo">
-          <Input data-testid="proposal-model-name" {...form.register("model_name")} />
-        </Field>
-      </div>
+      <WizardStep number="1" title="Registro">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="Cliente">
+            <select
+              className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+              data-testid="proposal-model-client"
+              {...form.register("client_id")}
+            >
+              {clients.map((client) => (
+                <option key={client.id} value={client.id}>
+                  {client.name}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field label="Nome do empreendimento">
+            <Input data-testid="proposal-model-title" {...form.register("title")} />
+          </Field>
+        </div>
+        <div className="grid gap-4 sm:grid-cols-4">
+          <Field label="Pais">
+            <Input name="country" defaultValue="Brasil" />
+          </Field>
+          <Field label="Estado">
+            <Input name="state" />
+          </Field>
+          <Field label="Cidade">
+            <Input name="city" />
+          </Field>
+          <Field label="CEP">
+            <Input name="cep" />
+          </Field>
+        </div>
+        <div className="grid gap-4 sm:grid-cols-4">
+          <Field label="Bairro">
+            <Input name="district" />
+          </Field>
+          <Field label="Logradouro">
+            <Input name="street" />
+          </Field>
+          <Field label="Numero">
+            <Input name="number" />
+          </Field>
+          <Field label="Complemento">
+            <Input name="complement" />
+          </Field>
+        </div>
+      </WizardStep>
 
-      <Field label="Registro - titulo">
-        <Input data-testid="proposal-model-title" {...form.register("title")} />
-      </Field>
-
-      <div className="grid gap-4 sm:grid-cols-2">
-        <Field label="Demanda">
-          <Textarea data-testid="proposal-model-demand" {...form.register("demand")} />
-        </Field>
-        <Field label="Secoes">
-          <Textarea
-            data-testid="proposal-model-sections"
-            placeholder="Escopo, entregaveis, condicoes..."
-            {...form.register("sections")}
-          />
-        </Field>
-      </div>
-
-      <div className="grid gap-4 sm:grid-cols-4">
-        <Field label="Tipo de servico">
+      <WizardStep number="2" title="Demanda">
+        <div className="grid gap-4 sm:grid-cols-3">
+          <Field label="Tipo de empreendimento">
+            <Input name="enterprise_type" />
+          </Field>
+          <Field label="Area">
+            <Input name="area" />
+          </Field>
+          <Field label="Nicho">
+            <Input name="niche" />
+          </Field>
+        </div>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="Tipo de servico">
           <select
             className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
             data-testid="proposal-model-service-type"
@@ -347,21 +372,135 @@ function ProposalModelDraftForm({ clients }: { clients: Client[] }) {
               </option>
             ))}
           </select>
+          </Field>
+          <Field label="Servicos">
+            <Input name="services" />
+          </Field>
+        </div>
+        <Field label="Demanda">
+          <Textarea data-testid="proposal-model-demand" {...form.register("demand")} />
         </Field>
-        <Field label="Prazos - envio">
+        <div className="grid gap-4 sm:grid-cols-5">
+          <Field label="Quantidade">
+            <Input name="quantity" type="number" step="0.01" />
+          </Field>
+          <Field label="Unidade">
+            <Input name="unit" />
+          </Field>
+          <Field label="Valor unitario">
+            <Input name="unit_price" type="number" step="0.01" />
+          </Field>
+          <Field label="Desconto">
+            <Input name="discount" type="number" step="0.01" />
+          </Field>
+          <Field label="Total">
+            <Input data-testid="proposal-model-value" type="number" step="0.01" {...form.register("value")} />
+          </Field>
+        </div>
+      </WizardStep>
+
+      <WizardStep number="3" title="Prazos">
+        <div className="grid gap-4 sm:grid-cols-4">
+          <Field label="Prazo de execucao">
+            <Input name="execution_deadline" />
+          </Field>
+          <Field label="Unidade">
+            <select
+              name="deadline_unit"
+              className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+            >
+              <option value="dias">Dias</option>
+              <option value="semanas">Semanas</option>
+              <option value="meses">Meses</option>
+            </select>
+          </Field>
+          <Field label="Data final">
+            <Input name="final_date" type="date" />
+          </Field>
+          <Field label="Validade">
+            <Input data-testid="proposal-model-valid-until" type="date" {...form.register("valid_until")} />
+          </Field>
+        </div>
+        <Field label="Envio">
           <Input data-testid="proposal-model-sent-at" type="date" {...form.register("sent_at")} />
         </Field>
-        <Field label="Prazos - validade">
-          <Input data-testid="proposal-model-valid-until" type="date" {...form.register("valid_until")} />
+      </WizardStep>
+
+      <WizardStep number="4" title="Financeiro">
+        <div className="grid gap-4 sm:grid-cols-3">
+          <Field label="Parcelas">
+            <Input name="installments" type="number" />
+          </Field>
+          <Field label="Percentual">
+            <Input name="installment_percentage" type="number" step="0.01" />
+          </Field>
+          <Field label="Valor da parcela">
+            <Input name="installment_amount" type="number" step="0.01" />
+          </Field>
+        </div>
+        <Field label="Observacao da parcela">
+          <Textarea name="installment_note" />
         </Field>
-        <Field label="Financeiro - valor">
-          <Input data-testid="proposal-model-value" type="number" step="0.01" {...form.register("value")} />
+        <Field label="Previsao de pagamento">
+          <Input name="payment_forecast" type="date" />
         </Field>
-      </div>
+        <div className="grid gap-2 sm:grid-cols-2">
+          {["Cartao de credito", "Cartao de debito", "Boleto", "Dinheiro", "Pix", "Transferencia bancaria"].map((method) => (
+            <label key={method} className="flex items-center gap-2 rounded-md border p-2 text-sm">
+              <input name="payment_methods" type="checkbox" value={method} />
+              {method}
+            </label>
+          ))}
+        </div>
+      </WizardStep>
+
+      <WizardStep number="5" title="Secoes">
+        <Field label="Selecionar/editar secoes">
+          <Textarea
+            data-testid="proposal-model-sections"
+            placeholder="Objetivo, servicos, prazos, precos, formas de pagamento, observacoes..."
+            {...form.register("sections")}
+          />
+        </Field>
+        <Field label="Objetivo">
+          <Textarea name="objective_text" />
+        </Field>
+        <Field label="Servicos">
+          <Textarea name="services_text" />
+        </Field>
+        <Field label="Prazos">
+          <Textarea name="deadlines_text" />
+        </Field>
+        <Field label="Precos">
+          <Textarea name="prices_text" />
+        </Field>
+        <Field label="Formas de pagamento">
+          <Textarea name="payment_text" />
+        </Field>
+        <Field label="Observacoes">
+          <Textarea name="notes_text" />
+        </Field>
+      </WizardStep>
+
+      <WizardStep number="6" title="Modelo">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="Modelo">
+            <Input data-testid="proposal-model-name" {...form.register("model_name")} />
+          </Field>
+          <Field label="Aparencia">
+            <Input name="appearance" />
+          </Field>
+        </div>
+        <Field label="Preview">
+          <div className="rounded-md border bg-secondary p-4 text-sm text-muted-foreground">
+            O preview final fica disponivel na pagina da proposta apos salvar.
+          </div>
+        </Field>
+      </WizardStep>
 
       <Button data-testid="proposal-model-submit" disabled={pending}>
         {pending ? <Loader2 className="animate-spin" aria-hidden="true" /> : <Wand2 aria-hidden="true" />}
-        Salvar rascunho
+        Criar proposta usando modelo
       </Button>
       <Feedback feedback={feedback} />
     </form>
@@ -380,6 +519,25 @@ function Field({
       <Label>{label}</Label>
       {children}
     </div>
+  );
+}
+
+function WizardStep({
+  number,
+  title,
+  children,
+}: {
+  number: string;
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <fieldset className="rounded-lg border p-4">
+      <legend className="px-1 text-sm font-semibold">
+        {number}. {title}
+      </legend>
+      <div className="mt-3 grid gap-4">{children}</div>
+    </fieldset>
   );
 }
 

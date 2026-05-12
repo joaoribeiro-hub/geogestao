@@ -2,7 +2,10 @@
 
 import { useMemo, useRef, useState, useTransition } from "react";
 import { Loader2, Upload } from "lucide-react";
-import { registerAttachmentAction } from "@/app/(app)/anexos/actions";
+import {
+  prepareAttachmentUploadAction,
+  registerAttachmentAction,
+} from "@/app/(app)/anexos/actions";
 import { createBrowserSupabase } from "@/lib/supabase/browser";
 import type { AttachmentEntityType } from "@/types/database";
 import { Button } from "@/components/ui/button";
@@ -15,6 +18,7 @@ export type AttachmentEntityOption = {
 };
 
 const entityLabels: Record<AttachmentEntityType, string> = {
+  profile: "Perfil",
   client: "Cliente",
   proposal: "Proposta",
   service_card: "Card de servico",
@@ -27,13 +31,20 @@ const entityLabels: Record<AttachmentEntityType, string> = {
 
 export function AttachmentUploader({ entities }: { entities: AttachmentEntityOption[] }) {
   const fileRef = useRef<HTMLInputElement>(null);
-  const [entityType, setEntityType] = useState<AttachmentEntityType>("client");
+  const [entityType, setEntityType] = useState<AttachmentEntityType>(
+    entities[0]?.type ?? "client",
+  );
+  const availableTypes = useMemo(
+    () => Array.from(new Set(entities.map((entity) => entity.type))),
+    [entities],
+  );
   const filtered = useMemo(
     () => entities.filter((entity) => entity.type === entityType),
     [entities, entityType],
   );
   const [entityId, setEntityId] = useState(filtered[0]?.id ?? "");
   const [message, setMessage] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
   const [pending, startTransition] = useTransition();
 
   async function upload() {
@@ -44,27 +55,58 @@ export function AttachmentUploader({ entities }: { entities: AttachmentEntityOpt
       return;
     }
 
+    setUploading(true);
+    setMessage(null);
+    const prepared = await prepareAttachmentUploadAction({
+      entityType,
+      entityId: selectedId,
+      fileName: file.name,
+      sizeBytes: file.size,
+    }).catch((error) => {
+      setMessage(error instanceof Error ? error.message : "Nao foi possivel preparar o upload.");
+      return null;
+    });
+
+    if (!prepared) {
+      setUploading(false);
+      return;
+    }
+
     const supabase = createBrowserSupabase();
-    const safeName = file.name.replace(/[^\w.-]+/g, "-");
-    const filePath = `${entityType}/${selectedId}/${crypto.randomUUID()}-${safeName}`;
-    const { error } = await supabase.storage.from("attachments").upload(filePath, file);
+    const { error } = await supabase.storage
+      .from(prepared.bucket)
+      .upload(prepared.filePath, file, {
+        upsert: false,
+        contentType: file.type,
+      });
     if (error) {
+      setUploading(false);
       setMessage(error.message);
       return;
     }
+    setUploading(false);
 
     const formData = new FormData();
     formData.set("entity_type", entityType);
     formData.set("entity_id", selectedId);
-    formData.set("file_path", filePath);
+    formData.set("file_path", prepared.filePath);
+    formData.set("bucket", prepared.bucket);
+    formData.set("storage_path", prepared.filePath);
     formData.set("file_name", file.name);
     formData.set("mime_type", file.type);
     formData.set("size_bytes", file.size.toString());
+    formData.set("file_size", file.size.toString());
 
     startTransition(() => {
-      void registerAttachmentAction(formData);
-      setMessage("Arquivo enviado.");
-      if (fileRef.current) fileRef.current.value = "";
+      void (async () => {
+        try {
+          await registerAttachmentAction(formData);
+          setMessage("Arquivo enviado.");
+          if (fileRef.current) fileRef.current.value = "";
+        } catch (error) {
+          setMessage(error instanceof Error ? error.message : "Nao foi possivel registrar o anexo.");
+        }
+      })();
     });
   }
 
@@ -83,9 +125,9 @@ export function AttachmentUploader({ entities }: { entities: AttachmentEntityOpt
               setEntityId(next);
             }}
           >
-            {Object.entries(entityLabels).map(([type, label]) => (
+            {availableTypes.map((type) => (
               <option key={type} value={type}>
-                {label}
+                {entityLabels[type]}
               </option>
             ))}
           </select>
@@ -107,8 +149,12 @@ export function AttachmentUploader({ entities }: { entities: AttachmentEntityOpt
       </div>
       <input ref={fileRef} type="file" className="text-sm" />
       {message ? <p className="text-sm text-muted-foreground">{message}</p> : null}
-      <Button type="button" onClick={upload} disabled={pending || !filtered.length}>
-        {pending ? <Loader2 className="animate-spin" aria-hidden="true" /> : <Upload aria-hidden="true" />}
+      <Button type="button" onClick={upload} disabled={pending || uploading || !filtered.length}>
+        {pending || uploading ? (
+          <Loader2 className="animate-spin" aria-hidden="true" />
+        ) : (
+          <Upload aria-hidden="true" />
+        )}
         Enviar anexo
       </Button>
     </div>

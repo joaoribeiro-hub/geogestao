@@ -65,6 +65,20 @@ export function buildProposalExecutionUpdate({
   };
 }
 
+export function buildProposalLostUpdate({
+  lostAt,
+  reason,
+}: {
+  lostAt: string;
+  reason?: string | null;
+}): Database["public"]["Tables"]["proposals"]["Update"] {
+  return {
+    stage: "lost",
+    lost_at: lostAt,
+    lost_reason: reason ?? "Status comercial nao aprovado.",
+  };
+}
+
 export function buildProposalRevertUpdate(): Database["public"]["Tables"]["proposals"]["Update"] {
   return {
     stage: "sent",

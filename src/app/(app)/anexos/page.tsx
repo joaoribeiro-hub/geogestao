@@ -3,11 +3,15 @@ import { PageHeader } from "@/components/layout/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
+import { requireUser } from "@/lib/auth";
+import { getCurrentOrganizationForUser } from "@/lib/organization";
 import { createServerSupabase } from "@/lib/supabase/server";
 import { formatDate } from "@/lib/utils";
 
 export default async function AttachmentsPage() {
   const supabase = await createServerSupabase();
+  const user = await requireUser(supabase);
+  const organization = await getCurrentOrganizationForUser(supabase, user.id);
   const [
     clientsResult,
     proposalsResult,
@@ -19,15 +23,15 @@ export default async function AttachmentsPage() {
     legislationResult,
     attachmentsResult,
   ] = await Promise.all([
-    supabase.from("clients").select("id,name").order("name"),
-    supabase.from("proposals").select("id,title").order("title"),
-    supabase.from("service_cards").select("id,title").order("title"),
-    supabase.from("contracts").select("id,title").order("title"),
-    supabase.from("revenues").select("id,description").order("description"),
-    supabase.from("expenses").select("id,description").order("description"),
-    supabase.from("document_templates").select("id,title").order("title"),
-    supabase.from("legislation_items").select("id,title").order("title"),
-    supabase.from("attachments").select("*").order("created_at", { ascending: false }),
+    supabase.from("clients").select("id,name").eq("organization_id", organization.id).order("name"),
+    supabase.from("proposals").select("id,title").eq("organization_id", organization.id).order("title"),
+    supabase.from("service_cards").select("id,title").eq("organization_id", organization.id).order("title"),
+    supabase.from("contracts").select("id,title").eq("organization_id", organization.id).order("title"),
+    supabase.from("revenues").select("id,description").eq("organization_id", organization.id).order("description"),
+    supabase.from("expenses").select("id,description").eq("organization_id", organization.id).order("description"),
+    supabase.from("document_templates").select("id,title").eq("organization_id", organization.id).order("title"),
+    supabase.from("legislation_items").select("id,title").eq("organization_id", organization.id).order("title"),
+    supabase.from("attachments").select("*").eq("organization_id", organization.id).order("created_at", { ascending: false }),
   ]);
   const clients = clientsResult.data ?? [];
   const proposals = proposalsResult.data ?? [];
@@ -54,7 +58,7 @@ export default async function AttachmentsPage() {
     attachments.map(async (attachment) => {
       const { data } = await supabase.storage
         .from("attachments")
-        .createSignedUrl(attachment.file_path, 60 * 60);
+        .createSignedUrl(attachment.storage_path ?? attachment.file_path, 60 * 60);
       return { ...attachment, signedUrl: data?.signedUrl ?? null };
     }),
   );

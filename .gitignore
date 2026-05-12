@@ -9,5 +9,13 @@ test-results
 dist
 *.tsbuildinfo
 .next-dev.*.log
+.codex-dev-server.log
 supabase/.branches
 supabase/.temp
+data/geo/
+*.shp
+*.shx
+*.dbf
+*.prj
+*.geojson
+*.zip

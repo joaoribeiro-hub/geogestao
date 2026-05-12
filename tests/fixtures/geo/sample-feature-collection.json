@@ -1,0 +1,47 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "COD_CAR": "PR-1234567-ABCDEF0000",
+        "Municipio": "Londrina",
+        "UF": "PR",
+        "AREA_HA": "12,5"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [-51.1, -23.1],
+            [-51.0, -23.1],
+            [-51.0, -23.0],
+            [-51.1, -23.0],
+            [-51.1, -23.1]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "COD_CAR": "PR-7654321-ABCDEF0000",
+        "Municipio": "Maringa",
+        "UF": "PR",
+        "AREA_HA": "20"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [-52.1, -23.5],
+            [-52.0, -23.5],
+            [-52.0, -23.4],
+            [-52.1, -23.4],
+            [-52.1, -23.5]
+          ]
+        ]
+      }
+    }
+  ]
+}

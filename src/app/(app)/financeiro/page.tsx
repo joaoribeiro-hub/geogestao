@@ -1,8 +1,10 @@
 import { FinanceForm } from "@/components/forms/finance-form";
+import { PeriodFilter } from "@/components/filters/period-filter";
 import { PageHeader } from "@/components/layout/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
+import { filterByPeriod, resolvePeriodRange } from "@/lib/period";
 import { createServerSupabase } from "@/lib/supabase/server";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import type { Expense, FinanceStatus, Revenue, ServiceCard } from "@/types/database";
@@ -13,7 +15,12 @@ const statusLabel: Record<FinanceStatus, string> = {
   overdue: "Vencido",
 };
 
-export default async function FinancePage() {
+export default async function FinancePage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const periodRange = resolvePeriodRange(await searchParams);
   const supabase = await createServerSupabase();
   const [
     clientsResult,
@@ -31,22 +38,20 @@ export default async function FinancePage() {
   const clients = clientsResult.data ?? [];
   const proposals = proposalsResult.data ?? [];
   const serviceCards = serviceCardsResult.data ?? [];
-  const revenues = revenuesResult.data ?? [];
-  const expenses = expensesResult.data ?? [];
-
-  const now = new Date();
-  const month = now.getUTCMonth();
-  const year = now.getUTCFullYear();
-  const inCurrentMonth = (date: string) => {
-    const parsed = new Date(date);
-    return parsed.getUTCMonth() === month && parsed.getUTCFullYear() === year;
-  };
+  const revenues = filterByPeriod(
+    revenuesResult.data ?? [],
+    periodRange,
+    (revenue) => revenue.due_date ?? revenue.created_at,
+  );
+  const expenses = filterByPeriod(
+    expensesResult.data ?? [],
+    periodRange,
+    (expense) => expense.due_date ?? expense.created_at,
+  );
 
   const monthlyRevenue = revenues
-    .filter((item) => inCurrentMonth(item.due_date))
     .reduce((sum, item) => sum + Number(item.amount), 0);
   const monthlyExpense = expenses
-    .filter((item) => inCurrentMonth(item.due_date))
     .reduce((sum, item) => sum + Number(item.amount), 0);
   const projectRows = serviceCards
     .map((card) => {
@@ -73,9 +78,11 @@ export default async function FinancePage() {
         description="Receitas, despesas, contas pendentes e resumo de resultado por mes e projeto."
       />
 
+      <PeriodFilter range={periodRange} action="/financeiro" />
+
       <div className="mb-6 grid gap-4 md:grid-cols-3">
-        <SummaryCard title="Receitas do mes" value={formatCurrency(monthlyRevenue)} />
-        <SummaryCard title="Despesas do mes" value={formatCurrency(monthlyExpense)} />
+        <SummaryCard title="Receitas do periodo" value={formatCurrency(monthlyRevenue)} />
+        <SummaryCard title="Despesas do periodo" value={formatCurrency(monthlyExpense)} />
         <SummaryCard title="Lucro estimado" value={formatCurrency(monthlyRevenue - monthlyExpense)} />
       </div>
 

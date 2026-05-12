@@ -7,11 +7,14 @@ import {
 import {
   buildPaidRevenueInsertFromProposal,
   buildPaidRevenueUpdate,
+  buildPendingRevenueInsertFromProposal,
+  buildPendingRevenueUpdate,
   calculateFinanceTotals,
 } from "@/lib/services/finance";
 import {
   buildPaymentStatusUpdate,
   buildProposalExecutionUpdate,
+  buildProposalLostUpdate,
   buildProposalRevertUpdate,
   normalizeProposalServiceType,
 } from "@/lib/services/proposals";
@@ -184,11 +187,55 @@ describe("regras do fluxo proposta -> contrato -> servico -> financeiro", () => 
     expect(update).toEqual({
       contract_id: "contract-2",
       service_card_id: "card-2",
+      description: "Pagamento recebido - Georreferenciamento Fazenda Boa Vista",
       status: "paid",
       paid_at: "2026-05-05",
     });
     expect(buildPaymentStatusUpdate("pagamento_efetuado")).toEqual({
       payment_status: "pagamento_efetuado",
+    });
+  });
+
+  it("pagamento nao pago cria ou reaproveita receita pendente a receber", () => {
+    const proposal = makeProposal({ value: 5500 });
+    const insert = buildPendingRevenueInsertFromProposal({
+      proposal,
+      contractId: "contract-1",
+      serviceCardId: "card-1",
+      dueDate: "2026-06-01",
+    });
+    const update = buildPendingRevenueUpdate({
+      existing: makeRevenue({ status: "paid", paid_at: "2026-05-10" }),
+      contractId: "contract-1",
+      serviceCardId: "card-1",
+      dueDate: "2026-06-01",
+      proposalTitle: proposal.title,
+    });
+
+    expect(insert).toMatchObject({
+      description: "Pagamento a receber - Georreferenciamento Fazenda Boa Vista",
+      amount: 5500,
+      status: "pending",
+      paid_at: null,
+      auto_generated: true,
+    });
+    expect(update).toMatchObject({
+      description: "Pagamento a receber - Georreferenciamento Fazenda Boa Vista",
+      status: "pending",
+      paid_at: null,
+    });
+  });
+
+  it("status nao aprovado move para perdidas e registra valor perdido por proposta", () => {
+    expect(
+      buildProposalLostUpdate({
+        lostAt: "2026-05-09T10:00:00.000Z",
+        reason: "Nao aprovado pelo cliente.",
+      }),
+    ).toEqual({
+      stage: "lost",
+      lost_at: "2026-05-09T10:00:00.000Z",
+      lost_reason: "Nao aprovado pelo cliente.",
     });
   });
 

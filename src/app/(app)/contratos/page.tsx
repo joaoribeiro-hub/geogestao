@@ -1,8 +1,10 @@
 import Link from "next/link";
+import { PeriodFilter } from "@/components/filters/period-filter";
 import { PageHeader } from "@/components/layout/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
+import { filterByPeriod, resolvePeriodRange } from "@/lib/period";
 import { createServerSupabase } from "@/lib/supabase/server";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import type { ContractStatus } from "@/types/database";
@@ -17,7 +19,12 @@ const statusLabels: Record<ContractStatus, string> = {
   cancelado: "Cancelado",
 };
 
-export default async function ContractsPage() {
+export default async function ContractsPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const periodRange = resolvePeriodRange(await searchParams);
   const supabase = await createServerSupabase();
   const [contractsResult, clientsResult, proposalsResult, serviceCardsResult] =
     await Promise.all([
@@ -27,7 +34,11 @@ export default async function ContractsPage() {
       supabase.from("service_cards").select("id,title").order("title"),
     ]);
 
-  const contracts = contractsResult.data ?? [];
+  const contracts = filterByPeriod(
+    contractsResult.data ?? [],
+    periodRange,
+    (contract) => contract.starts_at ?? contract.sent_at ?? contract.created_at,
+  );
   const clients = clientsResult.data ?? [];
   const proposals = proposalsResult.data ?? [];
   const serviceCards = serviceCardsResult.data ?? [];
@@ -41,6 +52,8 @@ export default async function ContractsPage() {
         title="Contratos"
         description="Contratos vinculados a clientes, propostas, servicos e receitas previstas."
       />
+
+      <PeriodFilter range={periodRange} action="/contratos" />
 
       <Card data-testid="contracts-card">
         <CardHeader>
@@ -62,6 +75,7 @@ export default async function ContractsPage() {
                     <th className="px-4 py-3 font-medium">Status</th>
                     <th className="px-4 py-3 font-medium">Servico</th>
                     <th className="px-4 py-3 font-medium">Datas</th>
+                    <th className="px-4 py-3 font-medium">Acoes</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -108,6 +122,22 @@ export default async function ContractsPage() {
                           <p>Assinatura: {formatDate(contract.signed_at)}</p>
                           <p>Inicio: {formatDate(contract.starts_at)}</p>
                           <p>Fim: {formatDate(contract.ends_at)}</p>
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="grid gap-2">
+                            <Link
+                              href={`/contratos/${contract.id}`}
+                              className="rounded-md border px-3 py-2 text-xs font-medium hover:border-primary"
+                            >
+                              Visualizar contrato
+                            </Link>
+                            <Link
+                              href={`/contratos/${contract.id}#wizard`}
+                              className="rounded-md border px-3 py-2 text-xs font-medium hover:border-primary"
+                            >
+                              Continuar contrato
+                            </Link>
+                          </div>
                         </td>
                       </tr>
                     );

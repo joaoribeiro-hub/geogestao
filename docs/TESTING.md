@@ -37,6 +37,11 @@ Cobertura inicial:
 - regras puras do fluxo proposta -> contrato -> servico -> financeiro;
 - idempotencia por payload de contrato, card tecnico e receita automatica;
 - reset do fluxo de voltar proposta/servico.
+- filtros por periodo usados por Dashboard, Propostas, Contratos, Servicos/Projetos e Financeiro;
+- regras UX-2 de status comercial, valor perdido e pagamento pago/nao pago.
+- ACCOUNT-1: calculo de armazenamento usado, limite de quota, validacao de perfil, input do Chat IA e extracao segura de texto da resposta OpenAI.
+- GEOQUERY-1: validacao/normalizacao do CAR Federal, normalizacao de campos DBF, aliases CAR/INCRA e classificacao de camadas.
+- GEOQUERY-2A: leitura streaming de GeoJSON FeatureCollection e mapeamento de preview/importacao com fixture pequena.
 
 ### Integracao de regras criticas
 
@@ -65,7 +70,12 @@ Cobertura inicial:
 - pagina de login carrega;
 - dashboard apos login, quando `E2E_TEST_EMAIL` e `E2E_TEST_PASSWORD` forem definidos;
 - rota `/mapa` carrega apos login, quando credenciais forem definidas;
+- rota `/mapa` valida a tela "Fazer busca de imovel", campo CAR e links oficiais;
+- rota `/minha-conta` carrega apos login, quando credenciais forem definidas;
+- menu lateral mostra secoes MENU e CONFIGURACOES;
+- Chat IA abre no app autenticado e, sem `OPENAI_API_KEY`, mostra mensagem de configuracao ausente;
 - fluxo completo com escrita no banco fica preparado e bloqueado por seguranca ate `E2E_RUN_MUTATION_TESTS=true`.
+- O fluxo destrutivo UX-2 cria proposta, altera status para aprovado, verifica contrato/servico, marca pagamento como nao pago, valida receita a receber, marca pagamento como pago, valida receita recebida e abre a visualizacao da proposta.
 
 O helper de login comeca explicitamente em `/login`, aguarda o formulario client-side estar hidratado (`data-e2e-ready="true"`), preenche as credenciais de teste, confirma que os campos receberam os valores esperados e valida que o layout autenticado (`app-shell`) ficou disponivel apos o redirecionamento. Testes de paginas autenticadas devem navegar explicitamente para a rota que desejam validar e usar seletores estaveis, como `dashboard-title` e `map-title`.
 
@@ -169,6 +179,9 @@ Para rodar testes autenticados:
    - `004_phase1_payment_and_service_repair.sql`;
    - `005_company_area.sql`, se quiser validar Minha Empresa;
    - `006_map_properties_geometries.sql`, se quiser validar Mapa.
+   - `007_ux2_proposals_contracts_documents.sql`, para validar UX-2.
+   - `008_account1_organizations_profiles_ai.sql`, para validar Minha Conta, organizacoes, planos, limite de armazenamento e Chat IA.
+   - `009_geoquery_car_incra_alerts.sql`, para validar Fazer busca de imovel, bases CAR/INCRA/alertas e historico.
 3. Crie um usuario no Supabase Auth.
 4. Garanta um registro correspondente em `profiles`.
 5. Configure variaveis locais:
@@ -178,6 +191,7 @@ E2E_TEST_EMAIL=
 E2E_TEST_PASSWORD=
 NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=
+OPENAI_API_KEY=
 ```
 
 `NEXT_PUBLIC_SUPABASE_ANON_KEY` continua aceito como fallback de compatibilidade.
@@ -216,6 +230,8 @@ npm run test:e2e
 ```
 
 Nao grave senhas ou chaves reais em arquivos versionados.
+
+`OPENAI_API_KEY` e opcional nos testes. Quando nao existir, o E2E valida o fallback "OPENAI_API_KEY nao configurada". Quando existir, o chat pode chamar a API real; por isso nao configure essa chave nos E2E se a intencao for testar apenas o fallback local.
 
 O `npm run test:e2e` deve ser executado sem um servidor manual aberto na porta `3100`. O servidor manual na porta `3000` nao e usado pelo Playwright.
 
@@ -278,6 +294,9 @@ Se `E2E_RUN_MUTATION_TESTS` nao estiver como `true`, o workflow falha antes de r
 - Falha de Playwright antes do login: app nao subiu, rota publica quebrou ou navegador nao foi instalado.
 - Falha de Playwright no `app-shell`: credenciais invalidas, sessao nao criada, formulario ainda nao hidratado, middleware bloqueando autenticacao ou app apontando para Supabase diferente daquele onde o usuario QA existe. O erro do helper de login informa a URL atual, host Supabase configurado, status da resposta `/auth/v1/token`, se continuou em `/login`, se houve erro de credenciais, se o `app-shell` apareceu e anexa um screenshot ao relatorio.
 - Falha de Playwright apos navegar para uma rota autenticada: migrations ausentes, RLS/policies ou mudanca de UI sem seletor estavel.
+- Falha em `/minha-conta`: normalmente indica que a migration ACCOUNT-1 ainda nao foi aplicada, pois a tela depende de `profiles.organization_id`, `organizations`, `plans` e novos metadados de `attachments`.
+- Falha em `/mapa`/GeoQuery: normalmente indica que as migrations 008 e 009 ainda nao foram aplicadas, pois a tela consulta `organization_id`, `geo_data_sources` e `property_searches`.
+- Falha do Chat IA sem chave: o esperado e exibir "OPENAI_API_KEY nao configurada no servidor.". Se aparecer 401, a sessao autenticada nao foi criada.
 
 ## Como adicionar novo teste
 
@@ -297,13 +316,27 @@ Coberto agora:
 - criacao/reaproveitamento logico de card tecnico;
 - criacao/reaproveitamento logico de receita automatica paga;
 - voltar proposta/servico em nivel de payload;
+- filtros por periodo;
+- armazenamento/limite de plano da ACCOUNT-1;
+- validacao de perfil e Chat IA;
+- validacao/normalizacao GeoQuery, campos DBF e classificacao de bases geograficas;
+- leitura streaming de GeoJSON pequeno em fixture para proteger o importador de regressao basica;
+- status comercial de proposta nao aprovada/perdida;
+- receita pendente/a receber para pagamento nao pago;
 - pagina de login em E2E.
+- rota Minha Conta, secoes do menu e abertura do Chat IA em E2E autenticado, quando credenciais existem.
+- tela Fazer busca de imovel em E2E autenticado, quando credenciais existem.
 
 Pendente:
 
 - testes com Supabase local ou banco dedicado;
 - E2E autenticado rodando com secrets configurados;
 - E2E destrutivo com `E2E_RUN_MUTATION_TESTS=true` em ambiente de teste;
+- E2E destrutivo UX-2 no workflow manual depois de configurar secrets/variable no GitHub;
 - cobertura de upload real KML/KMZ no Storage;
 - testes de RLS/policies;
-- testes de contratos e financeiro diretamente no banco.
+- testes de contratos e financeiro diretamente no banco;
+- E2E de upload real de avatar/anexo com verificacao de quota no Supabase de teste;
+- teste automatizado de chamada real OpenAI, caso seja desejado em ambiente isolado.
+- teste de importacao real de shapefile/GeoJSON em Supabase de teste;
+- teste de intersecao espacial/buffer depois de ativar PostGIS e carregar fixtures geograficas.

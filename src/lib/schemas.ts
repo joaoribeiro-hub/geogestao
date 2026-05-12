@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { isValidCarCode, normalizeCarCode } from "@/lib/geoquery";
 
 const optionalText = z
   .string()
@@ -57,6 +58,43 @@ export const companySettingsSchema = z.object({
   notes: optionalText,
 });
 
+export const profileSchema = z.object({
+  full_name: z.string().trim().min(2, "Informe seu nome completo."),
+  phone: optionalText,
+  birth_date: dateString,
+  document_type: optionalText,
+  document_number: optionalText,
+  avatar_path: optionalText,
+  email_preferences: z.object({
+    summaries: z.coerce.boolean().default(false),
+    special_dates: z.coerce.boolean().default(false),
+    projects: z.coerce.boolean().default(false),
+    proposals: z.coerce.boolean().default(false),
+    finance: z.coerce.boolean().default(false),
+  }),
+  account_preferences: z.object({
+    compact_mode: z.coerce.boolean().default(false),
+  }),
+});
+
+const aiChatMessageSchema = z.object({
+  role: z.enum(["user", "assistant"]),
+  content: z
+    .string()
+    .trim()
+    .min(1, "Digite uma mensagem.")
+    .max(1200, "Mensagem muito longa. Use ate 1200 caracteres."),
+});
+
+export const aiChatSchema = z
+  .object({
+    message: aiChatMessageSchema.shape.content.optional(),
+    messages: z.array(aiChatMessageSchema).max(12).optional(),
+  })
+  .refine((value) => Boolean(value.message || value.messages?.length), {
+    message: "Digite uma mensagem.",
+  });
+
 export const companyServiceSchema = z.object({
   niche: z.string().trim().min(2, "Informe o nicho de atuacao."),
   name: z.string().trim().min(2, "Informe o servico oferecido."),
@@ -97,6 +135,34 @@ export const propertyMapSchema = z.object({
   mime_type: optionalText,
   size_bytes: z.coerce.number().nullable().optional(),
   geojson: z.string().min(1, "GeoJSON nao foi gerado."),
+});
+
+export const geoQuerySearchSchema = z.object({
+  codCar: z
+    .string()
+    .trim()
+    .min(1, "Informe o numero do CAR Federal.")
+    .transform(normalizeCarCode)
+    .refine(isValidCarCode, "Informe um numero de CAR Federal valido."),
+  clientId: z
+    .string()
+    .uuid()
+    .optional()
+    .nullable()
+    .transform((value) => value || null),
+  serviceCardId: z
+    .string()
+    .uuid()
+    .optional()
+    .nullable()
+    .transform((value) => value || null),
+  propertyId: z
+    .string()
+    .uuid()
+    .optional()
+    .nullable()
+    .transform((value) => value || null),
+  bufferMeters: z.coerce.number().min(0).max(10000).default(500),
 });
 
 export const proposalSchema = z.object({
@@ -229,6 +295,7 @@ export const legislationSchema = z.object({
 
 export const attachmentSchema = z.object({
   entity_type: z.enum([
+    "profile",
     "client",
     "proposal",
     "service_card",
@@ -240,15 +307,21 @@ export const attachmentSchema = z.object({
   ]),
   entity_id: z.string().uuid(),
   file_path: z.string().min(1),
+  bucket: optionalText,
+  storage_path: optionalText,
   file_name: z.string().min(1),
   mime_type: optionalText,
   size_bytes: z.coerce.number().nullable().optional(),
+  file_size: z.coerce.number().nullable().optional(),
+  category: optionalText,
 });
 
 export type ClientFormValues = z.input<typeof clientSchema>;
 export type CompanySettingsFormValues = z.input<typeof companySettingsSchema>;
+export type ProfileFormValues = z.input<typeof profileSchema>;
 export type CompanyServiceFormValues = z.input<typeof companyServiceSchema>;
 export type PropertyMapFormValues = z.input<typeof propertyMapSchema>;
+export type GeoQuerySearchFormValues = z.input<typeof geoQuerySearchSchema>;
 export type ProposalFormValues = z.input<typeof proposalSchema>;
 export type ProposalPdfFormValues = z.input<typeof proposalPdfSchema>;
 export type ProposalModelDraftFormValues = z.input<typeof proposalModelDraftSchema>;

@@ -177,7 +177,32 @@ test.describe("rotas autenticadas", () => {
     await page.goto("/mapa");
 
     await expect(page.getByTestId("map-page")).toBeVisible();
-    await expect(page.getByTestId("map-title")).toHaveText("Mapa");
+    await expect(page.getByTestId("map-title")).toHaveText("Fazer busca de imóvel");
+    await expect(page.getByTestId("geoquery-car-input")).toBeVisible();
+    await expect(page.getByText("Abrir consulta publica do CAR")).toBeVisible();
+    await expect(page.getByText("Acessar Central do CAR / gov.br")).toBeVisible();
+  });
+
+  test("minha conta, menu e chat IA inicial carregam", async ({ page }) => {
+    await page.goto("/minha-conta", { waitUntil: "domcontentloaded" });
+
+    await expect(page.getByTestId("account-page")).toBeVisible();
+    await expect(page.getByTestId("account-title")).toHaveText("Minha Conta");
+    await expect(page.getByTestId("nav-section-menu")).toContainText("MENU");
+    await expect(page.getByTestId("nav-section-configuracoes")).toContainText(
+      "CONFIGURACOES",
+    );
+
+    await page.getByTestId("ai-chat-button").click();
+    await expect(page.getByTestId("ai-chat-panel")).toBeVisible();
+
+    if (!process.env.OPENAI_API_KEY) {
+      await page.getByTestId("ai-chat-input").fill("Resumo das propostas em aberto");
+      await page.getByTestId("ai-chat-send").click();
+      await expect(
+        page.getByTestId("ai-chat-message").filter({ hasText: "OPENAI_API_KEY" }),
+      ).toBeVisible();
+    }
   });
 });
 
@@ -226,11 +251,12 @@ test.describe("fluxos criticos com escrita no banco", () => {
       ).toBeVisible();
     });
 
-    await test.step("converter proposta em servico sem criar receita", async () => {
+    await test.step("aprovar proposta e criar contrato/servico sem receita recebida", async () => {
       const proposalCard = page
         .getByTestId("proposal-card")
         .filter({ hasText: proposalTitle });
-      await proposalCard.getByTestId("proposal-convert-button").click();
+      await proposalCard.getByTestId("proposal-status-select").selectOption("approved");
+      await proposalCard.getByTestId("proposal-status-submit").click();
 
       await expect(page.getByTestId("proposal-column-execution")).toContainText(
         proposalTitle,
@@ -250,13 +276,27 @@ test.describe("fluxos criticos com escrita no banco", () => {
       );
     });
 
-    await test.step("pagamento cria receita e atualiza card", async () => {
+    await test.step("pagamento nao pago cria receita a receber", async () => {
       await page.goto("/propostas");
       const executionCard = page
         .getByTestId("proposal-column-execution")
         .getByTestId("proposal-card")
         .filter({ hasText: proposalTitle });
-      await executionCard.getByTestId("proposal-payment-button").click();
+      await executionCard.getByTestId("proposal-payment-pending-button").click();
+
+      await page.goto("/financeiro");
+      await expect(page.getByTestId("finance-revenues")).toContainText(
+        `Pagamento a receber - ${proposalTitle}`,
+      );
+    });
+
+    await test.step("pagamento pago cria receita recebida e atualiza card", async () => {
+      await page.goto("/propostas");
+      const executionCard = page
+        .getByTestId("proposal-column-execution")
+        .getByTestId("proposal-card")
+        .filter({ hasText: proposalTitle });
+      await executionCard.getByTestId("proposal-payment-paid-button").click();
       await expect(executionCard).toContainText("Pagamento efetuado");
 
       await page.goto("/financeiro");
@@ -268,6 +308,17 @@ test.describe("fluxos criticos com escrita no banco", () => {
       await expect(
         page.getByTestId("service-card").filter({ hasText: proposalTitle }),
       ).toContainText("Pagamento efetuado");
+    });
+
+    await test.step("visualizar proposta", async () => {
+      await page.goto("/propostas");
+      const executionCard = page
+        .getByTestId("proposal-column-execution")
+        .getByTestId("proposal-card")
+        .filter({ hasText: proposalTitle });
+      await executionCard.getByTestId("proposal-view-link").click();
+      await expect(page.getByRole("heading", { name: proposalTitle })).toBeVisible();
+      await expect(page.getByText("Gerar PDF da proposta")).toBeVisible();
     });
   });
 });

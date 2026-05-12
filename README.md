@@ -39,9 +39,12 @@ cp .env.example .env.local
 NEXT_PUBLIC_SUPABASE_URL=https://seu-projeto.supabase.co
 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=sua-chave-publica
 NEXT_PUBLIC_SUPABASE_ANON_KEY=sua-chave-anon-publica-opcional
+OPENAI_API_KEY=sua-chave-server-side-opcional
+OPENAI_MODEL=gpt-5.5
 ```
 
 Use apenas a publishable key ou anon key no frontend. Nao coloque service role key no `.env.local` usado pelo Next.js.
+`OPENAI_API_KEY` e somente server-side. Nunca crie `NEXT_PUBLIC_OPENAI_API_KEY`. Em producao, configure essa variavel como secret do ambiente do servidor.
 
 4. Rode migrations e seed no Supabase.
 
@@ -60,6 +63,9 @@ Ou, em um projeto remoto, execute o SQL de:
 - `supabase/migrations/004_phase1_payment_and_service_repair.sql` para a regra atual da Fase 1: converter cria contrato + servico, pagamento efetuado cria receita
 - `supabase/migrations/005_company_area.sql` para a area Minha Empresa
 - `supabase/migrations/006_map_properties_geometries.sql` para o mapa com imoveis e geometrias KML/KMZ
+- `supabase/migrations/007_ux2_proposals_contracts_documents.sql` para UX-2: status comercial, documentos, wizards e metadados de PDF
+- `supabase/migrations/008_account1_organizations_profiles_ai.sql` para ACCOUNT-1: Minha Conta, organizacoes, planos, quotas e Chat IA
+- `supabase/migrations/009_geoquery_car_incra_alerts.sql` para GEOQUERY-1: busca de imovel por CAR Federal, CAR, INCRA, alertas e historico
 - `supabase/seed.sql`
 
 5. Crie ao menos um usuario no Supabase Auth.
@@ -149,6 +155,10 @@ O workflow manual `.github/workflows/e2e-mutation.yml` roda os E2E destrutivos a
 - Autenticacao protegida por middleware.
 - `profiles` com roles: admin, gerente, tecnico, financeiro e leitura.
 - Minha Empresa com informacoes da empresa, clientes espelhados e servicos/nichos basicos.
+- Minha Conta com dados pessoais, avatar e preferencias.
+- Base multiempresa com `organizations`, `organization_members`, `plans` e `organization_id`.
+- Menu lateral dividido em MENU e CONFIGURACOES.
+- Chat IA flutuante com chamada server-side para OpenAI e fallback quando `OPENAI_API_KEY` nao esta configurada.
 - CRM com clientes PF/PJ, busca, detalhe, edicao, exclusao e historico de interacoes.
 - Propostas comerciais com cards de resumo, grafico simples por status, criacao por PDF/modelo e Kanban com drag and drop persistente.
 - Propostas possuem tipo de servico: `georreferenciamento`, `car`, `itr_ccir` ou `outros_servicos`.
@@ -158,8 +168,10 @@ O workflow manual `.github/workflows/e2e-mutation.yml` roda os E2E destrutivos a
 - Financeiro basico com receitas, despesas, contas a receber/pagar, resumo mensal e resumo por projeto.
 - Biblioteca de documentos com busca.
 - Biblioteca de legislacao com busca por palavra-chave.
-- Mapa com upload KML/KMZ, conversao para GeoJSON e visualizacao em Leaflet/OpenStreetMap.
+- Fazer busca de imovel em `/mapa`, com CAR Federal, bases CAR/INCRA/alertas preparadas, historico, links oficiais e mapa Leaflet/OpenStreetMap.
+- Upload KML/KMZ manual continua disponivel dentro da tela de busca de imovel.
 - Dashboard com indicadores, vencimentos e projetos atrasados.
+- Filtros por periodo em Dashboard, Propostas, Contratos, Servicos/Projetos e Financeiro.
 
 ## Fluxo proposta -> contrato -> servico -> financeiro
 
@@ -188,6 +200,48 @@ Ao clicar em "Pagamento efetuado", o sistema:
 - atualiza proposta e card tecnico para `pagamento_efetuado`;
 - evita duplicidade quando o usuario clica mais de uma vez.
 
+Na Fase UX-2, a acao principal da UI de Propostas passou a ser status comercial:
+
+- `Aprovado`: move para Propostas em Execucao e cria/reaproveita contrato e card tecnico;
+- `Em espera`: move para Propostas em Negociacao;
+- `Nao aprovado`: move para Propostas Perdidas e entra no indicador de valor perdido.
+
+Propostas em execucao exibem controle financeiro:
+
+- `Nao pago`: cria/reaproveita receita pendente em Contas a Receber;
+- `Pago`: cria/reaproveita a mesma receita como recebida.
+
+As rotas `/propostas/[id]` e `/contratos/[id]` exibem preview A4 e permitem imprimir/salvar como PDF. PDFs anexados continuam salvos no Storage privado e vinculados por `attachments`.
+
+Antes de testar UX-2 em Supabase remoto, execute no SQL Editor:
+
+```text
+supabase/migrations/007_ux2_proposals_contracts_documents.sql
+```
+
+Execute primeiro no Supabase de teste. So depois de validar fluxo comercial, contratos, documentos e financeiro, avalie aplicar no Supabase oficial.
+
+## Minha Conta, multiempresa e Chat IA
+
+Antes de testar a Fase ACCOUNT-1 em Supabase remoto, execute no SQL Editor o conteudo completo de:
+
+```text
+supabase/migrations/008_account1_organizations_profiles_ai.sql
+```
+
+Execute primeiro no Supabase de teste. A migration cria `plans`, `organizations`, `organization_members`, vincula perfis existentes a uma organizacao e adiciona `organization_id` nas tabelas principais para isolamento progressivo.
+
+Depois:
+
+1. Acesse `/minha-conta`.
+2. Edite nome, telefone, documento e preferencias.
+3. Envie uma foto de perfil JPG, PNG ou WebP de ate 2 MB.
+4. Acesse `/minha-empresa` e confirme que os dados da empresa ficam vinculados a organizacao atual.
+5. Teste um upload em `/anexos` para validar o limite de armazenamento.
+6. Abra o Chat IA no canto inferior direito.
+
+Sem `OPENAI_API_KEY`, o chat mostra erro claro de configuracao. Com a chave configurada no servidor, o route handler `/api/ai/chat` usa o SDK oficial da OpenAI e a Responses API com texto, usando apenas contexto basico da organizacao logada. Nesta fase a IA nao altera banco.
+
 Ao clicar em "Voltar" na proposta ou "Voltar servico" no card tecnico, o sistema:
 
 - retorna a proposta para `Propostas Enviadas`;
@@ -205,6 +259,42 @@ Para habilitar esse fluxo em um banco ja existente, execute a migration:
 ```
 
 Se aparecer `Could not find the table 'public.contracts' in the schema cache`, a migration da Fase 1 ainda nao foi aplicada com sucesso no Supabase real ou o PostgREST ainda nao recarregou o schema. A migration de reparo termina com `notify pgrst, 'reload schema';`.
+
+## Fazer busca de imovel / GeoQuery
+
+Antes de testar a Fase GEOQUERY-1 em Supabase remoto, execute no SQL Editor o conteudo completo de:
+
+```text
+supabase/migrations/008_account1_organizations_profiles_ai.sql
+supabase/migrations/009_geoquery_car_incra_alerts.sql
+```
+
+Se a migration 008 ja foi aplicada, rode somente a 009. Execute primeiro no Supabase de teste.
+
+A rota `/mapa` continua funcionando, mas o menu mostra "Fazer busca de imovel". A tela permite buscar pelo numero do CAR Federal, vincular cliente/servico/imovel, ver historico, abrir links oficiais do CAR/gov.br e renderizar GeoJSON no mapa quando a base ja estiver importada.
+
+O Drive e apenas origem bruta dos arquivos. Baixe os arquivos da pasta configurada, converta shapefiles completos para GeoJSON e gere uma previa de importacao:
+
+```bash
+npx tsx scripts/geo/import-geojson.ts --file base.geojson --classification CAR_COMPLETA --limit 100 --output preview.json
+```
+
+Para importacao real em lote no Supabase de teste, use `SUPABASE_SERVICE_ROLE_KEY` somente no terminal local/admin:
+
+```bash
+npx tsx scripts/geo/import-geojson-to-supabase.ts --file base.geojson --classification CAR_COMPLETA --batch-size 100 --source-name "CAR teste" --provider SICAR
+```
+
+Variaveis opcionais para a origem bruta:
+
+```env
+GOOGLE_DRIVE_FOLDER_ID=
+GOOGLE_SERVICE_ACCOUNT_EMAIL=
+GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY=
+GOOGLE_APPLICATION_CREDENTIALS=
+```
+
+O GeoGestao nao automatiza login gov.br, nao armazena senha gov.br e nao burla captcha. Para demonstrativo CAR ou CAR atualizado, use os links oficiais, baixe o documento manualmente e anexe pelo fluxo de documentos/anexos. Detalhes em `docs/GEOQUERY.md`.
 
 ## Mapa com KML/KMZ
 

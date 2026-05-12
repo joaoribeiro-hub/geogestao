@@ -1,13 +1,20 @@
 import Link from "next/link";
 import { AlertTriangle, CalendarClock, CircleDollarSign, FolderKanban, Users } from "lucide-react";
+import { PeriodFilter } from "@/components/filters/period-filter";
 import { PageHeader } from "@/components/layout/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
+import { filterByPeriod, resolvePeriodRange } from "@/lib/period";
 import { createServerSupabase } from "@/lib/supabase/server";
 import { formatCurrency, formatDate } from "@/lib/utils";
 
-export default async function DashboardPage() {
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const periodRange = resolvePeriodRange(await searchParams);
   const supabase = await createServerSupabase();
   const [
     clientsResult,
@@ -25,40 +32,57 @@ export default async function DashboardPage() {
     supabase.from("expenses").select("*").order("due_date"),
   ]);
   const clients = clientsResult.data ?? [];
-  const proposals = proposalsResult.data ?? [];
-  const cards = cardsResult.data ?? [];
+  const proposals = filterByPeriod(
+    proposalsResult.data ?? [],
+    periodRange,
+    (proposal) => proposal.sent_at ?? proposal.created_at,
+  );
+  const cards = filterByPeriod(
+    cardsResult.data ?? [],
+    periodRange,
+    (card) => card.due_date ?? card.created_at,
+  );
   const columns = columnsResult.data ?? [];
-  const revenues = revenuesResult.data ?? [];
-  const expenses = expensesResult.data ?? [];
+  const revenues = filterByPeriod(
+    revenuesResult.data ?? [],
+    periodRange,
+    (revenue) => revenue.due_date ?? revenue.created_at,
+  );
+  const expenses = filterByPeriod(
+    expensesResult.data ?? [],
+    periodRange,
+    (expense) => expense.due_date ?? expense.created_at,
+  );
 
   const columnMap = new Map(columns.map((column) => [column.id, column]));
-  const openProposals = proposals.filter(
-    (proposal) => !["finished", "lost"].includes(proposal.stage),
-  );
   const inProgressCards = cards.filter((card) => {
     const column = columnMap.get(card.column_id);
     return !column?.slug.includes("concluido");
   });
-  const pendingCards = cards.filter((card) => {
-    const column = columnMap.get(card.column_id);
-    return card.priority === "urgent" || column?.slug.includes("pendencia");
-  });
   const pendingRevenues = revenues.filter((item) => item.status !== "paid");
-  const pendingExpenses = expenses.filter((item) => item.status !== "paid");
+  const sentProposals = proposals.filter((proposal) =>
+    ["sent", "negotiation", "execution", "finished"].includes(proposal.stage),
+  );
+  const approvedProposals = proposals.filter((proposal) =>
+    ["execution", "finished"].includes(proposal.stage),
+  );
+  const negotiationProposals = proposals.filter((proposal) => proposal.stage === "negotiation");
+  const lostProposals = proposals.filter((proposal) => proposal.stage === "lost");
+  const activeContracts = approvedProposals.filter((proposal) => proposal.contract_id);
+  const pendingContracts = proposals.filter(
+    (proposal) => proposal.stage === "execution" && !proposal.contract_id,
+  );
+  const receivedRevenues = revenues.filter((item) => item.status === "paid");
+  const lostProposalAmount = lostProposals.reduce(
+    (sum, proposal) => sum + Number(proposal.value ?? 0),
+    0,
+  );
 
-  const now = new Date();
-  const month = now.getUTCMonth();
-  const year = now.getUTCFullYear();
-  const isCurrentMonth = (date: string) => {
-    const parsed = new Date(date);
-    return parsed.getUTCMonth() === month && parsed.getUTCFullYear() === year;
-  };
-  const monthRevenue = revenues
-    .filter((item) => isCurrentMonth(item.due_date))
-    .reduce((sum, item) => sum + Number(item.amount), 0);
-  const monthExpense = expenses
-    .filter((item) => isCurrentMonth(item.due_date))
-    .reduce((sum, item) => sum + Number(item.amount), 0);
+  const receivedRevenueAmount = receivedRevenues.reduce(
+    (sum, item) => sum + Number(item.amount),
+    0,
+  );
+  const expenseAmount = expenses.reduce((sum, item) => sum + Number(item.amount), 0);
 
   const nextDue = [
     ...revenues
@@ -84,14 +108,25 @@ export default async function DashboardPage() {
         description="Visao rapida de clientes, propostas, servicos em andamento e financeiro."
       />
 
+      <PeriodFilter range={periodRange} action="/" />
+
       <div className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Metric title="Total de clientes" value={clients.length.toString()} icon={<Users />} />
-        <Metric title="Propostas em aberto" value={openProposals.length.toString()} icon={<FolderKanban />} />
+        <Metric title="Propostas enviadas" value={sentProposals.length.toString()} icon={<FolderKanban />} />
+        <Metric title="Propostas aprovadas" value={approvedProposals.length.toString()} icon={<FolderKanban />} />
+        <Metric title="Propostas em negociacao" value={negotiationProposals.length.toString()} icon={<FolderKanban />} />
+        <Metric title="Propostas perdidas" value={lostProposals.length.toString()} icon={<AlertTriangle />} />
+        <Metric title="Valor total enviado" value={formatCurrency(sentProposals.reduce((sum, item) => sum + Number(item.value ?? 0), 0))} icon={<CircleDollarSign />} />
+        <Metric title="Valor total aprovado" value={formatCurrency(approvedProposals.reduce((sum, item) => sum + Number(item.value ?? 0), 0))} icon={<CircleDollarSign />} />
+        <Metric title="Valor perdido" value={formatCurrency(lostProposalAmount)} icon={<CircleDollarSign />} />
+        <Metric title="Contratos ativos" value={activeContracts.length.toString()} icon={<FolderKanban />} />
+        <Metric title="Contratos pendentes" value={pendingContracts.length.toString()} icon={<FolderKanban />} />
+        <Metric title="Receitas recebidas" value={formatCurrency(receivedRevenueAmount)} icon={<CircleDollarSign />} />
+        <Metric title="Receitas a receber" value={formatCurrency(pendingRevenues.reduce((sum, item) => sum + Number(item.amount), 0))} icon={<CircleDollarSign />} />
+        <Metric title="Despesas" value={formatCurrency(expenseAmount)} icon={<CircleDollarSign />} />
+        <Metric title="Lucro estimado" value={formatCurrency(receivedRevenueAmount - expenseAmount)} icon={<CircleDollarSign />} />
         <Metric title="Projetos em andamento" value={inProgressCards.length.toString()} icon={<CalendarClock />} />
-        <Metric title="Projetos com pendencia" value={pendingCards.length.toString()} icon={<AlertTriangle />} />
-        <Metric title="Receitas pendentes" value={formatCurrency(pendingRevenues.reduce((sum, item) => sum + Number(item.amount), 0))} icon={<CircleDollarSign />} />
-        <Metric title="Despesas pendentes" value={formatCurrency(pendingExpenses.reduce((sum, item) => sum + Number(item.amount), 0))} icon={<CircleDollarSign />} />
-        <Metric title="Lucro estimado do mes" value={formatCurrency(monthRevenue - monthExpense)} icon={<CircleDollarSign />} />
+        <Metric title="Projetos atrasados" value={overdueCards.length.toString()} icon={<AlertTriangle />} />
       </div>
 
       <div className="grid gap-6 xl:grid-cols-2">

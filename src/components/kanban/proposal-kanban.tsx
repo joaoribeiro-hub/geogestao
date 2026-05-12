@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, useTransition } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   DndContext,
@@ -8,12 +9,14 @@ import {
   useDraggable,
   useDroppable,
 } from "@dnd-kit/core";
-import { ArrowRightCircle, GripVertical } from "lucide-react";
+import { Download, Eye, GripVertical, Pencil, Trash2 } from "lucide-react";
 import {
-  convertProposalAction,
+  deleteProposalAction,
   markProposalPaymentAsPaid,
+  markProposalPaymentAsPending,
   moveProposalAction,
   revertProposalFromService,
+  updateProposalCommercialStatusAction,
 } from "@/app/(app)/propostas/actions";
 import { proposalServiceTypes, proposalStages } from "@/lib/constants";
 import { formatCurrency, formatDate } from "@/lib/utils";
@@ -21,7 +24,10 @@ import type { Client, Proposal, ProposalStage } from "@/types/database";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 
-type ProposalWithClient = Proposal & { client?: Pick<Client, "id" | "name"> | null };
+type ProposalWithClient = Proposal & {
+  client?: Pick<Client, "id" | "name"> | null;
+  proposalPdfUrl?: string | null;
+};
 
 const serviceTypeLabels = new Map(
   proposalServiceTypes.map((serviceType) => [serviceType.id, serviceType.label]),
@@ -99,7 +105,7 @@ export function ProposalKanban({
               type: "success",
               message:
                 result?.message ??
-                "Proposta em execucao. Contrato, servico e receita foram vinculados.",
+                "Proposta aprovada. Contrato e servico foram vinculados.",
             });
           }
           router.refresh();
@@ -228,6 +234,63 @@ function ProposalCard({ proposal }: { proposal: ProposalWithClient }) {
           <Badge variant="outline">Validade {formatDate(proposal.valid_until)}</Badge>
         ) : null}
       </div>
+      <div className="mt-3 grid grid-cols-3 gap-2">
+        <Button asChild size="sm" variant="outline" data-testid="proposal-view-link">
+          <Link href={`/propostas/${proposal.id}`}>
+            <Eye aria-hidden="true" />
+            Ver
+          </Link>
+        </Button>
+        <Button asChild size="sm" variant="outline" data-testid="proposal-edit-link">
+          <Link href={`/propostas/${proposal.id}#editar`}>
+            <Pencil aria-hidden="true" />
+            Editar
+          </Link>
+        </Button>
+        <Button
+          size="sm"
+          variant="outline"
+          data-testid="proposal-delete-button"
+          disabled={pending}
+          onClick={() => {
+            if (!window.confirm("Excluir esta proposta?")) return;
+            startTransition(() => {
+              void (async () => {
+                setFeedback(null);
+                try {
+                  await deleteProposalAction(proposal.id);
+                  setFeedback({ type: "success", message: "Proposta excluida." });
+                  router.refresh();
+                } catch (error) {
+                  setFeedback({
+                    type: "error",
+                    message:
+                      error instanceof Error
+                        ? error.message
+                        : "Nao foi possivel excluir a proposta.",
+                  });
+                }
+              })();
+            });
+          }}
+        >
+          <Trash2 aria-hidden="true" />
+          Excluir
+        </Button>
+      </div>
+      {proposal.proposalPdfUrl ? (
+        <Button asChild size="sm" variant="outline" className="mt-2 w-full">
+          <a
+            data-testid="proposal-download-pdf-link"
+            href={proposal.proposalPdfUrl}
+            target="_blank"
+            rel="noreferrer"
+          >
+            <Download aria-hidden="true" />
+            Baixar PDF da proposta
+          </a>
+        </Button>
+      ) : null}
       {proposal.converted_service_card_id || proposal.service_card_id ? (
         <div className="mt-3 grid gap-2">
           <Badge variant="outline">Convertida</Badge>
@@ -235,7 +298,7 @@ function ProposalCard({ proposal }: { proposal: ProposalWithClient }) {
             size="sm"
             variant="outline"
             className="w-full"
-            data-testid="proposal-payment-button"
+            data-testid="proposal-payment-paid-button"
             disabled={pending || proposal.payment_status === "pagamento_efetuado"}
             onClick={() =>
               startTransition(() => {
@@ -258,7 +321,36 @@ function ProposalCard({ proposal }: { proposal: ProposalWithClient }) {
               })
             }
           >
-            {pending ? "Processando..." : "Pagamento efetuado"}
+            {pending ? "Processando..." : "Pago"}
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            className="w-full"
+            data-testid="proposal-payment-pending-button"
+            disabled={pending}
+            onClick={() =>
+              startTransition(() => {
+                void (async () => {
+                  setFeedback(null);
+                  try {
+                    const result = await markProposalPaymentAsPending(proposal.id);
+                    setFeedback({ type: "success", message: result.message });
+                    router.refresh();
+                  } catch (error) {
+                    setFeedback({
+                      type: "error",
+                      message:
+                        error instanceof Error
+                          ? error.message
+                          : "Nao foi possivel registrar o pagamento pendente.",
+                    });
+                  }
+                })();
+              })
+            }
+          >
+            {pending ? "Processando..." : "Nao pago"}
           </Button>
           <Button
             size="sm"
@@ -291,39 +383,13 @@ function ProposalCard({ proposal }: { proposal: ProposalWithClient }) {
           </Button>
         </div>
       ) : (
-        <Button
-          size="sm"
-          variant="outline"
-          className="mt-3 w-full"
-          data-testid="proposal-convert-button"
-          disabled={pending}
-          onClick={() =>
-            startTransition(() => {
-              void (async () => {
-                setFeedback(null);
-                try {
-                  const result = await convertProposalAction(proposal.id);
-                  setFeedback({
-                    type: "success",
-                    message: result.message,
-                  });
-                  router.refresh();
-                } catch (error) {
-                  setFeedback({
-                    type: "error",
-                    message:
-                      error instanceof Error
-                        ? error.message
-                        : "Nao foi possivel converter a proposta.",
-                  });
-                }
-              })();
-            })
-          }
-        >
-          <ArrowRightCircle aria-hidden="true" />
-          {pending ? "Convertendo..." : "Converter em servico"}
-        </Button>
+        proposal.stage === "todo" ? (
+          <CommercialStatusControl
+            proposalId={proposal.id}
+            pending={pending}
+            onFeedback={(nextFeedback) => setFeedback(nextFeedback)}
+          />
+        ) : null
       )}
       {feedback ? (
         <p
@@ -337,5 +403,69 @@ function ProposalCard({ proposal }: { proposal: ProposalWithClient }) {
         </p>
       ) : null}
     </article>
+  );
+}
+
+function CommercialStatusControl({
+  proposalId,
+  pending,
+  onFeedback,
+}: {
+  proposalId: string;
+  pending: boolean;
+  onFeedback: (feedback: { type: "success" | "error"; message: string } | null) => void;
+}) {
+  const router = useRouter();
+  const [status, setStatus] = useState<"approved" | "waiting" | "not_approved">("approved");
+  const [statusPending, startTransition] = useTransition();
+  const disabled = pending || statusPending;
+
+  return (
+    <div className="mt-3 grid gap-2">
+      <select
+        className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+        data-testid="proposal-status-select"
+        value={status}
+        disabled={disabled}
+        onChange={(event) =>
+          setStatus(event.target.value as "approved" | "waiting" | "not_approved")
+        }
+      >
+        <option value="approved">Aprovado</option>
+        <option value="waiting">Em espera</option>
+        <option value="not_approved">Nao aprovado</option>
+      </select>
+      <Button
+        size="sm"
+        variant="outline"
+        data-testid="proposal-status-submit"
+        disabled={disabled}
+        onClick={() =>
+          startTransition(() => {
+            void (async () => {
+              onFeedback(null);
+              try {
+                const result = await updateProposalCommercialStatusAction(proposalId, status);
+                onFeedback({
+                  type: "success",
+                  message: result.message,
+                });
+                router.refresh();
+              } catch (error) {
+                onFeedback({
+                  type: "error",
+                  message:
+                    error instanceof Error
+                      ? error.message
+                      : "Nao foi possivel alterar o status.",
+                });
+              }
+            })();
+          })
+        }
+      >
+        {disabled ? "Atualizando..." : "Alterar status"}
+      </Button>
+    </div>
   );
 }

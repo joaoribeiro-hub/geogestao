@@ -3,7 +3,7 @@ export const ptBR = {
   nav: {
     dashboard: "Dashboard",
     company: "Minha Empresa",
-    map: "Mapa",
+    map: "Fazer busca de imóvel",
     clients: "Clientes",
     proposals: "Propostas",
     contracts: "Contratos",

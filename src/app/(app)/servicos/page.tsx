@@ -1,18 +1,22 @@
 import Link from "next/link";
+import { PeriodFilter } from "@/components/filters/period-filter";
 import { ServiceCardForm } from "@/components/forms/service-card-form";
 import { ServiceKanban } from "@/components/kanban/service-kanban";
 import { PageHeader } from "@/components/layout/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
+import { filterByPeriod, resolvePeriodRange } from "@/lib/period";
 import { createServerSupabase } from "@/lib/supabase/server";
 import { cn } from "@/lib/utils";
 
 export default async function ServicesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ board?: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined> & { board?: string }>;
 }) {
-  const { board } = await searchParams;
+  const params = await searchParams;
+  const board = Array.isArray(params.board) ? params.board[0] : params.board;
+  const periodRange = resolvePeriodRange(params);
   const supabase = await createServerSupabase();
   const [boardsResult, clientsResult] = await Promise.all([
     supabase.from("service_boards").select("*").order("position"),
@@ -35,7 +39,11 @@ export default async function ServicesPage({
   const cardsResult = columnIds.length
     ? await supabase.from("service_cards").select("*").in("column_id", columnIds)
     : { data: [] };
-  const cards = cardsResult.data ?? [];
+  const cards = filterByPeriod(
+    cardsResult.data ?? [],
+    periodRange,
+    (card) => card.due_date ?? card.created_at,
+  );
 
   const clientMap = new Map(clients.map((client) => [client.id, client]));
   const cardsWithClients = cards.map((card) => ({
@@ -48,6 +56,12 @@ export default async function ServicesPage({
       <PageHeader
         title="Servicos tecnicos"
         description="Quadros flexiveis para GEO, CAR, ITR/CCIR e demais demandas."
+      />
+
+      <PeriodFilter
+        range={periodRange}
+        action="/servicos"
+        preserveParams={{ board: selectedBoard?.slug }}
       />
 
       <div className="mb-5 flex flex-wrap gap-2">

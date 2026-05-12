@@ -1,6 +1,6 @@
 # GeoGestao - Estado Atual do Projeto
 
-Data do checkpoint: 2026-05-07
+Data do checkpoint: 2026-05-11
 
 ## Visao geral
 
@@ -41,6 +41,13 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=
 E2E_TEST_EMAIL=
 E2E_TEST_PASSWORD=
 E2E_RUN_MUTATION_TESTS=false
+OPENAI_API_KEY=
+OPENAI_MODEL=gpt-5.5
+GOOGLE_DRIVE_FOLDER_ID=
+GOOGLE_SERVICE_ACCOUNT_EMAIL=
+GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY=
+GOOGLE_APPLICATION_CREDENTIALS=
+SUPABASE_SERVICE_ROLE_KEY=
 ```
 
 Observacoes:
@@ -52,6 +59,11 @@ Observacoes:
 - `.env.local` esta listado no `.gitignore`.
 - `E2E_TEST_EMAIL` e `E2E_TEST_PASSWORD` sao opcionais e devem apontar para usuario de teste.
 - `E2E_RUN_MUTATION_TESTS=true` deve ser usado apenas em Supabase dedicado a testes.
+- `OPENAI_API_KEY` e server-side. Nunca criar `NEXT_PUBLIC_OPENAI_API_KEY`.
+- Se `OPENAI_API_KEY` nao estiver configurada, o Chat IA retorna erro claro de configuracao e nao chama a OpenAI.
+- O Chat IA usa o SDK oficial `openai` e a Responses API apenas com texto nesta fase.
+- Variaveis Google/Drive sao opcionais e servem apenas para a origem bruta das bases geograficas. A consulta do app deve usar tabelas ja importadas no Supabase/Postgres.
+- `SUPABASE_SERVICE_ROLE_KEY` e permitido apenas em scripts locais/admin de importacao geografica. Nunca usar no frontend.
 
 ## Status da integracao Supabase
 
@@ -106,10 +118,12 @@ No ultimo ciclo de implementacao da Fase 1, essas validacoes passaram.
 - `/login` - tela de login.
 - `/` - dashboard.
 - `/minha-empresa` - area central de configuracoes e cadastros internos.
-- `/mapa` - mapa de imoveis/projetos com KML/KMZ e perimetros.
+- `/minha-conta` - dados pessoais, avatar e preferencias da conta.
+- `/mapa` - Fazer busca de imovel por CAR Federal, com mapa, historico, bases CAR/INCRA/alertas preparadas e upload KML/KMZ manual preservado.
 - `/clientes` - lista e busca de clientes.
 - `/clientes/[id]` - detalhe de cliente.
 - `/propostas` - dashboard comercial, criacao de propostas e Kanban de propostas.
+- `/propostas/[id]` - visualizacao/preview A4 e edicao resumida da proposta.
 - `/servicos` - quadros e cards de servicos tecnicos.
 - `/servicos/[id]` - detalhe de card/servico tecnico.
 - `/financeiro` - receitas, despesas e resumos basicos.
@@ -117,6 +131,7 @@ No ultimo ciclo de implementacao da Fase 1, essas validacoes passaram.
 - `/legislacao` - biblioteca de legislacao/normas.
 - `/anexos` - listagem/envio de anexos.
 - `/contratos` - modulo basico de contratos.
+- `/contratos/[id]` - detalhe, continuidade por etapas e preview A4 do contrato.
 
 ## Modulos ja implementados
 
@@ -138,6 +153,7 @@ No ultimo ciclo de implementacao da Fase 1, essas validacoes passaram.
 
 - Rota `/minha-empresa`.
 - Item "Minha Empresa" no menu lateral.
+- Area vinculada a `organizations` na Fase ACCOUNT-1, sem duplicar o conceito de empresa.
 - Abas iniciais:
   - Informacoes;
   - Equipe;
@@ -154,9 +170,46 @@ No ultimo ciclo de implementacao da Fase 1, essas validacoes passaram.
 - Cadastro basico de servicos e nichos com preco base opcional, unidade de cobranca, descricao e status ativo/inativo.
 - Abas avancadas permanecem marcadas como "em breve".
 
+### Minha Conta, organizacoes, planos e Chat IA
+
+- Fase ACCOUNT-1 criada para preparar uso real por empresas e usuarios.
+- Rota `/minha-conta` criada com formulario de dados pessoais:
+  - nome completo;
+  - telefone;
+  - data de nascimento;
+  - tipo e numero de documento;
+  - e-mail de login somente leitura;
+  - avatar/foto de perfil;
+  - preferencias de e-mail;
+  - preferencias basicas da conta.
+- Upload de avatar usa Supabase Storage no bucket `attachments`, registra `profiles.avatar_path` e cria attachment `profile/avatar`.
+- Base multiempresa preparada em um unico Supabase:
+  - `organizations`;
+  - `organization_members`;
+  - `plans`;
+  - `profiles.organization_id`;
+  - `organization_id` nas tabelas principais para migracao progressiva.
+- Planos iniciais criados:
+  - Gratuito;
+  - Premium basico.
+- Limite de armazenamento por organizacao/plano preparado e aplicado inicialmente em avatar e upload generico de anexos.
+- Menu lateral reorganizado em:
+  - MENU: Dashboard, Fazer busca de imovel, Propostas, Contratos, Servicos e Financeiro;
+  - CONFIGURACOES: Minha Empresa, Minha Conta, Clientes, Documentos, Legislacao e Anexos.
+- Chat IA flutuante criado no layout autenticado:
+  - chamada a OpenAI somente pelo route handler server-side `/api/ai/chat`;
+  - SDK oficial `openai` com `client.responses.create`;
+  - contexto basico limitado a organizacao do usuario logado;
+  - historico local na sessao do navegador;
+  - fallback seguro quando `OPENAI_API_KEY` nao esta configurada;
+  - IA somente leitura/geracao de texto nesta fase.
+
+Status da Fase ACCOUNT-1: parcial/implementada no codigo. Pendente aplicar `supabase/migrations/008_account1_organizations_profiles_ai.sql` no Supabase de teste, validar manualmente Minha Conta, Minha Empresa, upload de avatar/anexos e Chat IA, e depois avaliar aplicacao no Supabase oficial.
+
 ### Propostas
 
 - Kanban com colunas comerciais.
+- Filtro reutilizavel por periodo aplicado a Propostas.
 - Cards de resumo da aba Propostas:
   - propostas enviadas;
   - propostas aprovadas;
@@ -170,15 +223,23 @@ No ultimo ciclo de implementacao da Fase 1, essas validacoes passaram.
   - criar proposta usando modelo do sistema.
 - Fluxo de anexar PDF cria proposta, registra anexo e aparece no Kanban.
 - Fluxo por modelo cria rascunho inicial em Propostas a Fazer com etapas Registro, Demanda, Prazos, Financeiro, Secoes e Modelo.
+- O wizard por modelo foi expandido na Fase UX-2 com campos de registro do empreendimento, demanda, prazos, financeiro, secoes e modelo.
 - Cards com cliente, titulo, descricao, valor e responsavel.
+- Cards com acoes de visualizar, editar, excluir e baixar PDF quando houver anexo.
 - Drag and drop com persistencia.
 - Campo obrigatorio de tipo de servico: Georreferenciamento, CAR, ITR/CCIR ou Outros Servicos.
 - Criacao de proposta atualiza a tela e mostra feedback visual.
-- Fluxo de conversao de proposta em servico foi ajustado na Fase 1.
-- Arrastar para "Propostas em Execucao" dispara o mesmo fluxo de conversao do botao.
+- Fluxo de conversao de proposta em servico foi ajustado na Fase 1 e refinado na UX-2.
+- A UI principal agora usa controle de status comercial: Aprovado, Em espera ou Nao aprovado.
+- Aprovado move para execucao e cria/reaproveita contrato e service card.
+- Em espera move para negociacao.
+- Nao aprovado move para perdidas e entra no indicador de valor perdido.
+- Arrastar para "Propostas em Execucao" ainda dispara o mesmo fluxo de conversao por compatibilidade.
 - Conversao cria/reaproveita contrato e card tecnico, mas nao cria receita automaticamente.
-- Botao "Pagamento efetuado" cria/reaproveita uma receita paga e atualiza status de pagamento.
+- Controle Pago/Nao pago em propostas em execucao cria/reaproveita receita recebida ou receita a receber e atualiza status de pagamento da proposta e do card tecnico.
 - Botao "Voltar" retorna a proposta para "Propostas Enviadas" e remove o servico/receita automatica.
+- Rota propria `/propostas/[id]` mostra preview A4, dados da empresa, cliente, servicos, valores, observacoes, links para contrato/servico e download de PDF anexado quando existir.
+- Geracao real de PDF em Storage ficou preparada via campos e attachments; nesta fase existe preview A4 com imprimir/salvar como PDF.
 
 ### Servicos tecnicos
 
@@ -195,6 +256,8 @@ No ultimo ciclo de implementacao da Fase 1, essas validacoes passaram.
 - Status pendente, pago e vencido.
 - Resumos basicos.
 - Regra atual da Fase 1: receita automatica so e criada quando o usuario clica em "Pagamento efetuado".
+- Regra UX-2: pagamento "Nao pago" cria/reaproveita receita pendente a receber; pagamento "Pago" atualiza/cria receita paga.
+- Financeiro usa filtro por periodo.
 
 ### Anexos
 
@@ -212,10 +275,37 @@ No ultimo ciclo de implementacao da Fase 1, essas validacoes passaram.
 - Biblioteca de normas/legislacao.
 - Busca e campos de apoio tecnico.
 
-### Mapa
+### Fazer busca de imovel / GeoQuery
 
 - Rota `/mapa`.
-- Item "Mapa" no menu lateral.
+- Item "Fazer busca de imovel" no menu lateral.
+- Fase GEOQUERY-1 criada para consultar imovel rural por CAR Federal usando bases previamente importadas.
+- Painel de busca com:
+  - numero do CAR Federal;
+  - cliente opcional;
+  - servico/card tecnico opcional;
+  - imovel cadastrado opcional;
+  - buffer de alertas proximos.
+- Links oficiais:
+  - Consulta publica do CAR;
+  - Central do CAR / gov.br;
+  - Meu Imovel Rural.
+- Endpoint interno `POST /api/geoquery/search`.
+- Tabelas preparadas:
+  - `geo_data_sources`;
+  - `car_properties`;
+  - `incra_properties`;
+  - `geo_alert_layers`;
+  - `geo_thematic_layers`;
+  - `property_searches`;
+  - `property_search_results`;
+  - `property_documents`.
+- Migration `009_geoquery_car_incra_alerts.sql` tenta habilitar PostGIS e usa `geom_geojson` como fallback.
+- Scripts preparatorios em `scripts/geo` para fluxo de importacao por GeoJSON/Drive/shapefile/DBF.
+- GEOQUERY-2A adiciona leitura GeoJSON por streaming, preview com `--limit`/`--sample` e importador por lote `scripts/geo/import-geojson-to-supabase.ts`.
+- Busca sem base importada retorna mensagem clara: "Base CAR ainda nao importada."
+- O sistema nao consulta Drive em tempo real a cada busca e nao automatiza login gov.br.
+- Relatorio inicial da busca usa impressao do navegador; PDF automatico fica para fase futura.
 - Tabelas `properties` e `property_geometries`.
 - Upload de arquivo KML/KMZ vinculado a cliente, imovel e servico/card tecnico.
 - Conversao de KML/KMZ para GeoJSON no cliente.
@@ -236,15 +326,30 @@ No ultimo ciclo de implementacao da Fase 1, essas validacoes passaram.
   - link para abrir o servico.
 - Arquitetura preparada para camada de satelite futura via provedor adequado.
 
-Status da Fase 7: parcial. Implementada no codigo e validada por typecheck, lint e build; ainda depende de aplicar a migration `006_map_properties_geometries.sql` no Supabase real e testar com um KML/KMZ simples.
+Status da Fase GEOQUERY-1: parcial/implementada no codigo. Pendente aplicar `supabase/migrations/009_geoquery_car_incra_alerts.sql` no Supabase de teste, importar uma base CAR pequena, validar busca real com GeoJSON e depois avaliar aplicacao no Supabase oficial.
+
+Status legado da Fase 7: parcial. Upload KML/KMZ permanece no codigo; ainda depende de aplicar a migration `006_map_properties_geometries.sql` no Supabase real e testar com um KML/KMZ simples.
 
 ### Contratos
 
 - Modulo basico criado na Fase 1.
 - Rota `/contratos`.
+- Filtro por periodo em Contratos.
 - Contrato vinculado a cliente, proposta e opcionalmente servico.
 - Status iniciais de contrato modelados.
 - Criacao/reaproveitamento automatico no fluxo de conversao.
+- Rota `/contratos/[id]` com detalhe proprio, atalhos para proposta/servico/cliente, preview A4 e wizard de contrato.
+- Wizard de contrato com etapas Registro, Demanda, Prazos, Financeiro, Clausulas, Assinaturas e Modelo.
+- PDF real de contrato em Storage ficou preparado por campos e attachments; nesta fase existe preview A4 com imprimir/salvar como PDF.
+
+### Filtros por periodo e Dashboard
+
+- Componente reutilizavel de filtro por periodo criado para Dashboard, Propostas, Contratos, Servicos/Projetos e Financeiro.
+- Presets: hoje, ultimos 7 dias, ultimos 30 dias, ultimos 3 meses, ultimos 12 meses, este mes, mes ate a data, trimestre ate a data, ano ate a data, tudo e personalizado.
+- Filtro persiste por query params `period`, `from` e `to`.
+- Dashboard principal passou a mostrar indicadores por periodo para propostas, contratos, receitas, despesas, lucro estimado e projetos.
+
+Status da Fase UX-2: parcial/implementada no codigo. Pendente aplicar `supabase/migrations/007_ux2_proposals_contracts_documents.sql` no Supabase de teste, validar manualmente e depois avaliar aplicacao no Supabase oficial. Geracao real de PDF em arquivo ainda esta preparada, mas a entrega funcional atual usa preview A4 e imprimir/salvar como PDF.
 
 ### Qualidade e testes automatizados
 
@@ -359,6 +464,46 @@ Adiciona a Fase 7:
 - policies CRUD para usuarios autenticados;
 - recarrega schema cache do Supabase/PostgREST.
 
+### `supabase/migrations/007_ux2_proposals_contracts_documents.sql`
+
+Adiciona a Fase UX-2:
+
+- metadados JSON e campos de PDF em `proposals`;
+- metadados JSON, clausulas, assinaturas, foro, status de pagamento e campos de PDF em `contracts`;
+- categoria em `attachments`;
+- tabelas auxiliares `proposal_services`, `contract_services` e `payment_installments`;
+- indices para filtros por periodo e consultas de documentos;
+- RLS e policies para usuarios autenticados nas novas tabelas;
+- recarrega schema cache do Supabase/PostgREST.
+
+### `supabase/migrations/008_account1_organizations_profiles_ai.sql`
+
+Adiciona a Fase ACCOUNT-1:
+
+- tabelas `plans`, `organizations` e `organization_members`;
+- planos iniciais Gratuito e Premium basico;
+- campos de perfil para conta pessoal, avatar e preferencias;
+- `organization_id` em tabelas principais para isolamento progressivo;
+- metadados de armazenamento em `attachments`;
+- backfill seguro para criar organizacao de perfis existentes;
+- RLS e policies das novas tabelas;
+- funcao `is_organization_member`;
+- atualizacao da trigger `handle_new_user` para criar organizacao e membro owner;
+- recarrega schema cache do Supabase/PostgREST.
+
+### `supabase/migrations/009_geoquery_car_incra_alerts.sql`
+
+Adiciona a Fase GEOQUERY-1:
+
+- tenta habilitar PostGIS com fallback para `geom_geojson`;
+- cria catalogo `geo_data_sources`;
+- cria tabelas de CAR, INCRA/SIGEF, alertas e camadas tematicas;
+- cria historico de buscas e resultados;
+- cria tabela `property_documents` para demonstrativo CAR, CAR atualizado, shapefiles e relatorios;
+- cria indices por codigo CAR, SIGEF/CNIR, tipo de camada, organizacao e geometrias quando PostGIS existe;
+- cria RLS para usuarios autenticados acessarem dados globais ou da propria organizacao;
+- recarrega schema cache do Supabase/PostgREST.
+
 ## Tipos principais
 
 O arquivo `src/types/database.ts` concentra os tipos TypeScript principais, incluindo:
@@ -369,6 +514,14 @@ O arquivo `src/types/database.ts` concentra os tipos TypeScript principais, incl
 - `CompanyService`
 - `Property`
 - `PropertyGeometry`
+- `GeoDataSource`
+- `CarProperty`
+- `IncraProperty`
+- `GeoAlertLayer`
+- `GeoThematicLayer`
+- `PropertySearch`
+- `PropertySearchResult`
+- `PropertyDocument`
 - `ClientInteraction`
 - `Proposal`
 - `ProposalServiceType`
@@ -408,6 +561,8 @@ O arquivo `src/types/database.ts` concentra os tipos TypeScript principais, incl
 - A migration `006_map_properties_geometries.sql` precisa ser aplicada no Supabase real antes de usar a aba Mapa.
 - Os testes E2E autenticados dependem de `E2E_TEST_EMAIL`, `E2E_TEST_PASSWORD` e de usuario criado no Supabase Auth.
 - Os testes E2E que escrevem no banco dependem de `E2E_RUN_MUTATION_TESTS=true` e devem rodar apenas em banco de teste.
+- A migration `008_account1_organizations_profiles_ai.sql` precisa ser aplicada no Supabase de teste antes de validar `/minha-conta`, Chat IA com contexto e filtros por `organization_id`.
+- `OPENAI_API_KEY` deve existir apenas no ambiente do servidor. Sem ela, o chat retorna mensagem de configuracao ausente.
 - O CI precisa de secrets `NEXT_PUBLIC_SUPABASE_URL` e `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` ou `NEXT_PUBLIC_SUPABASE_ANON_KEY` para validar build/E2E em ambiente GitHub quando necessario.
 - O mapa usa OpenStreetMap; camada de satelite ainda e futura e depende de provedor/API apropriado.
 - O upload KML/KMZ foi preparado para arquivos simples com geometrias suportadas por KML/GeoJSON; arquivos complexos devem ser testados caso a caso.
@@ -438,7 +593,9 @@ O arquivo `src/types/database.ts` concentra os tipos TypeScript principais, incl
    - abrir servico vinculado pelo popup.
 3. Criar usuario/projeto Supabase dedicado para E2E e rodar os testes autenticados da Fase QA-1.
 4. Configurar secrets no GitHub Actions para build/E2E quando desejado.
-5. Evoluir o wizard de propostas ate pre-visualizacao e geracao de PDF.
-6. Preparar documentos de cliente/imovel.
-7. Evoluir dashboard gerencial.
-8. Adicionar camada de satelite ao mapa via provedor com API adequada.
+5. Aplicar a migration `008_account1_organizations_profiles_ai.sql` no Supabase de teste.
+6. Validar manualmente `/minha-conta`, Minha Empresa vinculada a organizacao, upload de avatar/anexos e Chat IA.
+7. Evoluir o wizard de propostas ate pre-visualizacao e geracao de PDF.
+8. Preparar documentos de cliente/imovel.
+9. Evoluir dashboard gerencial.
+10. Adicionar camada de satelite ao mapa via provedor com API adequada.

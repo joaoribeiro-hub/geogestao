@@ -1,6 +1,6 @@
 # GeoGestao - Roadmap
 
-Data do checkpoint: 2026-05-07
+Data do checkpoint: 2026-05-11
 
 ## Qualidade tecnica
 
@@ -22,6 +22,98 @@ Escopo:
 - Criar workflow `.github/workflows/ci.yml`.
 
 Status: parcial. Infraestrutura, scripts, testes iniciais, E2E basico e CI foram criados. Pendente rodar E2E autenticado/destrutivo em Supabase separado de teste e configurar secrets no GitHub.
+
+## Refinamento UX e fluxo comercial
+
+### Fase UX-2: Propostas, Contratos, PDF, Status Comercial e Filtros por Periodo
+
+Objetivo: refinar o fluxo comercial sem copiar marca, layout ou codigo de sistemas de referencia, usando apenas ideias conceituais de UX.
+
+Escopo:
+
+- Criar filtro reutilizavel por periodo.
+- Aplicar filtro em Dashboard, Propostas, Contratos, Servicos/Projetos e Financeiro.
+- Trocar a acao principal de "Converter em servico" por status comercial:
+  - Aprovado;
+  - Em espera;
+  - Nao aprovado.
+- Fazer "Aprovado" criar/reaproveitar contrato e service card.
+- Fazer "Nao aprovado" entrar como valor perdido/nao recebido.
+- Adicionar controle Pago/Nao pago em propostas em execucao.
+- Criar/reaproveitar receita paga ou receita pendente conforme pagamento.
+- Manter Kanban de propostas e adicionar acoes de visualizar, editar, excluir e baixar PDF quando houver.
+- Criar rota propria de proposta com preview A4 e impressao/salvar como PDF.
+- Expandir wizard de proposta por modelo.
+- Criar rota propria de contrato com detalhe, atalhos, preview A4 e wizard de contrato.
+- Criar migration segura `007_ux2_proposals_contracts_documents.sql`.
+- Atualizar testes unitarios/integracao e E2E destrutivo.
+
+Status: parcial/implementado no codigo. Pendente aplicar a migration 007 no Supabase de teste e validar manualmente. Geracao real de PDF em Storage esta preparada por schema e attachments; a interface atual entrega preview A4 e impressao/salvar como PDF.
+
+## Conta, multiempresa, planos e IA
+
+### Fase ACCOUNT-1: Minha Conta, base multiempresa, menu e Chat IA inicial
+
+Objetivo: preparar o GeoGestao para uso real por empresas e usuarios dentro de um unico Supabase, com isolamento progressivo por `organization_id`, estrutura de planos/limites e assistente IA server-side.
+
+Escopo:
+
+- Criar rota `/minha-conta`.
+- Permitir edicao de dados pessoais, avatar e preferencias.
+- Adicionar `profiles.organization_id` e campos de perfil.
+- Criar `organizations`, `organization_members` e `plans`.
+- Criar planos iniciais Gratuito e Premium basico.
+- Preparar quota de armazenamento por organizacao/plano.
+- Aplicar verificacao de limite inicialmente em avatar e anexos genericos.
+- Vincular Minha Empresa a `organizations`.
+- Reorganizar menu lateral em MENU e CONFIGURACOES.
+- Criar Chat IA flutuante com chamada server-side em `/api/ai/chat`.
+- Usar `OPENAI_API_KEY` apenas no servidor.
+- Buscar contexto IA somente da organizacao do usuario logado.
+- Atualizar testes unitarios/E2E e documentacao.
+
+Status: parcial/implementado no codigo. Pendente aplicar `supabase/migrations/008_account1_organizations_profiles_ai.sql` no Supabase de teste, validar manualmente conta, organizacao, uploads e Chat IA, e depois avaliar aplicacao no Supabase oficial.
+
+## GeoQuery e bases geograficas
+
+### Fase GEOQUERY-1: Fazer busca de imovel por CAR Federal com bases CAR, INCRA e Alertas
+
+Objetivo: evoluir a antiga aba Mapa para uma ferramenta de consulta por CAR Federal, usando bases espaciais previamente importadas no Supabase/Postgres.
+
+Escopo:
+
+- Renomear o menu para "Fazer busca de imovel", mantendo a rota `/mapa`.
+- Criar painel de busca por numero do CAR Federal.
+- Preservar Leaflet/OpenStreetMap e o upload KML/KMZ legado.
+- Criar estrutura de banco para fontes, CAR, INCRA/SIGEF, alertas, tematicas, historico, resultados e documentos.
+- Tentar habilitar PostGIS e manter fallback por GeoJSON.
+- Criar endpoint interno `POST /api/geoquery/search`.
+- Mostrar mensagem clara quando a base CAR ainda nao foi importada.
+- Preparar scripts de importacao por GeoJSON e documentar Drive como origem bruta.
+- Incluir links oficiais para consulta publica CAR, Central CAR/gov.br, Meu Imovel Rural e ONR.
+- Nao automatizar gov.br, captcha ou scraping.
+- Atualizar testes unitarios e E2E da tela.
+- Criar `docs/GEOQUERY.md`.
+
+Status: parcial/implementado no codigo. Pendente aplicar `supabase/migrations/009_geoquery_car_incra_alerts.sql` no Supabase de teste, importar uma base pequena, validar busca real com geometria e evoluir intersecoes/buffer com PostGIS.
+
+### Fase GEOQUERY-2A: Importador geografico robusto para arquivos grandes
+
+Objetivo: evitar quebra por memoria ao lidar com GeoJSON grande e permitir carga administrativa em lotes no Supabase de teste.
+
+Escopo:
+
+- Trocar preview GeoJSON para leitura por streaming.
+- Adicionar `--limit` e `--sample`.
+- Mostrar mensagem clara quando o arquivo for grande demais para preview simples.
+- Criar importador real `scripts/geo/import-geojson-to-supabase.ts`.
+- Usar `NEXT_PUBLIC_SUPABASE_URL` e `SUPABASE_SERVICE_ROLE_KEY` somente em script local/admin.
+- Gravar em lotes nas tabelas CAR, INCRA, alertas ou tematicas.
+- Registrar `geo_data_sources`.
+- Proteger arquivos brutos no `.gitignore`.
+- Documentar fluxo de QGIS/sample, preview e importacao.
+
+Status: parcial/implementado no codigo. Pendente validar com uma base grande real no Supabase de teste e, se necessario, adicionar preenchimento automatico de `geom` via PostGIS/RPC.
 
 ## Fase 1: Contratos + conversao proposta -> servico + receita automatica
 

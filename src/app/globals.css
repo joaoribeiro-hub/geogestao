@@ -42,3 +42,14 @@
     background-size: 44px 44px;
   }
 }
+
+@media print {
+  @page {
+    size: A4;
+    margin: 14mm;
+  }
+
+  body {
+    background: white;
+  }
+}
