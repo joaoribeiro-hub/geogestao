@@ -1,0 +1,167 @@
+
+> geo-office-mvp@0.1.0 dev
+> next dev --hostname 0.0.0.0 --port 3000
+
+   ▲ Next.js 15.5.15
+   - Local:        http://localhost:3000
+   - Network:      http://0.0.0.0:3000
+   - Environments: .env.local
+
+ ✓ Starting...
+ ✓ Ready in 3.6s
+ ✓ Compiled /middleware in 376ms (187 modules)
+ ○ Compiling /login ...
+ ✓ Compiled /login in 1539ms (771 modules)
+ GET /login?redirectedFrom=%2F 200 in 2198ms
+ ○ Compiling / ...
+ ✓ Compiled / in 3.7s (1024 modules)
+ GET / 200 in 6347ms
+ ○ Compiling /mapa ...
+ ✓ Compiled /mapa in 2.2s (1351 modules)
+ GET /mapa 200 in 1147ms
+ GET /mapa 200 in 4858ms
+ ○ Compiling /api/geoquery/search ...
+ ✓ Compiled /api/geoquery/search in 1751ms (1369 modules)
+geoquery.sigef.rpc.start {
+  codCar: 'GO-5219753-80EEBF1E6C744118A4C94B2EB35DAE83',
+  minCarOverlap: 0.6,
+  bufferMeters: 0,
+  rpcName: 'find_sigef_matches_by_car_app'
+}
+geoquery.sigef.rpc.success {
+  codCar: 'GO-5219753-80EEBF1E6C744118A4C94B2EB35DAE83',
+  minCarOverlap: 0.6,
+  bufferMeters: 0,
+  rpcName: 'find_sigef_matches_by_car_app',
+  resultCount: 1
+}
+geoquery.alerts.imported.diagnostics {
+  codCar: 'GO-5219753-80EEBF1E6C744118A4C94B2EB35DAE83',
+  rpcName: 'find_alerts_by_car_app',
+  includeNearbyAlerts: false,
+  directColumnCount: 0,
+  directCodeCount: 0,
+  attributesCodeCount: 1,
+  spatialIntersectionCount: 3,
+  nearbyAlerts: 0,
+  geomGeojsonCount: 4,
+  localAlerts: 4,
+  resultCount: 4,
+  finalShownAlerts: 4
+}
+ POST /api/geoquery/search 200 in 13517ms
+ ○ Compiling /api/geoquery/mapbiomas-alert/report ...
+ ✓ Compiled /api/geoquery/mapbiomas-alert/report in 893ms (1369 modules)
+ POST /api/geoquery/mapbiomas-alert/report 502 in 2415ms
+ ○ Compiling /api/geoquery/mapbiomas-alert ...
+ ✓ Compiled /api/geoquery/mapbiomas-alert in 614ms (1371 modules)
+ POST /api/geoquery/mapbiomas-alert 502 in 2379ms
+ GET /mapa 200 in 6254ms
+ GET / 200 in 1513ms
+ GET / 200 in 1454ms
+ ○ Compiling /propostas ...
+ ✓ Compiled /propostas in 2.6s (1417 modules)
+ ✓ Compiled in 889ms (405 modules)
+ GET /propostas 200 in 4486ms
+ POST /propostas 200 in 3356ms
+ GET /propostas 200 in 617ms
+ POST /propostas 200 in 8290ms
+ GET /propostas 200 in 1108ms
+ POST /propostas 200 in 2742ms
+ GET /propostas 200 in 997ms
+ POST /propostas 200 in 2757ms
+ GET /propostas 200 in 763ms
+ POST /propostas 200 in 2028ms
+ GET /propostas 200 in 832ms
+ POST /propostas 200 in 2610ms
+ GET /propostas 200 in 648ms
+ POST /propostas 200 in 6187ms
+ POST /propostas 200 in 2151ms
+ POST /propostas 200 in 1939ms
+ GET /propostas 200 in 479ms
+ GET /propostas 200 in 630ms
+ POST /propostas 200 in 1843ms
+ GET /propostas 200 in 700ms
+ GET /propostas 200 in 580ms
+ ○ Compiling /contratos ...
+ ✓ Compiled /contratos in 1143ms (1419 modules)
+ GET /contratos 200 in 2432ms
+ POST /propostas 200 in 5927ms
+ GET /contratos 200 in 610ms
+ GET /contratos 200 in 558ms
+ ○ Compiling /servicos ...
+ ✓ Compiled /servicos in 1948ms (1442 modules)
+ GET /servicos 200 in 4338ms
+ ○ Compiling /servicos/[id] ...
+ ✓ Compiled /servicos/[id] in 1080ms (1412 modules)
+ GET /servicos/357fdbf4-d7c6-4f9a-9daa-5d07f187a8ab 200 in 5835ms
+ ✓ Compiled /servicos in 387ms (1015 modules)
+ GET /servicos 200 in 2507ms
+ GET / 200 in 1903ms
+ GET /servicos 200 in 1177ms
+ ○ Compiling /financeiro ...
+ ✓ Compiled /financeiro in 1273ms (1436 modules)
+ GET /financeiro 200 in 2890ms
+ ○ Compiling /minha-empresa ...
+ ✓ Compiled /minha-empresa in 1062ms (1457 modules)
+ GET /minha-empresa 200 in 3205ms
+ GET /minha-empresa?tab=equipe 200 in 1044ms
+ GET /minha-empresa?tab=clientes 200 in 1247ms
+ GET /minha-empresa?tab=servicos-nichos 200 in 2212ms
+ GET /minha-empresa?tab=armazenamento 200 in 1806ms
+ ○ Compiling /minha-conta ...
+ ✓ Compiled /minha-conta in 1203ms (1500 modules)
+ GET /minha-conta 200 in 3651ms
+ ○ Compiling /clientes ...
+ ✓ Compiled /clientes in 1434ms (1426 modules)
+ GET /clientes 200 in 2436ms
+ ○ Compiling /documentos ...
+ ✓ Compiled /documentos in 897ms (1472 modules)
+ GET /documentos 200 in 1808ms
+ ○ Compiling /legislacao ...
+ ✓ Compiled /legislacao in 546ms (1484 modules)
+ GET /legislacao 200 in 1075ms
+ GET /mapa 200 in 2172ms
+ ○ Compiling /api/geoquery/search ...
+ ✓ Compiled /api/geoquery/search in 643ms (1050 modules)
+geoquery.sigef.rpc.start {
+  codCar: 'GO-5219753-80EEBF1E6C744118A4C94B2EB35DAE83',
+  minCarOverlap: 0.6,
+  bufferMeters: 0,
+  rpcName: 'find_sigef_matches_by_car_app'
+}
+geoquery.sigef.rpc.success {
+  codCar: 'GO-5219753-80EEBF1E6C744118A4C94B2EB35DAE83',
+  minCarOverlap: 0.6,
+  bufferMeters: 0,
+  rpcName: 'find_sigef_matches_by_car_app',
+  resultCount: 1
+}
+geoquery.alerts.imported.diagnostics {
+  codCar: 'GO-5219753-80EEBF1E6C744118A4C94B2EB35DAE83',
+  rpcName: 'find_alerts_by_car_app',
+  includeNearbyAlerts: false,
+  directColumnCount: 0,
+  directCodeCount: 0,
+  attributesCodeCount: 1,
+  spatialIntersectionCount: 3,
+  nearbyAlerts: 0,
+  geomGeojsonCount: 4,
+  localAlerts: 4,
+  resultCount: 4,
+  finalShownAlerts: 4
+}
+ POST /api/geoquery/search 200 in 11825ms
+ GET /mapa 200 in 1646ms
+ ○ Compiling /servicos ...
+ ✓ Compiled /servicos in 1011ms (1009 modules)
+ GET /servicos 200 in 2334ms
+ GET /servicos 200 in 701ms
+ ✓ Compiled in 22.9s (1249 modules)
+ ✓ Compiled in 5.4s (1062 modules)
+ ○ Compiling /login ...
+ ✓ Compiled /login in 4.9s (670 modules)
+ ○ Compiling /_error ...
+ GET /login?redirectedFrom=%2F 500 in 8278ms
+ ✓ Compiled /_error in 8.6s (1416 modules)
+[?25h

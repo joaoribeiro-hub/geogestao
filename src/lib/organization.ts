@@ -1,6 +1,6 @@
 import { calculateStorageUsage, canUseStorage, formatStorageLimitMessage } from "@/lib/services/storage-quota";
 import type { createServerSupabase } from "@/lib/supabase/server";
-import type { Organization, Plan, Profile } from "@/types/database";
+import type { Organization, OrganizationMember, Plan, Profile } from "@/types/database";
 
 type ServerSupabase = Awaited<ReturnType<typeof createServerSupabase>>;
 
@@ -36,6 +36,61 @@ export async function getCurrentOrganizationForUser(
     : { data: null };
 
   return { ...organization, plan };
+}
+
+export async function getOrganizationMembershipForUser(
+  supabase: ServerSupabase,
+  organizationId: string,
+  userId: string,
+): Promise<OrganizationMember | null> {
+  const { data, error } = await supabase
+    .from("organization_members")
+    .select("*")
+    .eq("organization_id", organizationId)
+    .eq("user_id", userId)
+    .eq("status", "active")
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  return data;
+}
+
+export function canViewOrganizationSettings({
+  membership,
+}: {
+  membership: Pick<OrganizationMember, "role" | "status"> | null;
+}) {
+  return (
+    membership?.status === "active" &&
+    (membership.role === "owner" || membership.role === "admin")
+  );
+}
+
+export function canManageOrganization({
+  profile,
+  membership,
+}: {
+  profile: Pick<Profile, "role"> | null;
+  membership: Pick<OrganizationMember, "role" | "status"> | null;
+}) {
+  void profile;
+  return membership?.status === "active" && membership.role === "owner";
+}
+
+export async function requireOrganizationManager(
+  supabase: ServerSupabase,
+  organizationId: string,
+  userId: string,
+) {
+  const [profile, membership] = await Promise.all([
+    getCurrentProfile(supabase, userId),
+    getOrganizationMembershipForUser(supabase, organizationId, userId),
+  ]);
+
+  if (!canManageOrganization({ profile, membership })) {
+    throw new Error("Apenas o proprietario da empresa pode editar estas informacoes.");
+  }
+
+  return { profile, membership };
 }
 
 export async function assertOrganizationStorageQuota(
@@ -74,5 +129,6 @@ export function buildOrganizationStoragePath({
   fileName: string;
 }) {
   const safeName = fileName.replace(/[^\w.-]+/g, "-");
-  return `${folder}/${organizationId}/${crypto.randomUUID()}-${safeName}`;
+  const safeFolder = folder.replace(/^\/+|\/+$/g, "");
+  return `organizations/${organizationId}/${safeFolder}/${crypto.randomUUID()}-${safeName}`;
 }

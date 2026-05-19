@@ -12,6 +12,7 @@ export const geoLayerClassifications = [
   "CAR_TEMATICA",
   "INCRA_PERIMETROS",
   "ALERTA_DESMATAMENTO",
+  "CAR_ALERT_INTERSECTION",
   "ESTADOS",
   "MUNICIPIOS",
   "BIOMAS",
@@ -48,6 +49,7 @@ export const geoLayerTargetTable: Record<GeoLayerClassification, GeoTargetTable>
   CAR_TEMATICA: "geo_thematic_layers",
   INCRA_PERIMETROS: "incra_properties",
   ALERTA_DESMATAMENTO: "geo_alert_layers",
+  CAR_ALERT_INTERSECTION: "geo_alert_layers",
   ESTADOS: "geo_thematic_layers",
   MUNICIPIOS: "geo_thematic_layers",
   BIOMAS: "geo_thematic_layers",
@@ -143,6 +145,160 @@ export function mapIncraAttributes(attributes: Record<string, unknown>) {
   };
 }
 
+export function mapGeoAlertAttributes(attributes: Record<string, unknown>) {
+  const alertCode = integerOrNull(
+    pickAttribute(attributes, [
+      "alert_code",
+      "codigo_alerta",
+      "cod_alerta",
+      "alerta",
+      "id_alerta",
+      "code",
+      "codigo",
+      "alert_id",
+      "alertcode",
+      "codigo_do_alerta",
+      "cod_mapbiomas",
+    ]),
+  );
+  const codCar = stringOrNull(
+    pickAttribute(attributes, [
+      "cod_car",
+      "cod_imovel",
+      "codigo_imovel",
+      "car_code",
+      "carcode",
+      "codigo_car",
+      "codigo_do_car",
+      "car",
+      "cod_car_federal",
+      "cod_imovel_car",
+      "codigo_imovel_rural",
+    ]),
+  );
+  const codImovel = stringOrNull(
+    pickAttribute(attributes, [
+      "cod_imovel",
+      "codigo_imovel",
+      "property_code",
+      "imovel",
+      "cod_imovel_rural",
+      "codigo_imovel_rural",
+    ]),
+  );
+  const areaIntersecaoHa = numberOrNull(
+    pickAttribute(attributes, [
+      "area_intersecao_ha",
+      "area_intersecao",
+      "intersection_area",
+      "intersection_area_ha",
+      "area_overlap",
+      "area_sobreposta",
+      "area_intersect",
+      "area_intersection",
+    ]),
+  );
+  const areaAlertaHa = numberOrNull(
+    pickAttribute(attributes, [
+      "area_alerta_ha",
+      "area_alerta",
+      "alert_area_ha",
+      "alert_area",
+      "area_do_alerta",
+      "area_ha",
+      "area",
+    ]),
+  );
+  const alertDate = dateOrNull(
+    pickAttribute(attributes, [
+      "alert_date",
+      "data_alerta",
+      "data_deteccao",
+      "detected_at",
+      "published_at",
+      "dt_alerta",
+    ]),
+  );
+
+  return {
+    cod_car: codCar,
+    cod_imovel: codImovel,
+    alert_code: alertCode,
+    codigo_alerta: stringOrNull(
+      pickAttribute(attributes, ["codigo_alerta", "cod_alerta", "alert_code", "alerta"]),
+    ),
+    area_intersecao_ha: areaIntersecaoHa,
+    area_alerta_ha: areaAlertaHa,
+    area_ha: areaAlertaHa,
+    alert_date: alertDate,
+  };
+}
+
+export type GeoAlertMergeCandidate = {
+  id: string;
+  alertCode?: number | null;
+  sourceLabel?: string;
+  matchType?: string | null;
+  isNearbyOnly?: boolean | null;
+  mapbiomasData?: Json | null;
+};
+
+export function isNearbyAlertMatch(alert: Pick<GeoAlertMergeCandidate, "isNearbyOnly" | "matchType">) {
+  return alert.isNearbyOnly === true || alert.matchType === "spatial_buffer";
+}
+
+export function splitGeoAlertsByNearby<T extends GeoAlertMergeCandidate>(alerts: T[]) {
+  return {
+    localAlerts: alerts.filter((alert) => !isNearbyAlertMatch(alert)),
+    nearbyAlerts: alerts.filter(isNearbyAlertMatch),
+  };
+}
+
+export function mergeGeoAlertMatches<T extends GeoAlertMergeCandidate>(
+  localAlerts: T[],
+  apiAlerts: T[],
+) {
+  const merged = new Map<string, T>();
+  localAlerts.forEach((alert) => {
+    merged.set(alert.alertCode ? String(alert.alertCode) : alert.id, alert);
+  });
+  apiAlerts.forEach((alert) => {
+    const key = alert.alertCode ? String(alert.alertCode) : alert.id;
+    const existing = merged.get(key);
+    if (existing) {
+      merged.set(key, {
+        ...existing,
+        sourceLabel: "Base importada + API MapBiomas",
+        mapbiomasData: alert.mapbiomasData ?? existing.mapbiomasData,
+      });
+      return;
+    }
+    merged.set(key, alert);
+  });
+  return [...merged.values()];
+}
+
+export function extractAlertCode(attributes: Record<string, unknown>) {
+  return mapGeoAlertAttributes(attributes).alert_code;
+}
+
+export function extractAlertCarCode(attributes: Record<string, unknown>) {
+  const mapped = mapGeoAlertAttributes(attributes);
+  return mapped.cod_car ?? mapped.cod_imovel;
+}
+
+export function isSigefOverlapMatch(
+  carOverlapRatio: number | null | undefined,
+  minCarOverlap = 0.6,
+) {
+  return Number(carOverlapRatio ?? 0) >= minCarOverlap;
+}
+
+export function formatOverlapPercent(value: number | null | undefined) {
+  if (value === null || value === undefined || !Number.isFinite(value)) return "-";
+  return `${Math.round(value * 10000) / 100}%`;
+}
+
 export function featureCollection(features: Json[]) {
   return {
     type: "FeatureCollection",
@@ -160,4 +316,23 @@ function numberOrNull(value: unknown) {
   if (value === null || value === undefined || value === "") return null;
   const numeric = Number(String(value).replace(",", "."));
   return Number.isFinite(numeric) ? numeric : null;
+}
+
+function integerOrNull(value: unknown) {
+  if (value === null || value === undefined || value === "") return null;
+  const digits = String(value).replace(/[^\d]/g, "");
+  if (!digits) return null;
+  const numeric = Number(digits);
+  return Number.isFinite(numeric) ? Math.trunc(numeric) : null;
+}
+
+function dateOrNull(value: unknown) {
+  if (value === null || value === undefined) return null;
+  const normalized = String(value).trim();
+  if (!normalized) return null;
+  const date = new Date(normalized);
+  if (!Number.isNaN(date.getTime())) return date.toISOString().slice(0, 10);
+  const brDate = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(normalized);
+  if (!brDate) return null;
+  return `${brDate[3]}-${brDate[2]}-${brDate[1]}`;
 }

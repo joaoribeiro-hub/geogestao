@@ -1,10 +1,16 @@
-import { FinanceForm } from "@/components/forms/finance-form";
 import { PeriodFilter } from "@/components/filters/period-filter";
+import { FinanceEntryModals } from "@/components/finance/finance-entry-modals";
 import { PageHeader } from "@/components/layout/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
+import { requireUser } from "@/lib/auth";
+import { getCurrentOrganizationForUser } from "@/lib/organization";
 import { filterByPeriod, resolvePeriodRange } from "@/lib/period";
+import {
+  calculateServiceFinanceSummary,
+  isServiceLostColumn,
+} from "@/lib/services/service-finance";
 import { createServerSupabase } from "@/lib/supabase/server";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import type { Expense, FinanceStatus, Revenue, ServiceCard } from "@/types/database";
@@ -22,26 +28,55 @@ export default async function FinancePage({
 }) {
   const periodRange = resolvePeriodRange(await searchParams);
   const supabase = await createServerSupabase();
+  const user = await requireUser(supabase);
+  const organization = await getCurrentOrganizationForUser(supabase, user.id);
   const [
     clientsResult,
     proposalsResult,
     serviceCardsResult,
+    serviceColumnsResult,
     revenuesResult,
     expensesResult,
   ] = await Promise.all([
-    supabase.from("clients").select("*").order("name"),
-    supabase.from("proposals").select("*").order("created_at", { ascending: false }),
-    supabase.from("service_cards").select("*").order("created_at", { ascending: false }),
-    supabase.from("revenues").select("*").order("due_date"),
-    supabase.from("expenses").select("*").order("due_date"),
+    supabase.from("clients").select("*").eq("organization_id", organization.id).order("name"),
+    supabase
+      .from("proposals")
+      .select("*")
+      .eq("organization_id", organization.id)
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("service_cards")
+      .select("*")
+      .eq("organization_id", organization.id)
+      .order("created_at", { ascending: false }),
+    supabase.from("service_columns").select("*"),
+    supabase.from("revenues").select("*").eq("organization_id", organization.id).order("due_date"),
+    supabase.from("expenses").select("*").eq("organization_id", organization.id).order("due_date"),
   ]);
   const clients = clientsResult.data ?? [];
   const proposals = proposalsResult.data ?? [];
   const serviceCards = serviceCardsResult.data ?? [];
+  const serviceColumns = serviceColumnsResult.data ?? [];
+  const serviceColumnById = new Map(
+    serviceColumns.map((column) => [column.id, column]),
+  );
+  const serviceCardsInPeriod = filterByPeriod(
+    serviceCards,
+    periodRange,
+    (card) => card.due_date,
+  );
+  const lostServiceIds = new Set(
+    serviceCards
+      .filter((card) => isServiceLostColumn(serviceColumnById.get(card.column_id)))
+      .map((card) => card.id),
+  );
   const revenues = filterByPeriod(
     revenuesResult.data ?? [],
     periodRange,
     (revenue) => revenue.due_date ?? revenue.created_at,
+  ).filter(
+    (revenue) =>
+      !(revenue.auto_generated && revenue.service_card_id && lostServiceIds.has(revenue.service_card_id)),
   );
   const expenses = filterByPeriod(
     expensesResult.data ?? [],
@@ -49,11 +84,16 @@ export default async function FinancePage({
     (expense) => expense.due_date ?? expense.created_at,
   );
 
+  const serviceFinance = calculateServiceFinanceSummary(
+    serviceCardsInPeriod,
+    serviceColumnById,
+  );
   const monthlyRevenue = revenues
+    .filter((item) => item.status === "paid")
     .reduce((sum, item) => sum + Number(item.amount), 0);
   const monthlyExpense = expenses
     .reduce((sum, item) => sum + Number(item.amount), 0);
-  const projectRows = serviceCards
+  const projectRows = serviceCardsInPeriod
     .map((card) => {
       const projectRevenues = revenues
         .filter((item) => item.service_card_id === card.id)
@@ -79,33 +119,22 @@ export default async function FinancePage({
       />
 
       <PeriodFilter range={periodRange} action="/financeiro" />
+      <FinanceEntryModals
+        clients={clients}
+        proposals={proposals}
+        serviceCards={serviceCards}
+      />
 
       <div className="mb-6 grid gap-4 md:grid-cols-3">
         <SummaryCard title="Receitas do periodo" value={formatCurrency(monthlyRevenue)} />
         <SummaryCard title="Despesas do periodo" value={formatCurrency(monthlyExpense)} />
-        <SummaryCard title="Lucro estimado" value={formatCurrency(monthlyRevenue - monthlyExpense)} />
+        <SummaryCard title="Lucro estimado" value={formatCurrency(serviceFinance.estimatedProfit)} />
+        <SummaryCard title="Lucro efetuado" value={formatCurrency(serviceFinance.realizedProfit)} />
+        <SummaryCard title="Lucro perdido" value={formatCurrency(serviceFinance.lostProfit)} />
+        <SummaryCard title="Resultado do periodo" value={formatCurrency(serviceFinance.realizedProfit - monthlyExpense)} />
       </div>
 
       <ProjectProfitSummary rows={projectRows} />
-
-      <div className="mb-6 grid gap-6 xl:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle>Nova receita</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <FinanceForm type="revenue" clients={clients} proposals={proposals} serviceCards={serviceCards} />
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle>Nova despesa</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <FinanceForm type="expense" clients={clients} proposals={proposals} serviceCards={serviceCards} />
-          </CardContent>
-        </Card>
-      </div>
 
       <div className="grid gap-6 xl:grid-cols-2">
         <FinanceTable title="Contas a receber" rows={revenues} kind="revenue" serviceCards={serviceCards} />

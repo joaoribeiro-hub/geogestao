@@ -173,14 +173,19 @@ test.describe("rotas autenticadas", () => {
     await expect(page.getByText("Total de clientes")).toBeVisible();
   });
 
-  test("mapa carrega sem quebrar a rota", async ({ page }) => {
+  test("busca CAR fica desabilitada no GeoGestao", async ({ page }) => {
+    await expect(page.getByTestId("nav-section-menu")).not.toContainText(
+      "Fazer busca",
+    );
+
     await page.goto("/mapa");
 
     await expect(page.getByTestId("map-page")).toBeVisible();
-    await expect(page.getByTestId("map-title")).toHaveText("Fazer busca de imóvel");
-    await expect(page.getByTestId("geoquery-car-input")).toBeVisible();
-    await expect(page.getByText("Abrir consulta publica do CAR")).toBeVisible();
-    await expect(page.getByText("Acessar Central do CAR / gov.br")).toBeVisible();
+    await expect(page.getByTestId("map-title")).toHaveText("Funcionalidade movida");
+    await expect(page.getByTestId("geoquery-car-input")).toHaveCount(0);
+    await expect(
+      page.getByText("Esta funcionalidade foi movida para o app MeuIMOVEL-CAR."),
+    ).toBeVisible();
   });
 
   test("minha conta, menu e chat IA inicial carregam", async ({ page }) => {

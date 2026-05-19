@@ -19,11 +19,13 @@ export function FinanceForm({
   clients,
   proposals,
   serviceCards,
+  onSaved,
 }: {
   type: "revenue" | "expense";
   clients: Client[];
   proposals: Proposal[];
   serviceCards: ServiceCard[];
+  onSaved?: () => void;
 }) {
   const [pending, startTransition] = useTransition();
   const form = useForm<FinanceFormValues>({
@@ -47,9 +49,14 @@ export function FinanceForm({
       formData.set(key, value?.toString() ?? ""),
     );
     startTransition(() => {
-      void (type === "revenue"
-        ? createRevenueAction(formData)
-        : createExpenseAction(formData));
+      void (async () => {
+        if (type === "revenue") {
+          await createRevenueAction(formData);
+        } else {
+          await createExpenseAction(formData);
+        }
+        onSaved?.();
+      })();
       form.reset({
         ...values,
         description: "",

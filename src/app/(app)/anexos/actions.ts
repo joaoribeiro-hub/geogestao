@@ -41,7 +41,7 @@ export async function prepareAttachmentUploadAction({
     bucket: "attachments",
     filePath: buildOrganizationStoragePath({
       organizationId: organization.id,
-      folder: `attachments/${entityType}/${entityId}`,
+      folder: buildEntityStorageFolder(entityType, entityId),
       fileName,
     }),
   };
@@ -79,4 +79,19 @@ export async function registerAttachmentAction(formData: FormData) {
   });
 
   revalidatePath("/anexos");
+}
+
+function buildEntityStorageFolder(entityType: AttachmentEntityType, entityId: string) {
+  const folders: Record<AttachmentEntityType, string> = {
+    profile: "profiles",
+    client: "clients",
+    proposal: "proposals",
+    service_card: "services",
+    contract: "contracts",
+    revenue: "finance/revenues",
+    expense: "finance/expenses",
+    document_template: "general/documents",
+    legislation_item: "general/legislation",
+  };
+  return `${folders[entityType]}/${entityId}`;
 }

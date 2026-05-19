@@ -1,13 +1,14 @@
 "use client";
 
-import { useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Loader2, Plus } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { createServiceCardAction } from "@/app/(app)/servicos/actions";
-import { paymentStatuses } from "@/lib/constants";
+import { paymentStatuses, proposalServiceTypes } from "@/lib/constants";
 import { serviceCardSchema, type ServiceCardFormValues } from "@/lib/schemas";
-import type { Client, ServiceColumn } from "@/types/database";
+import { formatBrlCurrency, parseBrlCurrencyInput } from "@/lib/services/service-finance";
+import type { Client, ProposalServiceType, ServiceColumn } from "@/types/database";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -16,128 +17,235 @@ import { Textarea } from "@/components/ui/textarea";
 export function ServiceCardForm({
   clients,
   columns,
+  columnByServiceType,
+  defaultServiceType = "georreferenciamento",
+  onCreated,
 }: {
   clients: Client[];
   columns: ServiceColumn[];
+  columnByServiceType?: Partial<Record<ProposalServiceType, string>>;
+  defaultServiceType?: ProposalServiceType;
+  onCreated?: (result: Awaited<ReturnType<typeof createServiceCardAction>>) => void;
 }) {
   const [pending, startTransition] = useTransition();
+  const [feedback, setFeedback] = useState<{
+    type: "success" | "error";
+    message: string;
+  } | null>(null);
+  const [estimatedValue, setEstimatedValue] = useState("");
+  const [responsibleName, setResponsibleName] = useState("");
+  const initialColumnId =
+    columnByServiceType?.[defaultServiceType] ?? columns[0]?.id ?? "";
   const form = useForm<ServiceCardFormValues>({
     resolver: zodResolver(serviceCardSchema),
     defaultValues: {
-      column_id: columns[0]?.id ?? "",
+      column_id: initialColumnId,
       client_id: "",
       title: "",
       description: "",
+      service_type: defaultServiceType,
       priority: "medium",
       payment_status: "pagamento_nao_efetuado",
       due_date: "",
       custom_fields_json: "{}",
     },
   });
+  const selectedType = form.watch("service_type") ?? defaultServiceType;
+
+  useEffect(() => {
+    const nextColumnId = columnByServiceType?.[selectedType as ProposalServiceType];
+    if (nextColumnId) form.setValue("column_id", nextColumnId);
+  }, [columnByServiceType, form, selectedType]);
 
   function submit(values: ServiceCardFormValues) {
+    const parsedEstimatedValue = parseBrlCurrencyInput(estimatedValue);
+    if (estimatedValue.trim() && parsedEstimatedValue === null) {
+      setFeedback({
+        type: "error",
+        message: "Informe o valor no formato R$ 16.000,00.",
+      });
+      return;
+    }
+
     const formData = new FormData();
+    const metadata = {
+      valor_previsto: parsedEstimatedValue,
+      responsavel_principal: responsibleName || null,
+    };
     Object.entries(values).forEach(([key, value]) =>
       formData.set(key, value?.toString() ?? ""),
     );
+    formData.set("custom_fields_json", JSON.stringify(metadata));
     startTransition(() => {
-      void createServiceCardAction(formData);
-      form.reset({ ...values, title: "", description: "", custom_fields_json: "{}" });
+      void (async () => {
+        setFeedback(null);
+        try {
+          const result = await createServiceCardAction(formData);
+          form.reset({
+            ...values,
+            title: "",
+            description: "",
+            client_id: values.client_id ?? "",
+            custom_fields_json: "{}",
+          });
+          setEstimatedValue("");
+          setResponsibleName("");
+          setFeedback({ type: "success", message: "Servico criado com sucesso." });
+          onCreated?.(result);
+        } catch (error) {
+          setFeedback({
+            type: "error",
+            message:
+              error instanceof Error
+                ? error.message
+                : "Nao foi possivel criar o servico.",
+          });
+        }
+      })();
     });
   }
 
   return (
-    <form className="grid gap-4" onSubmit={form.handleSubmit(submit)}>
-      <div className="space-y-2">
-        <Label htmlFor="service-column">Coluna</Label>
-        <select
-          id="service-column"
-          className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-          {...form.register("column_id")}
-        >
-          {columns.map((column) => (
-            <option key={column.id} value={column.id}>
-              {column.name}
-            </option>
-          ))}
-        </select>
+    <form
+      className="grid gap-4"
+      data-testid="new-service-form"
+      onSubmit={form.handleSubmit(submit)}
+    >
+      <input type="hidden" {...form.register("column_id")} />
+      <input type="hidden" {...form.register("custom_fields_json")} />
+
+      <div className="grid gap-4 md:grid-cols-2">
+        <div className="space-y-2">
+          <Label htmlFor="service-type">Tipo de servico</Label>
+          <select
+            id="service-type"
+            data-testid="service-type"
+            className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+            {...form.register("service_type")}
+          >
+            {proposalServiceTypes.map((type) => (
+              <option key={type.id} value={type.id}>
+                {type.label}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="service-client">Cliente</Label>
+          <select
+            id="service-client"
+            data-testid="service-client"
+            className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+            {...form.register("client_id")}
+          >
+            <option value="">Sem cliente vinculado</option>
+            {clients.map((client) => (
+              <option key={client.id} value={client.id}>
+                {client.name}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="service-client">Cliente</Label>
-        <select
-          id="service-client"
-          className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-          {...form.register("client_id")}
-        >
-          <option value="">Sem cliente vinculado</option>
-          {clients.map((client) => (
-            <option key={client.id} value={client.id}>
-              {client.name}
-            </option>
-          ))}
-        </select>
+        <Label htmlFor="service-title">Nome do imovel / empreendimento</Label>
+        <Input id="service-title" data-testid="service-title" {...form.register("title")} />
+        {form.formState.errors.title ? (
+          <p className="text-xs text-destructive">
+            {form.formState.errors.title.message?.toString()}
+          </p>
+        ) : null}
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="service-title">Titulo</Label>
-        <Input id="service-title" {...form.register("title")} />
+        <Label htmlFor="service-description">Descricao / observacoes iniciais</Label>
+        <Textarea
+          id="service-description"
+          rows={4}
+          {...form.register("description")}
+        />
       </div>
 
-      <div className="space-y-2">
-        <Label htmlFor="service-description">Descricao</Label>
-        <Textarea id="service-description" {...form.register("description")} />
-      </div>
-
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid gap-4 md:grid-cols-3">
         <div className="space-y-2">
           <Label htmlFor="service-priority">Prioridade</Label>
           <select
             id="service-priority"
+            data-testid="service-priority"
             className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
             {...form.register("priority")}
           >
             <option value="low">Baixa</option>
             <option value="medium">Media</option>
             <option value="high">Alta</option>
-            <option value="urgent">Urgente</option>
           </select>
         </div>
         <div className="space-y-2">
-          <Label htmlFor="service-due-date">Data prevista</Label>
+          <Label htmlFor="service-due-date">Data prevista / prazo</Label>
           <Input id="service-due-date" type="date" {...form.register("due_date")} />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="service-payment-status">Status de pagamento</Label>
+          <select
+            id="service-payment-status"
+            className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+            {...form.register("payment_status")}
+          >
+            {paymentStatuses.map((status) => (
+              <option key={status.id} value={status.id}>
+                {status.label}
+              </option>
+            ))}
+          </select>
         </div>
       </div>
 
-      <div className="space-y-2">
-        <Label htmlFor="service-payment-status">Status de pagamento</Label>
-        <select
-          id="service-payment-status"
-          className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-          {...form.register("payment_status")}
-        >
-          {paymentStatuses.map((status) => (
-            <option key={status.id} value={status.id}>
-              {status.label}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      <div className="space-y-2">
-        <Label htmlFor="custom-fields">Campos customizados JSON</Label>
-        <Textarea id="custom-fields" {...form.register("custom_fields_json")} />
-        {form.formState.errors.custom_fields_json ? (
-          <p className="text-xs text-destructive">
-            {form.formState.errors.custom_fields_json.message?.toString()}
+      <div className="grid gap-4 md:grid-cols-2">
+        <div className="space-y-2">
+          <Label htmlFor="service-estimated-value">Valor previsto/proposta</Label>
+          <Input
+            id="service-estimated-value"
+            inputMode="decimal"
+            placeholder="R$ 16.000,00"
+            value={estimatedValue}
+            onChange={(event) => setEstimatedValue(event.target.value)}
+            onBlur={() => {
+              const parsed = parseBrlCurrencyInput(estimatedValue);
+              if (parsed !== null) setEstimatedValue(formatBrlCurrency(parsed));
+            }}
+          />
+          <p className="text-xs text-muted-foreground">
+            Use valores como R$ 16.000,00 ou 1500,50.
           </p>
-        ) : null}
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="service-responsible">Responsavel principal</Label>
+          <Input
+            id="service-responsible"
+            value={responsibleName}
+            onChange={(event) => setResponsibleName(event.target.value)}
+          />
+        </div>
       </div>
 
-      <Button disabled={pending || !columns.length}>
+      <Button data-testid="create-service-submit" disabled={pending || !initialColumnId}>
         {pending ? <Loader2 className="animate-spin" aria-hidden="true" /> : <Plus aria-hidden="true" />}
-        Criar card
+        {pending ? "Criando..." : "Criar servico"}
       </Button>
+
+      {feedback ? (
+        <p
+          className={`rounded-md p-2 text-sm ${
+            feedback.type === "success"
+              ? "bg-primary/10 text-primary"
+              : "bg-destructive/10 text-destructive"
+          }`}
+        >
+          {feedback.message}
+        </p>
+      ) : null}
     </form>
   );
 }

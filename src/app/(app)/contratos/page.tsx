@@ -4,6 +4,8 @@ import { PageHeader } from "@/components/layout/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
+import { requireUser } from "@/lib/auth";
+import { getCurrentOrganizationForUser } from "@/lib/organization";
 import { filterByPeriod, resolvePeriodRange } from "@/lib/period";
 import { createServerSupabase } from "@/lib/supabase/server";
 import { formatCurrency, formatDate } from "@/lib/utils";
@@ -26,12 +28,18 @@ export default async function ContractsPage({
 }) {
   const periodRange = resolvePeriodRange(await searchParams);
   const supabase = await createServerSupabase();
+  const user = await requireUser(supabase);
+  const organization = await getCurrentOrganizationForUser(supabase, user.id);
   const [contractsResult, clientsResult, proposalsResult, serviceCardsResult] =
     await Promise.all([
-      supabase.from("contracts").select("*").order("created_at", { ascending: false }),
-      supabase.from("clients").select("id,name").order("name"),
-      supabase.from("proposals").select("id,title").order("title"),
-      supabase.from("service_cards").select("id,title").order("title"),
+      supabase
+        .from("contracts")
+        .select("*")
+        .eq("organization_id", organization.id)
+        .order("created_at", { ascending: false }),
+      supabase.from("clients").select("id,name").eq("organization_id", organization.id).order("name"),
+      supabase.from("proposals").select("id,title").eq("organization_id", organization.id).order("title"),
+      supabase.from("service_cards").select("id,title").eq("organization_id", organization.id).order("title"),
     ]);
 
   const contracts = filterByPeriod(

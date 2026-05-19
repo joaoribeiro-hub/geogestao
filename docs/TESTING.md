@@ -42,6 +42,7 @@ Cobertura inicial:
 - ACCOUNT-1: calculo de armazenamento usado, limite de quota, validacao de perfil, input do Chat IA e extracao segura de texto da resposta OpenAI.
 - GEOQUERY-1: validacao/normalizacao do CAR Federal, normalizacao de campos DBF, aliases CAR/INCRA e classificacao de camadas.
 - GEOQUERY-2A: leitura streaming de GeoJSON FeatureCollection e mapeamento de preview/importacao com fixture pequena.
+- GEOQUERY-3: regra de sobreposicao SIGEF/CAR, mapeamento `CAR_ALERT_INTERSECTION`, service MapBiomas Alerta com `fetch` mockado, fallback de token para `signIn`, resposta `alert = null` e PDF interno do laudo MapBiomas.
 
 ### Integracao de regras criticas
 
@@ -182,6 +183,7 @@ Para rodar testes autenticados:
    - `007_ux2_proposals_contracts_documents.sql`, para validar UX-2.
    - `008_account1_organizations_profiles_ai.sql`, para validar Minha Conta, organizacoes, planos, limite de armazenamento e Chat IA.
    - `009_geoquery_car_incra_alerts.sql`, para validar Fazer busca de imovel, bases CAR/INCRA/alertas e historico.
+   - `010_geoquery_spatial_matching_mapbiomas.sql`, para validar cruzamento espacial CAR x SIGEF e alertas MapBiomas.
 3. Crie um usuario no Supabase Auth.
 4. Garanta um registro correspondente em `profiles`.
 5. Configure variaveis locais:
@@ -296,6 +298,8 @@ Se `E2E_RUN_MUTATION_TESTS` nao estiver como `true`, o workflow falha antes de r
 - Falha de Playwright apos navegar para uma rota autenticada: migrations ausentes, RLS/policies ou mudanca de UI sem seletor estavel.
 - Falha em `/minha-conta`: normalmente indica que a migration ACCOUNT-1 ainda nao foi aplicada, pois a tela depende de `profiles.organization_id`, `organizations`, `plans` e novos metadados de `attachments`.
 - Falha em `/mapa`/GeoQuery: normalmente indica que as migrations 008 e 009 ainda nao foram aplicadas, pois a tela consulta `organization_id`, `geo_data_sources` e `property_searches`.
+- Falha no SIGEF por sobreposicao: normalmente indica que a migration 010 nao foi aplicada, PostGIS nao esta habilitado ou `refresh_geoquery_geometries(true)` ainda nao foi executada.
+- Falha no botao "Visualizar laudo": verifique variaveis server-side `MAPBIOMAS_ALERT_TOKEN` ou `MAPBIOMAS_ALERT_EMAIL`/`MAPBIOMAS_ALERT_PASSWORD`.
 - Falha do Chat IA sem chave: o esperado e exibir "OPENAI_API_KEY nao configurada no servidor.". Se aparecer 401, a sessao autenticada nao foi criada.
 
 ## Como adicionar novo teste
@@ -321,6 +325,12 @@ Coberto agora:
 - validacao de perfil e Chat IA;
 - validacao/normalizacao GeoQuery, campos DBF e classificacao de bases geograficas;
 - leitura streaming de GeoJSON pequeno em fixture para proteger o importador de regressao basica;
+- service MapBiomas Alerta com mock de `fetch`, sem chamada real a API;
+- PDF interno "Laudo GeoGestao - Dados MapBiomas Alerta";
+- ocultacao dos controles tecnicos da tela operacional GeoQuery;
+- UX-ORG-SERVICES-1: regras puras do fluxo de Servicos, incluindo coluna inicial `Aguardando documentos`, destino de prioridade alta, botao Proximo, checklists padrao por tipo e resumo automatico sem IA.
+- UX-ORG-SERVICES-1 correcao: colunas por tipo de servico, permissao owner/admin de Minha Empresa, path de storage por organizacao e regra de despesa mensal de membro de equipe.
+- UX-ORG-SERVICES-1 correcao RLS/financeiro: migration sem policy recursiva em `organization_members`, parser BRL de valores de servico, lucro estimado/efetuado/perdido e coluna `Servico perdido`.
 - status comercial de proposta nao aprovada/perdida;
 - receita pendente/a receber para pagamento nao pago;
 - pagina de login em E2E.
@@ -340,3 +350,4 @@ Pendente:
 - teste automatizado de chamada real OpenAI, caso seja desejado em ambiente isolado.
 - teste de importacao real de shapefile/GeoJSON em Supabase de teste;
 - teste de intersecao espacial/buffer depois de ativar PostGIS e carregar fixtures geograficas.
+- E2E completo do novo fluxo de Servicos com anexos, criacao de cliente pelo servico, proposta/contrato vinculados e reset seguro em Supabase de teste.

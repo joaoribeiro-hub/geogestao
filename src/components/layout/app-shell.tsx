@@ -5,12 +5,9 @@ import {
   BookOpen,
   BriefcaseBusiness,
   Building2,
-  FileSignature,
   FileText,
-  GanttChartSquare,
   Home,
   Landmark,
-  Map,
   Paperclip,
   UserCircle,
   Users,
@@ -22,9 +19,6 @@ import { SignOutButton } from "@/components/layout/sign-out-button";
 
 const mainNav = [
   { href: "/", label: ptBR.nav.dashboard, icon: Home },
-  { href: "/mapa", label: ptBR.nav.map, icon: Map },
-  { href: "/propostas", label: ptBR.nav.proposals, icon: GanttChartSquare },
-  { href: "/contratos", label: ptBR.nav.contracts, icon: FileSignature },
   { href: "/servicos", label: ptBR.nav.services, icon: BriefcaseBusiness },
   { href: "/financeiro", label: ptBR.nav.finance, icon: Landmark },
 ] as const;

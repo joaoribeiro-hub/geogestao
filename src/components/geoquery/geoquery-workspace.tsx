@@ -13,13 +13,14 @@ import { formatDate } from "@/lib/utils";
 import type {
   CarProperty,
   Client,
+  GeoAlertLayer,
   GeoDataSource,
-  IncraProperty,
   Json,
   Property,
   PropertyDocument,
   PropertySearch,
   ServiceCard,
+  SigefSpatialMatch,
 } from "@/types/database";
 import type { MapFeature } from "@/components/map/property-map";
 
@@ -34,9 +35,25 @@ type GeoQueryResponse = {
     alertsNearby: number;
     thematicLayers: number;
     bufferMeters: number;
+    includeNearbyAlerts: boolean;
+    sigefMinOverlap: number;
+    sigefBufferMeters: number;
+    sigefMatching: string;
+    warnings?: string[];
   };
   car: CarProperty | null;
-  incra: IncraProperty[];
+  incra: SigefSpatialMatch[];
+  alerts: {
+    inside: GeoAlertMatch[];
+    nearby: GeoAlertMatch[];
+  };
+  localAlerts?: GeoAlertMatch[];
+  nearbyAlerts?: GeoAlertMatch[];
+  apiAlerts?: GeoAlertMatch[];
+  mergedAlerts?: GeoAlertMatch[];
+  diagnostics?: {
+    alerts?: Record<string, number>;
+  };
   geojson: {
     car: Json | null;
     incra: Json[];
@@ -45,6 +62,26 @@ type GeoQueryResponse = {
   documents: PropertyDocument[];
   officialLinks: typeof officialGeoqueryLinks;
   searchId: string;
+};
+
+type GeoAlertMatch = GeoAlertLayer & {
+  alertCode: number | null;
+  sourceLabel: string;
+  matchType?: string | null;
+  distance_m?: number | null;
+  is_spatially_confirmed?: boolean | null;
+  is_nearby_only?: boolean | null;
+  platformUrl: string;
+  mapbiomasData?: Json | null;
+};
+
+type MapBiomasAlertResponse = {
+  ok: boolean;
+  alert?: Json | null;
+  ruralProperty?: Json | null;
+  reportUrl?: string | null;
+  platformUrl?: string | null;
+  message: string;
 };
 
 type GeoQueryErrorResponse = {
@@ -67,7 +104,7 @@ export function GeoQueryWorkspace({
   properties,
   initialFeatures,
   searches,
-  sources,
+  sources: _sources,
 }: {
   clients: Client[];
   serviceCards: ServiceCard[];
@@ -83,6 +120,7 @@ export function GeoQueryWorkspace({
 
   const resultFeatures = useMemo(() => buildResultFeatures(result), [result]);
   const mapFeatures = resultFeatures.length ? resultFeatures : initialFeatures;
+  const showTechnicalSourcesPanel = false;
 
   function searchProperty(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -92,15 +130,20 @@ export function GeoQueryWorkspace({
       clientId: optionalValue(form.get("clientId")),
       serviceCardId: optionalValue(form.get("serviceCardId")),
       propertyId: optionalValue(form.get("propertyId")),
-      bufferMeters: Number(form.get("bufferMeters") ?? 500),
+      bufferMeters: 500,
+      includeNearbyAlerts: form.get("includeNearbyAlerts") === "on",
+      sigefMinOverlap: 60,
+      sigefBufferMeters: 0,
     };
 
     startTransition(() => {
       void (async () => {
         setMessage(null);
+        setResult(null);
         try {
           const response = await fetch("/api/geoquery/search", {
             method: "POST",
+            cache: "no-store",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(payload),
           });
@@ -196,16 +239,20 @@ export function GeoQueryWorkspace({
               </select>
             </Field>
 
-            <Field label="Buffer de alertas proximos (m)">
-              <Input
-                name="bufferMeters"
-                type="number"
-                min={0}
-                max={10000}
-                defaultValue={500}
-                data-testid="geoquery-buffer-input"
+            <label className="flex items-start gap-3 rounded-md border bg-background p-3 text-sm">
+              <input
+                name="includeNearbyAlerts"
+                type="checkbox"
+                className="mt-1"
+                data-testid="geoquery-include-nearby-alerts"
               />
-            </Field>
+              <span>
+                <span className="block font-medium">Incluir alertas proximos</span>
+                <span className="block text-muted-foreground">
+                  Mostra alertas no buffer em uma secao separada, sem tratar como alerta do imovel.
+                </span>
+              </span>
+            </label>
 
             <Button disabled={pending} data-testid="geoquery-submit">
               {pending ? <Loader2 className="animate-spin" aria-hidden="true" /> : <Search aria-hidden="true" />}
@@ -232,11 +279,12 @@ export function GeoQueryWorkspace({
           </div>
         </section>
 
+        {showTechnicalSourcesPanel ? (
         <section className="rounded-lg border bg-card p-5">
           <h2 className="mb-3 text-lg font-semibold">Bases geograficas</h2>
-          {sources.length ? (
+          {_sources.length ? (
             <div className="space-y-3">
-              {sources.map((source) => (
+              {_sources.map((source) => (
                 <div key={source.id} className="rounded-md border bg-background p-3 text-sm">
                   <p className="font-medium">{source.name}</p>
                   <p className="text-muted-foreground">
@@ -252,6 +300,7 @@ export function GeoQueryWorkspace({
             <EmptyState title="Nenhuma base geografica importada ainda." />
           )}
         </section>
+        ) : null}
 
         <section className="rounded-lg border bg-card p-5">
           <h2 className="mb-3 text-lg font-semibold">Historico</h2>
@@ -350,6 +399,81 @@ function ResultTab({
   activeTab: (typeof tabs)[number];
   result: GeoQueryResponse | null;
 }) {
+  const [alertReport, setAlertReport] = useState<MapBiomasAlertResponse | null>(null);
+  const [loadingAlertCode, setLoadingAlertCode] = useState<number | null>(null);
+  const [loadingPdfAlertCode, setLoadingPdfAlertCode] = useState<number | null>(null);
+
+  async function viewAlertReport(alert: GeoAlertMatch) {
+    if (!alert.alertCode) return;
+    setLoadingAlertCode(alert.alertCode);
+    setAlertReport(null);
+    try {
+      const response = await fetch("/api/geoquery/mapbiomas-alert", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ alertCode: alert.alertCode, carCode: result?.codCar }),
+      });
+      const data = (await response.json()) as MapBiomasAlertResponse;
+      setAlertReport(data);
+    } catch {
+      setAlertReport({
+        ok: false,
+        message: "Nao foi possivel consultar a API MapBiomas Alerta agora.",
+      });
+    } finally {
+      setLoadingAlertCode(null);
+    }
+  }
+
+  async function downloadAlertReportPdf(alert: GeoAlertMatch) {
+    if (!alert.alertCode) return;
+    setLoadingPdfAlertCode(alert.alertCode);
+    try {
+      const response = await fetch("/api/geoquery/mapbiomas-alert/report", {
+        method: "POST",
+        cache: "no-store",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ alertCode: alert.alertCode, carCode: result?.codCar }),
+      });
+
+      if (!response.ok) {
+        const data = (await response.json().catch(() => null)) as
+          | { message?: string }
+          | null;
+        setAlertReport({
+          ok: false,
+          message: data?.message ?? "Nao foi possivel gerar o PDF do laudo MapBiomas agora.",
+        });
+        return;
+      }
+
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download =
+        extractDownloadFileName(response.headers) ?? `laudo-mapbiomas-${alert.alertCode}.pdf`;
+      link.click();
+      URL.revokeObjectURL(url);
+      setAlertReport({
+        ok: true,
+        alert: null,
+        reportUrl: null,
+        platformUrl: alert.platformUrl,
+        message:
+          response.headers.get("X-GeoGestao-Message") ??
+          "PDF gerado pelo GeoGestao com dados retornados pela API MapBiomas.",
+      });
+    } catch {
+      setAlertReport({
+        ok: false,
+        message: "Nao foi possivel gerar o PDF do laudo MapBiomas agora.",
+      });
+    } finally {
+      setLoadingPdfAlertCode(null);
+    }
+  }
+
   if (!result) {
     return (
       <EmptyState title="Nenhuma busca executada. Informe o CAR Federal para consultar as bases importadas." />
@@ -365,6 +489,13 @@ function ResultTab({
         <Info label="INCRA/SIGEF" value={`${result.summary.incraMatches} correspondencias`} />
         <Info label="Alertas sobrepostos" value={`${result.summary.alertsInside}`} />
         <Info label="Alertas proximos" value={`${result.summary.alertsNearby}`} />
+        <Info label="Buscar proximos" value={result.summary.includeNearbyAlerts ? "Sim" : "Nao"} />
+        {result.summary.warnings?.length ? (
+          <div className="rounded-md border bg-background p-3 md:col-span-2">
+            <p className="text-xs text-muted-foreground">Avisos</p>
+            <p className="mt-1 font-medium">{result.summary.warnings.join(" ")}</p>
+          </div>
+        ) : null}
       </div>
     );
   }
@@ -385,9 +516,28 @@ function ResultTab({
   }
 
   if (activeTab === "INCRA/SIGEF") {
-    return result.incra.length ? (
+    return <SigefResultList items={result.incra} />;
+  }
+
+  if (activeTab === "Alertas") {
+    return (
+      <AlertResultList
+        alerts={result.alerts.inside}
+        nearbyAlerts={result.alerts.nearby}
+        codCar={result.codCar}
+        alertReport={alertReport}
+        loadingAlertCode={loadingAlertCode}
+        loadingPdfAlertCode={loadingPdfAlertCode}
+        onViewReport={viewAlertReport}
+        onDownloadPdf={downloadAlertReportPdf}
+      />
+    );
+  }
+
+  if (false) {
+    return result!.incra.length ? (
       <div className="space-y-3">
-        {result.incra.map((item) => (
+        {result!.incra.map((item) => (
           <div key={item.id} className="rounded-md border bg-background p-3 text-sm">
             <p className="font-medium">{item.sigef_code ?? item.cnir ?? item.codigo_imovel ?? "INCRA/SIGEF"}</p>
             <p className="text-muted-foreground">
@@ -401,7 +551,7 @@ function ResultTab({
     );
   }
 
-  if (activeTab === "Alertas") {
+  if (false) {
     return (
       <EmptyState title="Alertas espaciais preparados para importacao. A consulta por intersecao/buffer sera ativada apos importar camadas com PostGIS." />
     );
@@ -441,10 +591,258 @@ function ResultTab({
         label="Baixar GeoJSON do INCRA"
         geojson={result.geojson.incra.length ? { type: "FeatureCollection", features: result.geojson.incra } : null}
       />
+      <DownloadButton
+        label="Baixar GeoJSON dos alertas"
+        geojson={result.geojson.alerts.length ? { type: "FeatureCollection", features: result.geojson.alerts } : null}
+      />
       <Button type="button" variant="outline" disabled>
         Shapefile ZIP em fase futura
       </Button>
     </div>
+  );
+}
+
+function SigefResultList({
+  items,
+}: {
+  items: SigefSpatialMatch[];
+}) {
+  if (!items.length) {
+    return (
+      <EmptyState
+        title="Nenhuma correspondencia SIGEF encontrada para o CAR pesquisado."
+      />
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      {items.map((item) => (
+        <div key={item.id} className="rounded-md border bg-background p-3 text-sm">
+          <p className="font-medium">
+            {item.sigef_code ?? item.cnir ?? item.codigo_imovel ?? "INCRA/SIGEF"}
+          </p>
+          <div className="mt-2 grid gap-2 md:grid-cols-3">
+            <Info label="Sobreposicao CAR" value={formatPercent(item.car_overlap_ratio)} />
+            <Info label="Area intersecao" value={formatHa(item.intersection_area_ha)} />
+            <Info label="Area CAR" value={formatHa(item.car_area_ha)} />
+            <Info label="Area SIGEF" value={formatHa(item.incra_area_ha ?? item.area_ha)} />
+            <Info label="Situacao" value={item.situacao ?? "-"} />
+            <Info label="Municipio/UF" value={[item.municipio, item.uf].filter(Boolean).join("/") || "-"} />
+            <Info label="Codigo imovel" value={item.codigo_imovel ?? "-"} />
+            <Info label="Certificacao" value={item.certificacao ?? "-"} />
+            <Info label="Data certificacao" value={formatDate(item.data_certificacao)} />
+            <Info label="ART" value={getAttributeText(item.attributes, ["art", "numero_art"])} />
+            <Info label="Data submissao" value={getAttributeText(item.attributes, ["data_submissao", "dt_submissao"])} />
+            <Info label="Data aprovacao" value={getAttributeText(item.attributes, ["data_aprovacao", "dt_aprovacao"])} />
+            <Info label="Nome area" value={getAttributeText(item.attributes, ["nome_area", "area_nome", "nome"])} />
+            <Info label="Matricula/registro" value={getAttributeText(item.attributes, ["matricula", "registro", "matricula_registro"])} />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function AlertResultList({
+  alerts,
+  nearbyAlerts,
+  codCar,
+  alertReport,
+  loadingAlertCode,
+  loadingPdfAlertCode,
+  onViewReport,
+  onDownloadPdf,
+}: {
+  alerts: GeoAlertMatch[];
+  nearbyAlerts: GeoAlertMatch[];
+  codCar: string;
+  alertReport: MapBiomasAlertResponse | null;
+  loadingAlertCode: number | null;
+  loadingPdfAlertCode: number | null;
+  onViewReport: (alert: GeoAlertMatch) => void;
+  onDownloadPdf: (alert: GeoAlertMatch) => void;
+}) {
+  if (!alerts.length && !nearbyAlerts.length) {
+    return (
+      <EmptyState title="Nenhum alerta importado ou retornado pela API MapBiomas para este CAR." />
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      <div>
+        <h3 className="mb-2 text-sm font-semibold">Alertas do imovel</h3>
+        {alerts.length ? null : (
+          <EmptyState title="Nenhum alerta vinculado diretamente ou intersectando o CAR pesquisado." />
+        )}
+      </div>
+      {alerts.map((alert) => (
+        <AlertCard
+          key={alert.id}
+          alert={alert}
+          codCar={codCar}
+          loadingAlertCode={loadingAlertCode}
+          loadingPdfAlertCode={loadingPdfAlertCode}
+          onViewReport={onViewReport}
+          onDownloadPdf={onDownloadPdf}
+        />
+      ))}
+
+      {nearbyAlerts.length ? (
+        <div className="space-y-3 pt-2">
+          <div>
+            <h3 className="text-sm font-semibold">Alertas proximos</h3>
+            <p className="mt-1 rounded-md bg-secondary p-3 text-sm text-muted-foreground">
+              Alerta proximo, nao intersecta o CAR pesquisado.
+            </p>
+          </div>
+          {nearbyAlerts.map((alert) => (
+            <AlertCard
+              key={alert.id}
+              alert={alert}
+              codCar={codCar}
+              loadingAlertCode={loadingAlertCode}
+              loadingPdfAlertCode={loadingPdfAlertCode}
+              onViewReport={onViewReport}
+              onDownloadPdf={onDownloadPdf}
+              nearby
+            />
+          ))}
+        </div>
+      ) : null}
+
+      {alertReport ? (
+        <div className="rounded-md border border-primary/30 bg-secondary p-4 text-sm">
+          <p className="font-medium">Retorno MapBiomas Alerta</p>
+          <p className="mt-1 text-muted-foreground">{alertReport.message}</p>
+          {alertReport.alert ? (
+            <p className="mt-2 inline-flex rounded-md bg-background px-2 py-1 text-xs font-medium">
+              Confirmado pela API
+            </p>
+          ) : null}
+          <div className="mt-3 flex flex-wrap gap-2">
+            {alertReport.reportUrl ? (
+              <a
+                className="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-input bg-background px-3 text-sm font-medium hover:bg-secondary"
+                href={alertReport.reportUrl}
+                target="_blank"
+                rel="noreferrer"
+              >
+                <ExternalLink className="size-4" aria-hidden="true" />
+                Abrir laudo
+              </a>
+            ) : null}
+            {alertReport.platformUrl ? (
+              <a
+                className="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-input bg-background px-3 text-sm font-medium hover:bg-secondary"
+                href={alertReport.platformUrl}
+                target="_blank"
+                rel="noreferrer"
+              >
+                <ExternalLink className="size-4" aria-hidden="true" />
+                Abrir plataforma oficial
+              </a>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function AlertCard({
+  alert,
+  codCar,
+  loadingAlertCode,
+  loadingPdfAlertCode,
+  onViewReport,
+  onDownloadPdf,
+  nearby = false,
+}: {
+  alert: GeoAlertMatch;
+  codCar: string;
+  loadingAlertCode: number | null;
+  loadingPdfAlertCode: number | null;
+  onViewReport: (alert: GeoAlertMatch) => void;
+  onDownloadPdf: (alert: GeoAlertMatch) => void;
+  nearby?: boolean;
+}) {
+  return (
+    <div className="rounded-md border bg-background p-3 text-sm">
+      {nearby ? (
+        <p className="mb-3 rounded-md bg-secondary p-2 text-xs text-muted-foreground">
+          Alerta proximo, nao intersecta o CAR pesquisado.
+        </p>
+      ) : null}
+          <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+            <div>
+              <p className="font-medium">
+                Alerta {alert.alertCode ?? alert.codigo_alerta ?? alert.name}
+              </p>
+              <p className="text-muted-foreground">
+                {alert.sourceLabel} - {alert.provider ?? "MapBiomas"} - {formatDate(alert.alert_date)}
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                disabled={!alert.alertCode || loadingAlertCode === alert.alertCode}
+                onClick={() => onViewReport(alert)}
+              >
+                {loadingAlertCode === alert.alertCode ? (
+                  <Loader2 className="animate-spin" aria-hidden="true" />
+                ) : (
+                  <ExternalLink aria-hidden="true" />
+                )}
+                {alert.sourceLabel.includes("API") ? "Ver dados do laudo" : "Consultar na API MapBiomas"}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={!alert.alertCode || loadingPdfAlertCode === alert.alertCode}
+                onClick={() => onDownloadPdf(alert)}
+              >
+                {loadingPdfAlertCode === alert.alertCode ? (
+                  <Loader2 className="animate-spin" aria-hidden="true" />
+                ) : (
+                  <Download aria-hidden="true" />
+                )}
+                Gerar/Baixar PDF
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={!alert.alertCode}
+                onClick={() => alert.alertCode && navigator.clipboard?.writeText(String(alert.alertCode))}
+              >
+                Copiar codigo
+              </Button>
+              <a
+                className="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-input bg-background px-3 text-sm font-medium hover:bg-secondary"
+                href={alert.platformUrl}
+                target="_blank"
+                rel="noreferrer"
+              >
+                <ExternalLink className="size-4" aria-hidden="true" />
+                Abrir MapBiomas Alerta
+              </a>
+            </div>
+          </div>
+          <div className="mt-3 grid gap-2 md:grid-cols-4">
+            <Info label="Codigo" value={alert.alertCode?.toString() ?? "-"} />
+            <Info label="Area alerta" value={formatHa(alert.area_alerta_ha ?? alert.area_ha)} />
+            <Info label="Area intersecao" value={formatHa(alert.area_intersecao_ha)} />
+            <Info label="CAR pesquisado" value={codCar} />
+            <Info label="CAR retornado" value={alert.cod_car ?? alert.cod_imovel ?? "-"} />
+            <Info label="Origem" value={alert.sourceLabel} />
+            <Info label="Correspondencia" value={formatAlertMatchType(alert.matchType)} />
+            <Info label="Confirmado API" value={alert.sourceLabel.includes("API") || alert.mapbiomasData ? "Sim" : "Nao consultado"} />
+            <Info label="Confirmado espacial" value={alert.is_spatially_confirmed ? "Sim" : "Nao"} />
+            <Info label="Distancia" value={formatMeters(alert.distance_m)} />
+          </div>
+        </div>
   );
 }
 
@@ -498,6 +896,30 @@ function buildResultFeatures(result: GeoQueryResponse | null): MapFeature[] {
     });
   });
 
+  result.alerts.inside.forEach((item) => {
+    if (!item.geom_geojson) return;
+    features.push({
+      id: `alert-${item.id}`,
+      kind: "alert",
+      title: `Alerta ${item.alertCode ?? item.codigo_alerta ?? item.name}`,
+      layerLabel: item.sourceLabel,
+      description: item.provider,
+      geojson: item.geom_geojson,
+      property: {
+        name: item.name,
+        area: item.area_intersecao_ha ?? item.area_ha,
+        registry_number: item.alertCode?.toString() ?? item.codigo_alerta,
+        registry_date: item.alert_date,
+        car_state: null,
+        car_federal: item.cod_car ?? result.codCar,
+        city: null,
+        state: null,
+      },
+      client: null,
+      service: null,
+    });
+  });
+
   return features;
 }
 
@@ -531,6 +953,42 @@ function Info({ label, value }: { label: string; value: string }) {
       <p className="mt-1 font-medium">{value || "-"}</p>
     </div>
   );
+}
+
+function formatHa(value: number | null | undefined) {
+  if (value === null || value === undefined || !Number.isFinite(value)) return "-";
+  return `${Number(value).toLocaleString("pt-BR", { maximumFractionDigits: 2 })} ha`;
+}
+
+function formatPercent(value: number | null | undefined) {
+  if (value === null || value === undefined || !Number.isFinite(value)) return "-";
+  return `${(Number(value) * 100).toLocaleString("pt-BR", { maximumFractionDigits: 2 })}%`;
+}
+
+function formatAlertMatchType(value: string | null | undefined) {
+  if (value === "direct_code") return "Codigo direto";
+  if (value === "attributes_code") return "Codigo em atributos";
+  if (value === "spatial_intersection") return "Intersecao espacial";
+  if (value === "spatial_buffer") return "Buffer espacial";
+  if (value === "mapbiomas_api") return "API MapBiomas";
+  return value ?? "-";
+}
+
+function formatMeters(value: number | null | undefined) {
+  if (value === null || value === undefined || !Number.isFinite(value)) return "-";
+  return `${Number(value).toLocaleString("pt-BR", { maximumFractionDigits: 1 })} m`;
+}
+
+function getAttributeText(attributes: Json, keys: string[]) {
+  if (!attributes || typeof attributes !== "object" || Array.isArray(attributes)) return "-";
+  const record = attributes as Record<string, Json | undefined>;
+  for (const key of keys) {
+    const value = record[key];
+    if (value !== null && value !== undefined && String(value).trim() !== "") {
+      return String(value);
+    }
+  }
+  return "-";
 }
 
 function Legend({ color, label }: { color: string; label: string }) {
@@ -567,6 +1025,12 @@ function DownloadButton({ label, geojson }: { label: string; geojson: Json | nul
 function optionalValue(value: FormDataEntryValue | null) {
   const normalized = value?.toString().trim();
   return normalized ? normalized : null;
+}
+
+function extractDownloadFileName(headers: Headers) {
+  const disposition = headers.get("Content-Disposition");
+  const match = /filename="?([^";]+)"?/i.exec(disposition ?? "");
+  return match?.[1] ?? null;
 }
 
 function isGeoQueryError(

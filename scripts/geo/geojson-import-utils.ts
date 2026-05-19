@@ -2,6 +2,7 @@ import {
   geoLayerClassifications,
   geoLayerTargetTable,
   mapCarAttributes,
+  mapGeoAlertAttributes,
   mapIncraAttributes,
   normalizeDbfAttributes,
   type GeoLayerClassification,
@@ -80,10 +81,16 @@ export function buildGeoImportRow(
   }
 
   if (targetTable === "geo_alert_layers") {
+    const alert = mapGeoAlertAttributes(attributes);
     return {
       ...base,
+      ...alert,
       layer_type: classification.toLowerCase(),
-      name: String(attributes.name ?? attributes.nome ?? classification),
+      name: String(
+        attributes.name ??
+          attributes.nome ??
+          (alert.alert_code ? `Alerta ${alert.alert_code}` : classification),
+      ),
     };
   }
 

@@ -98,3 +98,29 @@ Data do checkpoint: 2026-05-11
 39. O GeoGestao nao deve automatizar login gov.br, capturar senha, guardar cookies, burlar captcha ou fazer scraping agressivo de portais oficiais.
 
 40. Documentos oficiais que exigem login pessoal devem seguir fluxo assistido: abrir link oficial, baixar manualmente e anexar no sistema.
+
+41. SIGEF/INCRA nao deve ser cruzado por `cod_car`, porque a base SIGEF nao possui o CAR Federal como chave confiavel. O cruzamento deve ser espacial.
+
+42. A regra padrao para considerar SIGEF correspondente e sobreposicao de pelo menos 60% da area do CAR buscado.
+
+43. Alertas MapBiomas devem usar base importada e API oficial GraphQL MapBiomas Alerta. O GeoGestao nao deve fazer scraping da plataforma.
+
+44. Credenciais MapBiomas Alerta devem ser usadas apenas no servidor, por `MAPBIOMAS_ALERT_TOKEN` ou `MAPBIOMAS_ALERT_EMAIL`/`MAPBIOMAS_ALERT_PASSWORD`.
+
+45. A partir da FASE UX-ORG-SERVICES-1, Servico passa a ser o centro do sistema. Proposta e Contrato continuam existindo por compatibilidade, mas passam a ser subareas do Servico na experiencia principal.
+
+46. O menu lateral deve priorizar uma experiencia simples: Dashboard, Servicos e Financeiro como eixo operacional, com cadastros e bibliotecas em Configuracoes.
+
+47. Novo servico deve nascer em `Aguardando documentos`, com checklist padrao por tipo de servico. A fase `Proposta/Contrato` e o ponto de criacao ou visualizacao de proposta e contrato vinculados.
+
+48. Reset de dados operacionais por empresa deve ser feito somente por script admin com dry-run por padrao e flag explicita `--confirm`. O reset nunca deve apagar usuarios, profiles, organizacoes, membros, planos, migrations ou bases geograficas globais.
+
+49. A criacao de servico deve recalcular a coluna inicial no servidor a partir do `service_type`. O formulario pode sugerir a coluna, mas a regra de negocio nao deve depender apenas de campo escondido no client.
+
+50. Apenas membros `owner` ou `admin` da organizacao podem editar Minha Empresa, cadastrar equipe operacional e configurar dados bancarios. Usuarios comuns podem visualizar quando fizer sentido.
+
+51. A coluna `Servico perdido` existe em todos os fluxos de Servicos. Servicos nessa coluna deixam de contar em lucro estimado/efetuado e passam a contar em lucro perdido.
+
+52. Valores de servico devem usar formato monetario brasileiro na interface. O valor `16.000` representa `R$ 16.000,00`.
+
+53. Em `organization_members`, `owner` e `admin` tem responsabilidades diferentes: `owner` edita Minha Empresa e regras da empresa; `admin` e administrador operacional dos modulos, mas apenas visualiza Minha Empresa.

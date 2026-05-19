@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { isValidCarCode, normalizeCarCode } from "@/lib/geoquery";
+import { parseBrlCurrencyInput } from "@/lib/services/service-finance";
 
 const optionalText = z
   .string()
@@ -56,6 +57,41 @@ export const companySettingsSchema = z.object({
   state: optionalText,
   logo_url: optionalText,
   notes: optionalText,
+});
+
+export const companyBankSettingsSchema = z.object({
+  bank_name: optionalText,
+  bank_agency: optionalText,
+  bank_account: optionalText,
+  bank_account_type: optionalText,
+  pix_key: optionalText,
+  bank_account_holder: optionalText,
+  bank_holder_document: optionalText,
+  bank_notes: optionalText,
+  payment_instructions: optionalText,
+});
+
+export const teamMemberSchema = z.object({
+  name: z.string().trim().min(2, "Informe o nome do membro."),
+  email: z
+    .string()
+    .trim()
+    .optional()
+    .transform((value) => (value ? value : null))
+    .pipe(z.string().email("E-mail invalido.").nullable()),
+  document_number: optionalText,
+  pix_key: optionalText,
+  bank_name: optionalText,
+  bank_agency: optionalText,
+  bank_account: optionalText,
+  monthly_amount: z
+    .string()
+    .optional()
+    .transform((value) => (value ? parseBrlCurrencyInput(value) : null))
+    .pipe(z.number().nonnegative("Informe um valor valido.").nullable()),
+  role_title: optionalText,
+  notes: optionalText,
+  status: z.enum(["active", "inactive"]).default("active"),
 });
 
 export const profileSchema = z.object({
@@ -163,6 +199,9 @@ export const geoQuerySearchSchema = z.object({
     .nullable()
     .transform((value) => value || null),
   bufferMeters: z.coerce.number().min(0).max(10000).default(500),
+  includeNearbyAlerts: z.coerce.boolean().default(false),
+  sigefMinOverlap: z.coerce.number().min(1).max(100).default(60),
+  sigefBufferMeters: z.coerce.number().min(0).max(10000).default(0),
 });
 
 export const proposalSchema = z.object({
@@ -318,6 +357,8 @@ export const attachmentSchema = z.object({
 
 export type ClientFormValues = z.input<typeof clientSchema>;
 export type CompanySettingsFormValues = z.input<typeof companySettingsSchema>;
+export type CompanyBankSettingsFormValues = z.input<typeof companyBankSettingsSchema>;
+export type TeamMemberFormValues = z.input<typeof teamMemberSchema>;
 export type ProfileFormValues = z.input<typeof profileSchema>;
 export type CompanyServiceFormValues = z.input<typeof companyServiceSchema>;
 export type PropertyMapFormValues = z.input<typeof propertyMapSchema>;

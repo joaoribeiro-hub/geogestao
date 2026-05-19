@@ -1,11 +1,13 @@
 import Link from "next/link";
 import { Search } from "lucide-react";
-import { ClientForm } from "@/components/forms/client-form";
+import { ClientCreateModal } from "@/components/clients/client-create-modal";
 import { PageHeader } from "@/components/layout/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
+import { requireUser } from "@/lib/auth";
+import { getCurrentOrganizationForUser } from "@/lib/organization";
 import { createServerSupabase } from "@/lib/supabase/server";
 
 export default async function ClientsPage({
@@ -15,9 +17,12 @@ export default async function ClientsPage({
 }) {
   const { q = "" } = await searchParams;
   const supabase = await createServerSupabase();
+  const user = await requireUser(supabase);
+  const organization = await getCurrentOrganizationForUser(supabase, user.id);
   const { data } = await supabase
     .from("clients")
     .select("*")
+    .eq("organization_id", organization.id)
     .order("created_at", { ascending: false });
   const clients = data ?? [];
 
@@ -32,12 +37,15 @@ export default async function ClientsPage({
 
   return (
     <div>
-      <PageHeader
-        title="Clientes"
-        description="Cadastro PF/PJ, busca rapida e historico de relacionamento."
-      />
+      <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+        <PageHeader
+          title="Base de clientes"
+          description="Clientes da organizacao atual, compartilhados com Servicos e Minha Empresa."
+        />
+        <ClientCreateModal />
+      </div>
 
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_420px]">
+      <div className="grid gap-6">
         <Card>
           <CardHeader>
             <CardTitle>Base de clientes</CardTitle>
@@ -87,14 +95,6 @@ export default async function ClientsPage({
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Novo cliente</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ClientForm />
-          </CardContent>
-        </Card>
       </div>
     </div>
   );

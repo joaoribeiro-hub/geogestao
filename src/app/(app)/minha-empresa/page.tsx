@@ -1,5 +1,8 @@
 import Link from "next/link";
 import { Search } from "lucide-react";
+import { TeamMemberModal } from "@/components/company/team-member-modal";
+import { ClientCreateModal } from "@/components/clients/client-create-modal";
+import { CompanyBankForm } from "@/components/forms/company-bank-form";
 import { CompanyInfoForm } from "@/components/forms/company-info-form";
 import { CompanyServiceForm } from "@/components/forms/company-service-form";
 import { PageHeader } from "@/components/layout/page-header";
@@ -8,7 +11,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
 import { requireUser } from "@/lib/auth";
-import { getCurrentOrganizationForUser } from "@/lib/organization";
+import {
+  canManageOrganization,
+  canViewOrganizationSettings,
+  getCurrentOrganizationForUser,
+  getCurrentProfile,
+  getOrganizationMembershipForUser,
+} from "@/lib/organization";
 import { createServerSupabase } from "@/lib/supabase/server";
 import { cn, formatCurrency } from "@/lib/utils";
 
@@ -39,6 +48,12 @@ export default async function CompanyPage({
   const supabase = await createServerSupabase();
   const user = await requireUser(supabase);
   const organization = await getCurrentOrganizationForUser(supabase, user.id);
+  const [profile, membership] = await Promise.all([
+    getCurrentProfile(supabase, user.id),
+    getOrganizationMembershipForUser(supabase, organization.id, user.id),
+  ]);
+  const canEditCompany = canManageOrganization({ profile, membership });
+  const canViewCompanySettings = canViewOrganizationSettings({ membership });
 
   return (
     <div>
@@ -63,16 +78,40 @@ export default async function CompanyPage({
       </nav>
 
       {activeTab === "informacoes" ? (
-        <CompanyInfoSection organizationId={organization.id} />
+        <CompanyInfoSection
+          organizationId={organization.id}
+          canEdit={canEditCompany}
+          canView={canViewCompanySettings}
+        />
+      ) : null}
+      {activeTab === "equipe" ? (
+        <CompanyTeamSection
+          organizationId={organization.id}
+          canEdit={canEditCompany}
+          canView={canViewCompanySettings}
+        />
       ) : null}
       {activeTab === "clientes" ? (
         <CompanyClientsSection q={q} organizationId={organization.id} />
       ) : null}
+      {activeTab === "variaveis-financeiras" ? (
+        <CompanyFinancialSection
+          organizationId={organization.id}
+          canEdit={canEditCompany}
+          canView={canViewCompanySettings}
+        />
+      ) : null}
       {activeTab === "servicos-nichos" ? (
-        <CompanyServicesSection organizationId={organization.id} />
+        <CompanyServicesSection
+          organizationId={organization.id}
+          canEdit={canEditCompany}
+          canView={canViewCompanySettings}
+        />
       ) : null}
       {activeTab !== "informacoes" &&
+      activeTab !== "equipe" &&
       activeTab !== "clientes" &&
+      activeTab !== "variaveis-financeiras" &&
       activeTab !== "servicos-nichos" ? (
         <ComingSoonSection label={tabs.find((item) => item.id === activeTab)?.label ?? ""} />
       ) : null}
@@ -80,7 +119,17 @@ export default async function CompanyPage({
   );
 }
 
-async function CompanyInfoSection({ organizationId }: { organizationId: string }) {
+async function CompanyInfoSection({
+  organizationId,
+  canEdit,
+  canView,
+}: {
+  organizationId: string;
+  canEdit: boolean;
+  canView: boolean;
+}) {
+  if (!canView) return <CompanySettingsRestrictedSection />;
+
   const supabase = await createServerSupabase();
   const { data: settings } = await supabase
     .from("company_settings")
@@ -95,7 +144,136 @@ async function CompanyInfoSection({ organizationId }: { organizationId: string }
         <CardTitle>Informacoes da empresa</CardTitle>
       </CardHeader>
       <CardContent>
-        <CompanyInfoForm settings={settings} />
+        <CompanyInfoForm settings={settings} canEdit={canEdit} />
+      </CardContent>
+    </Card>
+  );
+}
+
+async function CompanyTeamSection({
+  organizationId,
+  canEdit,
+  canView,
+}: {
+  organizationId: string;
+  canEdit: boolean;
+  canView: boolean;
+}) {
+  if (!canView) return <CompanySettingsRestrictedSection />;
+
+  const supabase = await createServerSupabase();
+  const [membersResult, recurringResult] = await Promise.all([
+    supabase
+      .from("team_members")
+      .select("*")
+      .eq("organization_id", organizationId)
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("recurring_expenses")
+      .select("*")
+      .eq("organization_id", organizationId)
+      .eq("status", "active"),
+  ]);
+  const members = membersResult.data ?? [];
+  const recurringByMember = new Map(
+    (recurringResult.data ?? []).map((item) => [item.team_member_id, item]),
+  );
+
+  return (
+    <Card>
+      <CardHeader className="flex-row items-center justify-between gap-3">
+        <div>
+          <CardTitle>Equipe</CardTitle>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Membros operacionais vinculados a esta empresa.
+          </p>
+        </div>
+        <TeamMemberModal canEdit={canEdit} />
+      </CardHeader>
+      <CardContent>
+        {!canEdit ? (
+          <p className="mb-4 rounded-md bg-secondary px-3 py-2 text-sm text-muted-foreground">
+            Apenas o proprietario da empresa pode editar estas informacoes.
+          </p>
+        ) : null}
+
+        {members.length ? (
+          <div className="overflow-hidden rounded-lg border">
+            <table className="w-full text-sm">
+              <thead className="bg-secondary text-left">
+                <tr>
+                  <th className="px-4 py-3 font-medium">Membro</th>
+                  <th className="px-4 py-3 font-medium">Funcao</th>
+                  <th className="px-4 py-3 font-medium">Valor mensal</th>
+                  <th className="px-4 py-3 font-medium">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {members.map((member) => {
+                  const recurring = recurringByMember.get(member.id);
+                  return (
+                    <tr key={member.id} className="border-t bg-card align-top">
+                      <td className="px-4 py-3">
+                        <p className="font-medium">{member.name}</p>
+                        <p className="text-xs text-muted-foreground">{member.email ?? "-"}</p>
+                      </td>
+                      <td className="px-4 py-3 text-muted-foreground">
+                        {member.role_title ?? "-"}
+                      </td>
+                      <td className="px-4 py-3">
+                        <p>{formatCurrency(member.monthly_amount ?? 0)}</p>
+                        {recurring ? (
+                          <p className="text-xs text-muted-foreground">Despesa mensal preparada</p>
+                        ) : null}
+                      </td>
+                      <td className="px-4 py-3">
+                        <Badge variant={member.status === "active" ? "secondary" : "outline"}>
+                          {member.status === "active" ? "Ativo" : "Inativo"}
+                        </Badge>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <EmptyState title="Nenhum membro cadastrado." />
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+async function CompanyFinancialSection({
+  organizationId,
+  canEdit,
+  canView,
+}: {
+  organizationId: string;
+  canEdit: boolean;
+  canView: boolean;
+}) {
+  if (!canView) return <CompanySettingsRestrictedSection />;
+
+  const supabase = await createServerSupabase();
+  const { data: settings } = await supabase
+    .from("company_settings")
+    .select("*")
+    .eq("organization_id", organizationId)
+    .eq("singleton_key", "default")
+    .maybeSingle();
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Variaveis financeiras</CardTitle>
+        <p className="text-sm text-muted-foreground">
+          Dados bancarios e instrucoes de recebimento da empresa.
+        </p>
+      </CardHeader>
+      <CardContent>
+        <CompanyBankForm settings={settings} canEdit={canEdit} />
       </CardContent>
     </Card>
   );
@@ -127,10 +305,18 @@ async function CompanyClientsSection({
   return (
     <Card>
       <CardHeader className="flex-row items-center justify-between gap-3">
-        <CardTitle>Clientes</CardTitle>
-        <Link className="text-sm font-medium text-primary hover:underline" href="/clientes">
-          Abrir modulo completo
-        </Link>
+        <div>
+          <CardTitle>Base de clientes</CardTitle>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Mesma base usada em Servicos, Propostas e Financeiro.
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <ClientCreateModal />
+          <Link className="text-sm font-medium text-primary hover:underline" href="/clientes">
+            Abrir modulo completo
+          </Link>
+        </div>
       </CardHeader>
       <CardContent>
         <form className="mb-4 flex gap-2">
@@ -185,7 +371,17 @@ async function CompanyClientsSection({
   );
 }
 
-async function CompanyServicesSection({ organizationId }: { organizationId: string }) {
+async function CompanyServicesSection({
+  organizationId,
+  canEdit,
+  canView,
+}: {
+  organizationId: string;
+  canEdit: boolean;
+  canView: boolean;
+}) {
+  if (!canView) return <CompanySettingsRestrictedSection />;
+
   const supabase = await createServerSupabase();
   const { data } = await supabase
     .from("company_services")
@@ -243,15 +439,43 @@ async function CompanyServicesSection({ organizationId }: { organizationId: stri
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Novo servico</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <CompanyServiceForm />
-        </CardContent>
-      </Card>
+      {canEdit ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>Novo servico</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <CompanyServiceForm />
+          </CardContent>
+        </Card>
+      ) : (
+        <Card>
+          <CardHeader>
+            <CardTitle>Regras da empresa</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="rounded-md bg-secondary px-3 py-2 text-sm text-muted-foreground">
+              Apenas o proprietario da empresa pode editar estas informacoes.
+            </p>
+          </CardContent>
+        </Card>
+      )}
     </div>
+  );
+}
+
+function CompanySettingsRestrictedSection() {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Minha Empresa</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <p className="rounded-md bg-secondary px-3 py-2 text-sm text-muted-foreground">
+          Apenas proprietario e administradores operacionais ativos podem visualizar estas informacoes.
+        </p>
+      </CardContent>
+    </Card>
   );
 }
 

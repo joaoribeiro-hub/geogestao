@@ -160,6 +160,7 @@ export type Database = {
       organizations: {
         Row: BaseRow & {
           name: string;
+          slug: string | null;
           trade_name: string | null;
           document_number: string | null;
           owner_user_id: string | null;
@@ -171,6 +172,7 @@ export type Database = {
         Insert: {
           id?: string;
           name: string;
+          slug?: string | null;
           trade_name?: string | null;
           document_number?: string | null;
           owner_user_id?: string | null;
@@ -183,6 +185,7 @@ export type Database = {
         };
         Update: {
           name?: string;
+          slug?: string | null;
           trade_name?: string | null;
           document_number?: string | null;
           owner_user_id?: string | null;
@@ -305,6 +308,15 @@ export type Database = {
           state: string | null;
           logo_url: string | null;
           notes: string | null;
+          bank_name: string | null;
+          bank_agency: string | null;
+          bank_account: string | null;
+          bank_account_type: string | null;
+          pix_key: string | null;
+          bank_account_holder: string | null;
+          bank_holder_document: string | null;
+          bank_notes: string | null;
+          payment_instructions: string | null;
         };
         Insert: {
           id?: string;
@@ -321,6 +333,15 @@ export type Database = {
           state?: string | null;
           logo_url?: string | null;
           notes?: string | null;
+          bank_name?: string | null;
+          bank_agency?: string | null;
+          bank_account?: string | null;
+          bank_account_type?: string | null;
+          pix_key?: string | null;
+          bank_account_holder?: string | null;
+          bank_holder_document?: string | null;
+          bank_notes?: string | null;
+          payment_instructions?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -338,6 +359,15 @@ export type Database = {
           state?: string | null;
           logo_url?: string | null;
           notes?: string | null;
+          bank_name?: string | null;
+          bank_agency?: string | null;
+          bank_account?: string | null;
+          bank_account_type?: string | null;
+          pix_key?: string | null;
+          bank_account_holder?: string | null;
+          bank_holder_document?: string | null;
+          bank_notes?: string | null;
+          payment_instructions?: string | null;
           updated_at?: string;
         };
         Relationships: [];
@@ -647,8 +677,14 @@ export type Database = {
           provider: string | null;
           reference_year: string | null;
           name: string;
+          cod_car: string | null;
+          cod_imovel: string | null;
+          alert_code: number | null;
+          codigo_alerta: string | null;
           alert_date: string | null;
           area_ha: number | null;
+          area_intersecao_ha: number | null;
+          area_alerta_ha: number | null;
           attributes: Json;
           geom_geojson: Json | null;
           bbox: Json | null;
@@ -662,8 +698,14 @@ export type Database = {
           provider?: string | null;
           reference_year?: string | null;
           name: string;
+          cod_car?: string | null;
+          cod_imovel?: string | null;
+          alert_code?: number | null;
+          codigo_alerta?: string | null;
           alert_date?: string | null;
           area_ha?: number | null;
+          area_intersecao_ha?: number | null;
+          area_alerta_ha?: number | null;
           attributes?: Json;
           geom_geojson?: Json | null;
           bbox?: Json | null;
@@ -676,8 +718,14 @@ export type Database = {
           provider?: string | null;
           reference_year?: string | null;
           name?: string;
+          cod_car?: string | null;
+          cod_imovel?: string | null;
+          alert_code?: number | null;
+          codigo_alerta?: string | null;
           alert_date?: string | null;
           area_ha?: number | null;
+          area_intersecao_ha?: number | null;
+          area_alerta_ha?: number | null;
           attributes?: Json;
           geom_geojson?: Json | null;
           bbox?: Json | null;
@@ -1028,6 +1076,154 @@ export type Database = {
           custom_fields_json?: Json;
           position?: number;
           created_from_proposal_id?: string | null;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      service_members: {
+        Row: {
+          id: string;
+          organization_id: string | null;
+          service_card_id: string;
+          user_id: string;
+          role: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          organization_id?: string | null;
+          service_card_id: string;
+          user_id: string;
+          role?: string;
+          created_at?: string;
+        };
+        Update: {
+          organization_id?: string | null;
+          service_card_id?: string;
+          user_id?: string;
+          role?: string;
+        };
+        Relationships: [];
+      };
+      service_events: {
+        Row: {
+          id: string;
+          organization_id: string | null;
+          service_card_id: string;
+          event_type: string;
+          title: string;
+          description: string | null;
+          metadata: Json;
+          created_by: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          organization_id?: string | null;
+          service_card_id: string;
+          event_type: string;
+          title: string;
+          description?: string | null;
+          metadata?: Json;
+          created_by?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          organization_id?: string | null;
+          service_card_id?: string;
+          event_type?: string;
+          title?: string;
+          description?: string | null;
+          metadata?: Json;
+          created_by?: string | null;
+        };
+        Relationships: [];
+      };
+      team_members: {
+        Row: BaseRow & {
+          organization_id: string;
+          auth_user_id: string | null;
+          name: string;
+          email: string | null;
+          document_number: string | null;
+          pix_key: string | null;
+          bank_details: Json;
+          monthly_amount: number | null;
+          role_title: string | null;
+          notes: string | null;
+          status: "active" | "inactive";
+          created_by: string | null;
+        };
+        Insert: {
+          id?: string;
+          organization_id: string;
+          auth_user_id?: string | null;
+          name: string;
+          email?: string | null;
+          document_number?: string | null;
+          pix_key?: string | null;
+          bank_details?: Json;
+          monthly_amount?: number | null;
+          role_title?: string | null;
+          notes?: string | null;
+          status?: "active" | "inactive";
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          organization_id?: string;
+          auth_user_id?: string | null;
+          name?: string;
+          email?: string | null;
+          document_number?: string | null;
+          pix_key?: string | null;
+          bank_details?: Json;
+          monthly_amount?: number | null;
+          role_title?: string | null;
+          notes?: string | null;
+          status?: "active" | "inactive";
+          created_by?: string | null;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      recurring_expenses: {
+        Row: BaseRow & {
+          organization_id: string;
+          team_member_id: string | null;
+          amount: number;
+          description: string;
+          recurrence: "monthly";
+          status: "active" | "inactive";
+          next_due_date: string;
+          category: string;
+          created_by: string | null;
+        };
+        Insert: {
+          id?: string;
+          organization_id: string;
+          team_member_id?: string | null;
+          amount: number;
+          description: string;
+          recurrence?: "monthly";
+          status?: "active" | "inactive";
+          next_due_date?: string;
+          category?: string;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          organization_id?: string;
+          team_member_id?: string | null;
+          amount?: number;
+          description?: string;
+          recurrence?: "monthly";
+          status?: "active" | "inactive";
+          next_due_date?: string;
+          category?: string;
+          created_by?: string | null;
           updated_at?: string;
         };
         Relationships: [];
@@ -1400,6 +1596,8 @@ export type Database = {
           client_id: string | null;
           proposal_id: string | null;
           service_card_id: string | null;
+          team_member_id: string | null;
+          recurring_expense_id: string | null;
           description: string;
           category: string;
           amount: number;
@@ -1413,6 +1611,8 @@ export type Database = {
           client_id?: string | null;
           proposal_id?: string | null;
           service_card_id?: string | null;
+          team_member_id?: string | null;
+          recurring_expense_id?: string | null;
           description: string;
           category: string;
           amount: number;
@@ -1427,6 +1627,8 @@ export type Database = {
           organization_id?: string | null;
           proposal_id?: string | null;
           service_card_id?: string | null;
+          team_member_id?: string | null;
+          recurring_expense_id?: string | null;
           description?: string;
           category?: string;
           amount?: number;
@@ -1529,7 +1731,117 @@ export type Database = {
       };
     };
     Views: Record<string, never>;
-    Functions: Record<string, never>;
+    Functions: {
+      find_alerts_by_car_app: {
+        Args: {
+          p_cod_car: string;
+          p_include_nearby?: boolean;
+          p_buffer_meters?: number;
+          p_limit?: number;
+        };
+        Returns: Array<{
+          id: string;
+          organization_id: string | null;
+          layer_type: string;
+          provider: string | null;
+          reference_year: string | null;
+          name: string;
+          cod_car: string | null;
+          cod_imovel: string | null;
+          alert_code: number | null;
+          codigo_alerta: string | null;
+          alert_date: string | null;
+          area_ha: number | null;
+          area_intersecao_ha: number | null;
+          area_alerta_ha: number | null;
+          distance_m: number | null;
+          match_type: string;
+          is_spatially_confirmed: boolean;
+          is_nearby_only: boolean;
+          attributes: Json;
+          geom_geojson: Json | null;
+          bbox: Json | null;
+          source_id: string | null;
+          created_at: string;
+        }>;
+      };
+      find_sigef_matches_by_car: {
+        Args: {
+          p_cod_car: string;
+          p_min_car_overlap?: number;
+          p_limit?: number;
+          p_buffer_meters?: number;
+        };
+        Returns: Array<{
+          id: string;
+          organization_id: string | null;
+          sigef_code: string | null;
+          cnir: string | null;
+          codigo_imovel: string | null;
+          certificacao: string | null;
+          situacao: string | null;
+          municipio: string | null;
+          uf: string | null;
+          area_ha: number | null;
+          data_certificacao: string | null;
+          attributes: Json;
+          geom_geojson: Json | null;
+          intersection_area_ha: number | null;
+          car_area_ha: number | null;
+          incra_area_ha: number | null;
+          car_overlap_ratio: number | null;
+          incra_overlap_ratio: number | null;
+        }>;
+      };
+      find_sigef_matches_by_car_app: {
+        Args: {
+          p_cod_car: string;
+          p_min_car_overlap?: number;
+          p_limit?: number;
+          p_buffer_meters?: number;
+        };
+        Returns: Array<{
+          id: string;
+          organization_id: string | null;
+          sigef_code: string | null;
+          cnir: string | null;
+          codigo_imovel: string | null;
+          certificacao: string | null;
+          situacao: string | null;
+          municipio: string | null;
+          uf: string | null;
+          area_ha: number | null;
+          data_certificacao: string | null;
+          attributes: Json;
+          geom_geojson: Json | null;
+          intersection_area_ha: number | null;
+          car_area_ha: number | null;
+          incra_area_ha: number | null;
+          car_overlap_ratio: number | null;
+          incra_overlap_ratio: number | null;
+        }>;
+      };
+      refresh_geoquery_geometries: {
+        Args: {
+          p_force?: boolean;
+        };
+        Returns: Array<{
+          table_name: string;
+          updated_count: number;
+        }>;
+      };
+      refresh_alert_geom_batch: {
+        Args: {
+          p_limit?: number;
+        };
+        Returns: Array<{
+          table_name: string;
+          processed_count: number;
+          updated_count: number;
+          skipped_count: number;
+        }>;
+      };
+    };
     Enums: Record<string, never>;
     CompositeTypes: Record<string, never>;
   };
@@ -1547,7 +1859,11 @@ export type PropertyGeometry = Database["public"]["Tables"]["property_geometries
 export type GeoDataSource = Database["public"]["Tables"]["geo_data_sources"]["Row"];
 export type CarProperty = Database["public"]["Tables"]["car_properties"]["Row"];
 export type IncraProperty = Database["public"]["Tables"]["incra_properties"]["Row"];
+export type SigefSpatialMatch =
+  Database["public"]["Functions"]["find_sigef_matches_by_car"]["Returns"][number];
 export type GeoAlertLayer = Database["public"]["Tables"]["geo_alert_layers"]["Row"];
+export type GeoAlertSearchMatch =
+  Database["public"]["Functions"]["find_alerts_by_car_app"]["Returns"][number];
 export type GeoThematicLayer = Database["public"]["Tables"]["geo_thematic_layers"]["Row"];
 export type PropertySearch = Database["public"]["Tables"]["property_searches"]["Row"];
 export type PropertySearchResult = Database["public"]["Tables"]["property_search_results"]["Row"];
@@ -1556,6 +1872,10 @@ export type Proposal = Database["public"]["Tables"]["proposals"]["Row"];
 export type ServiceBoard = Database["public"]["Tables"]["service_boards"]["Row"];
 export type ServiceColumn = Database["public"]["Tables"]["service_columns"]["Row"];
 export type ServiceCard = Database["public"]["Tables"]["service_cards"]["Row"];
+export type ServiceMember = Database["public"]["Tables"]["service_members"]["Row"];
+export type ServiceEvent = Database["public"]["Tables"]["service_events"]["Row"];
+export type TeamMember = Database["public"]["Tables"]["team_members"]["Row"];
+export type RecurringExpense = Database["public"]["Tables"]["recurring_expenses"]["Row"];
 export type Contract = Database["public"]["Tables"]["contracts"]["Row"];
 export type ProposalService = Database["public"]["Tables"]["proposal_services"]["Row"];
 export type ContractService = Database["public"]["Tables"]["contract_services"]["Row"];

@@ -48,6 +48,10 @@ GOOGLE_SERVICE_ACCOUNT_EMAIL=
 GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY=
 GOOGLE_APPLICATION_CREDENTIALS=
 SUPABASE_SERVICE_ROLE_KEY=
+MAPBIOMAS_ALERT_API_URL=https://plataforma.alerta.mapbiomas.org/api/v2/graphql
+MAPBIOMAS_ALERT_EMAIL=
+MAPBIOMAS_ALERT_PASSWORD=
+MAPBIOMAS_ALERT_TOKEN=
 ```
 
 Observacoes:
@@ -64,6 +68,7 @@ Observacoes:
 - O Chat IA usa o SDK oficial `openai` e a Responses API apenas com texto nesta fase.
 - Variaveis Google/Drive sao opcionais e servem apenas para a origem bruta das bases geograficas. A consulta do app deve usar tabelas ja importadas no Supabase/Postgres.
 - `SUPABASE_SERVICE_ROLE_KEY` e permitido apenas em scripts locais/admin de importacao geografica. Nunca usar no frontend.
+- Variaveis MapBiomas Alerta sao server-side. Nunca criar `NEXT_PUBLIC_MAPBIOMAS_*`.
 
 ## Status da integracao Supabase
 
@@ -248,6 +253,37 @@ Status da Fase ACCOUNT-1: parcial/implementada no codigo. Pendente aplicar `supa
 - Kanban tecnico com cards arrastaveis.
 - Historico simples de movimentacao previsto.
 - Checklists por card.
+- FASE UX-ORG-SERVICES-1 reorganiza Servicos como centro do sistema.
+- Menu principal passa a priorizar Dashboard, Servicos e Financeiro; Propostas e Contratos continuam por rota, mas deixam de ser o foco do menu lateral.
+- Tela `/servicos` tem botao `Novo Servico` em modal grande.
+- Novo servico entra em `Aguardando documentos`.
+- Colunas de Georreferenciamento preparadas para:
+  - Aguardando documentos;
+  - Proposta/Contrato;
+  - Geo em Andamento;
+  - Prioridade;
+  - Geo Protocolado no Cartorio;
+  - Geo Protocolado no INCRA;
+  - Geo - Pendencia de Confrontante;
+  - Geo Concluido.
+- Cards de servico foram simplificados para estilo Trello:
+  - cliente;
+  - imovel/empreendimento;
+  - barra visual de status;
+  - indicadores discretos;
+  - prazo, prioridade e pagamento.
+- Card inteiro abre `/servicos/[id]`.
+- Detalhe do servico mostra cliente em destaque, imovel abaixo, tipo como badge pequeno, resumo automatico, chips editaveis de fase/prioridade/pagamento, proposta, contrato, checklists, anexos, membros e historico.
+- Checklists padrao sao criados por tipo de servico.
+- Financeiro passa a usar botoes `Nova receita` e `Nova despesa` com modal, mantendo as regras existentes.
+- Base de Clientes e Clientes dentro de Minha Empresa passam a usar a mesma fonte filtrada por `organization_id`.
+- Scripts admin adicionados para Terras Reunidas e reset seguro de organizacao.
+- Migration corretiva `017_org_members_rls_service_lost_finance.sql` criada para corrigir recursao de RLS em `organization_members`, adicionar `Servico perdido` a todos os fluxos e preparar financeiro por valor de servico.
+- Migration corretiva `018_company_owner_only_permissions.sql` criada para separar `owner` de `admin`: owner edita Minha Empresa; admin operacional visualiza Minha Empresa e continua operando os modulos do sistema.
+- Campo de valor do servico usa formato monetario brasileiro, preservando `R$ 16.000,00` como 16000.00.
+- Financeiro de Servicos passa a calcular lucro estimado, lucro efetuado e lucro perdido por `organization_id`.
+
+Status da Fase UX-ORG-SERVICES-1: parcial/implementada no codigo. Pendente aplicar `supabase/migrations/015_ux_org_services_center.sql` no Supabase de teste, rodar/validar scripts admin e testar o fluxo completo manualmente.
 
 ### Financeiro
 
@@ -303,6 +339,12 @@ Status da Fase ACCOUNT-1: parcial/implementada no codigo. Pendente aplicar `supa
 - Migration `009_geoquery_car_incra_alerts.sql` tenta habilitar PostGIS e usa `geom_geojson` como fallback.
 - Scripts preparatorios em `scripts/geo` para fluxo de importacao por GeoJSON/Drive/shapefile/DBF.
 - GEOQUERY-2A adiciona leitura GeoJSON por streaming, preview com `--limit`/`--sample` e importador por lote `scripts/geo/import-geojson-to-supabase.ts`.
+- GEOQUERY-3 adiciona cruzamento espacial CAR x SIGEF via PostGIS/RPC, regra padrao de 60% de sobreposicao CAR e integracao server-side com API oficial MapBiomas Alerta.
+- Classificacao `CAR_ALERT_INTERSECTION` aceita bases MapBiomas `car_with_alerts_and_intersections`.
+- MapBiomas Alerta usa `MAPBIOMAS_ALERT_TOKEN` ou `MAPBIOMAS_ALERT_EMAIL`/`MAPBIOMAS_ALERT_PASSWORD` somente no servidor.
+- A tela operacional oculta buffers e sobreposicao minima, mantendo defaults internos: alertas proximos 500 m, SIGEF 60% e buffer SIGEF 0 m.
+- Alertas MapBiomas vindos de `ruralProperty(carCode)` aparecem como fonte "API MapBiomas"; `alert(alertCode, carCode)` valida os dados do laudo.
+- O endpoint `/api/geoquery/mapbiomas-alert/report` gera PDF interno "Laudo GeoGestao - Dados MapBiomas Alerta" quando a API nao fornece PDF oficial direto.
 - Busca sem base importada retorna mensagem clara: "Base CAR ainda nao importada."
 - O sistema nao consulta Drive em tempo real a cada busca e nao automatiza login gov.br.
 - Relatorio inicial da busca usa impressao do navegador; PDF automatico fica para fase futura.
@@ -327,6 +369,8 @@ Status da Fase ACCOUNT-1: parcial/implementada no codigo. Pendente aplicar `supa
 - Arquitetura preparada para camada de satelite futura via provedor adequado.
 
 Status da Fase GEOQUERY-1: parcial/implementada no codigo. Pendente aplicar `supabase/migrations/009_geoquery_car_incra_alerts.sql` no Supabase de teste, importar uma base CAR pequena, validar busca real com GeoJSON e depois avaliar aplicacao no Supabase oficial.
+
+Status da Fase GEOQUERY-3: parcial/implementada no codigo. Pendente aplicar `supabase/migrations/010_geoquery_spatial_matching_mapbiomas.sql` no Supabase de teste, executar `select * from public.refresh_geoquery_geometries(true);`, validar CAR x SIGEF com base real e configurar credenciais MapBiomas quando quiser consultar laudos.
 
 Status legado da Fase 7: parcial. Upload KML/KMZ permanece no codigo; ainda depende de aplicar a migration `006_map_properties_geometries.sql` no Supabase real e testar com um KML/KMZ simples.
 
@@ -502,6 +546,69 @@ Adiciona a Fase GEOQUERY-1:
 - cria tabela `property_documents` para demonstrativo CAR, CAR atualizado, shapefiles e relatorios;
 - cria indices por codigo CAR, SIGEF/CNIR, tipo de camada, organizacao e geometrias quando PostGIS existe;
 - cria RLS para usuarios autenticados acessarem dados globais ou da propria organizacao;
+- recarrega schema cache do Supabase/PostgREST.
+
+### `supabase/migrations/010_geoquery_spatial_matching_mapbiomas.sql`
+
+Adiciona a Fase GEOQUERY-3:
+
+- garante PostGIS;
+- adiciona/garante colunas `geom` nas tabelas geograficas;
+- cria indices GiST;
+- cria `geojson_to_geom`;
+- cria `refresh_geoquery_geometries`;
+- cria `find_sigef_matches_by_car`;
+- adiciona campos normalizados de alerta MapBiomas em `geo_alert_layers`;
+- faz backfill desses campos a partir de `attributes`;
+- recarrega schema cache do Supabase/PostgREST.
+
+### `supabase/migrations/015_ux_org_services_center.sql`
+
+Adiciona a FASE UX-ORG-SERVICES-1:
+
+- `organizations.slug`;
+- organizacao `Terras Reunidas` com slug `terras-reunidas`;
+- tabelas `service_members` e `service_events`;
+- policies de RLS para membros da organizacao;
+- colunas novas/ordenadas do quadro de Georreferenciamento;
+- recarrega schema cache do Supabase/PostgREST.
+
+### `supabase/migrations/016_services_workflow_company_team_permissions.sql`
+
+Correcao da FASE UX-ORG-SERVICES-1:
+
+- garante fluxos iniciais por tipo de servico:
+  - Georreferenciamento;
+  - CAR;
+  - ITR/CCIR;
+  - Outros Servicos;
+- cria `public.is_organization_manager`;
+- adiciona dados bancarios em `company_settings`;
+- cria `team_members` e `recurring_expenses`;
+- adiciona vinculo de despesas com membro/recorrencia;
+- restringe edicao de Minha Empresa para owner/admin;
+- recarrega schema cache do Supabase/PostgREST.
+
+### `supabase/migrations/017_org_members_rls_service_lost_finance.sql`
+
+Correcao da FASE UX-ORG-SERVICES-1:
+
+- cria `public.is_org_member` e `public.is_org_owner_or_admin` com `SECURITY DEFINER`;
+- recria policies de `organization_members` sem consulta recursiva na propria policy;
+- restringe edicao de Minha Empresa, equipe e recorrencias a owner/admin;
+- adiciona `Servico perdido` aos fluxos de Georreferenciamento, CAR, ITR/CCIR e Outros Servicos;
+- cria indice de apoio para receitas automaticas por `service_card_id`;
+- recarrega schema cache do Supabase/PostgREST.
+
+### `supabase/migrations/018_company_owner_only_permissions.sql`
+
+Correcao de permissao da FASE UX-ORG-SERVICES-1:
+
+- cria `public.is_org_owner`;
+- restringe edicao de Minha Empresa, Equipe, Variaveis financeiras, dados bancarios e regras da empresa a `role = owner`;
+- permite leitura dessas areas para `owner` e `admin` ativos;
+- vincula `flavio.terras@gmail.com` como owner da Terras Reunidas quando existir no Auth;
+- vincula `nataliasilva.terras@gmail.com` e `romeu@teste.com.br` como admins operacionais quando existirem no Auth;
 - recarrega schema cache do Supabase/PostgREST.
 
 ## Tipos principais

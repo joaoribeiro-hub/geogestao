@@ -74,6 +74,43 @@ Escopo:
 
 Status: parcial/implementado no codigo. Pendente aplicar `supabase/migrations/008_account1_organizations_profiles_ai.sql` no Supabase de teste, validar manualmente conta, organizacao, uploads e Chat IA, e depois avaliar aplicacao no Supabase oficial.
 
+## Servicos como centro do sistema
+
+### Fase UX-ORG-SERVICES-1: Servicos, multiempresa e simplificacao visual
+
+Objetivo: transformar Servicos no centro operacional do GeoGestao, mantendo o produto completo, mas com experiencia visual simples como um quadro de tarefas.
+
+Escopo implementado:
+
+- Remover Propostas e Contratos do foco do menu principal.
+- Manter rotas antigas `/propostas` e `/contratos` por compatibilidade.
+- Manter Clientes em Configuracoes/Base de Clientes.
+- Criar botao `Novo Servico` em modal grande.
+- Criar servico em `Aguardando documentos`.
+- Criar checklist padrao conforme tipo de servico.
+- Atualizar o Kanban de Servicos para cards mais limpos e clicaveis.
+- Manter drag and drop e scroll horizontal.
+- Adicionar acoes por etapa:
+  - anexar documentacao;
+  - concluir documentacao;
+  - criar proposta;
+  - criar contrato;
+  - mover para execucao;
+  - proximo.
+- Reestruturar detalhe do servico com cliente em destaque, imovel abaixo, tipo como badge, chips editaveis, resumo automatico, anexos, membros e historico.
+- Transformar Nova Receita/Nova Despesa em botoes com modal.
+- Unificar a Base de Clientes por `organization_id`.
+- Preparar storage por empresa com path `organizations/{organization_id}/...`.
+- Criar migration `015_ux_org_services_center.sql`.
+- Criar migration corretiva `016_services_workflow_company_team_permissions.sql` para colunas por tipo de servico, equipe, dados bancarios e permissoes owner/admin.
+- Criar migration corretiva `017_org_members_rls_service_lost_finance.sql` para remover recursao de RLS, adicionar `Servico perdido` e calcular lucro estimado/efetuado/perdido por servico.
+- Criar scripts admin:
+  - `npm run admin:ensure-terras`;
+  - `npm run admin:reset-org`.
+- Criar documentacao `docs/SERVICES_FLOW.md` e `docs/ADMIN_ORGANIZATIONS.md`.
+
+Status: parcial/implementado no codigo. Pendente aplicar `supabase/migrations/015_ux_org_services_center.sql`, `supabase/migrations/016_services_workflow_company_team_permissions.sql` e `supabase/migrations/017_org_members_rls_service_lost_finance.sql` no Supabase de teste, vincular owner da Terras Reunidas e validar manualmente o fluxo completo com dados reais.
+
 ## GeoQuery e bases geograficas
 
 ### Fase GEOQUERY-1: Fazer busca de imovel por CAR Federal com bases CAR, INCRA e Alertas
@@ -114,6 +151,29 @@ Escopo:
 - Documentar fluxo de QGIS/sample, preview e importacao.
 
 Status: parcial/implementado no codigo. Pendente validar com uma base grande real no Supabase de teste e, se necessario, adicionar preenchimento automatico de `geom` via PostGIS/RPC.
+
+### Fase GEOQUERY-3: Cruzamento espacial CAR x SIGEF e MapBiomas Alerta
+
+Objetivo: corrigir a correspondencia INCRA/SIGEF para usar geometria em vez de `cod_car`, e integrar a consulta server-side com a API oficial MapBiomas Alerta.
+
+Escopo:
+
+- Criar migration `010_geoquery_spatial_matching_mapbiomas.sql`.
+- Preencher `geom` a partir de `geom_geojson`.
+- Criar RPC `find_sigef_matches_by_car`.
+- Usar regra padrao de 60% de sobreposicao da area CAR.
+- Permitir ajuste de sobreposicao minima e buffer SIGEF na UI.
+- Mostrar percentual de sobreposicao e areas CAR/SIGEF/intersecao.
+- Desenhar SIGEF no mapa quando houver correspondencia.
+- Aceitar classificacao `CAR_ALERT_INTERSECTION`.
+- Normalizar `cod_car`, `cod_imovel`, `alert_code` e areas em `geo_alert_layers`.
+- Criar service server-side MapBiomas Alerta.
+- Criar endpoint interno `/api/geoquery/mapbiomas-alert`.
+- Criar endpoint interno `/api/geoquery/mapbiomas-alert/report` para PDF interno do laudo com dados oficiais da API.
+- Exibir botao "Visualizar laudo" para alertas com codigo.
+- Atualizar testes e documentacao.
+
+Status: parcial/implementado no codigo. Pendente aplicar a migration 010 no Supabase de teste, rodar `refresh_geoquery_geometries(true)`, validar com bases CAR/SIGEF/MapBiomas reais e confirmar credenciais MapBiomas.
 
 ## Fase 1: Contratos + conversao proposta -> servico + receita automatica
 

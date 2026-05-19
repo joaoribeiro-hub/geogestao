@@ -4,7 +4,9 @@ import { PageHeader } from "@/components/layout/page-header";
 import { ProposalV2Create } from "@/components/proposals/proposal-v2-create";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
+import { requireUser } from "@/lib/auth";
 import { proposalStages } from "@/lib/constants";
+import { getCurrentOrganizationForUser } from "@/lib/organization";
 import { filterByPeriod, resolvePeriodRange } from "@/lib/period";
 import { createServerSupabase } from "@/lib/supabase/server";
 import { cn, formatCurrency } from "@/lib/utils";
@@ -18,12 +20,19 @@ export default async function ProposalsPage({
   const resolvedSearchParams = await searchParams;
   const periodRange = resolvePeriodRange(resolvedSearchParams);
   const supabase = await createServerSupabase();
+  const user = await requireUser(supabase);
+  const organization = await getCurrentOrganizationForUser(supabase, user.id);
   const [clientsResult, proposalsResult, attachmentsResult] = await Promise.all([
-    supabase.from("clients").select("*").order("name"),
-    supabase.from("proposals").select("*").order("position"),
+    supabase.from("clients").select("*").eq("organization_id", organization.id).order("name"),
+    supabase
+      .from("proposals")
+      .select("*")
+      .eq("organization_id", organization.id)
+      .order("position"),
     supabase
       .from("attachments")
       .select("*")
+      .eq("organization_id", organization.id)
       .eq("entity_type", "proposal")
       .order("created_at", { ascending: false }),
   ]);

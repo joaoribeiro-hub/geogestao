@@ -1,0 +1,110 @@
+
+> geo-office-mvp@0.1.0 dev
+> next dev
+
+   ▲ Next.js 15.5.15
+   - Local:        http://localhost:3000
+   - Network:      http://192.168.0.15:3000
+   - Environments: .env.local
+
+ ✓ Starting...
+ ✓ Ready in 9.5s
+ ○ Compiling /middleware ...
+ ✓ Compiled /middleware in 519ms (187 modules)
+ ○ Compiling / ...
+ ✓ Compiled / in 1617ms (970 modules)
+ GET / 200 in 3806ms
+ ○ Compiling /mapa ...
+ ✓ Compiled /mapa in 31.8s (1335 modules)
+ ✓ Compiled in 1656ms (368 modules)
+ GET /mapa 200 in 1344ms
+ GET /mapa 200 in 35798ms
+ GET /mapa 200 in 406ms
+ ○ Compiling /api/geoquery/search ...
+ ✓ Compiled /api/geoquery/search in 1063ms (1354 modules)
+geoquery.sigef.rpc.start {
+  codCar: 'GO-5219753-80EEBF1E6C744118A4C94B2EB35DAE83',
+  minCarOverlap: 0.6,
+  bufferMeters: 0,
+  rpcName: 'find_sigef_matches_by_car_app'
+}
+geoquery.sigef.rpc.success {
+  codCar: 'GO-5219753-80EEBF1E6C744118A4C94B2EB35DAE83',
+  minCarOverlap: 0.6,
+  bufferMeters: 0,
+  rpcName: 'find_sigef_matches_by_car_app',
+  resultCount: 1
+}
+geoquery.alerts.imported.diagnostics {
+  codCar: 'GO-5219753-80EEBF1E6C744118A4C94B2EB35DAE83',
+  rpcName: 'fallback_direct_columns',
+  directCodeCount: 0,
+  attributesCodeCount: 0,
+  spatialIntersectionCount: 0,
+  spatialBufferCount: 0,
+  geomGeojsonCount: 0,
+  resultCount: 0
+}
+ POST /api/geoquery/search 200 in 16875ms
+ ○ Compiling /api/geoquery/mapbiomas-alert ...
+ ✓ Compiled /api/geoquery/mapbiomas-alert in 1058ms (1352 modules)
+ POST /api/geoquery/mapbiomas-alert 502 in 3385ms
+   Reload env: .env.local
+ ✓ Compiled in 3.7s (1509 modules)
+ GET /mapa 200 in 2737ms
+ ○ Compiling /login ...
+ ✓ Compiled /login in 1255ms (1372 modules)
+ GET /login?redirectedFrom=%2F 200 in 667ms
+ ✓ Compiled in 618ms (385 modules)
+ GET /login?redirectedFrom=%2Fclientes 200 in 137ms
+ GET /login?redirectedFrom=%2Fmapa 200 in 97ms
+ ✓ Compiled in 1325ms (385 modules)
+ ✓ Compiled in 698ms (385 modules)
+ ✓ Compiled in 549ms (385 modules)
+ ✓ Compiled in 3s (1539 modules)
+ ✓ Compiled in 677ms (385 modules)
+ ✓ Compiled in 3.4s (1352 modules)
+ ✓ Compiled in 2.2s (1352 modules)
+ ✓ Compiled in 1746ms (1352 modules)
+ ✓ Compiled in 2s (1352 modules)
+ ✓ Compiled in 1371ms (1352 modules)
+ ✓ Compiled in 1538ms (1352 modules)
+ ✓ Compiled in 1003ms (1352 modules)
+ ✓ Compiled in 1463ms (1352 modules)
+ ✓ Compiled in 2.2s (1352 modules)
+ ✓ Compiled in 1805ms (1352 modules)
+ ✓ Compiled in 1264ms (1352 modules)
+ ✓ Compiled in 1517ms (1352 modules)
+ ✓ Compiled in 1016ms (1352 modules)
+ ✓ Compiled in 755ms (1352 modules)
+ ✓ Compiled in 2.5s (1352 modules)
+ ✓ Compiled in 634ms (385 modules)
+ ✓ Compiled in 1014ms (385 modules)
+ GET / 200 in 898ms
+ ○ Compiling /servicos ...
+ ✓ Compiled /servicos in 3.5s (1440 modules)
+ GET /servicos 200 in 3622ms
+ GET /financeiro 200 in 3917ms
+ GET /propostas 200 in 3930ms
+ GET /contratos 200 in 3911ms
+ GET /mapa 200 in 3915ms
+ ○ Compiling /clientes ...
+ ✓ Compiled /clientes in 2.3s (1546 modules)
+ GET /minha-conta 200 in 2824ms
+ GET /legislacao 200 in 2829ms
+ GET /documentos 200 in 2831ms
+ GET /clientes 200 in 2828ms
+ GET /minha-empresa 200 in 2841ms
+ ○ Compiling /anexos ...
+ ✓ Compiled /anexos in 782ms (1558 modules)
+ GET /anexos 200 in 924ms
+ GET /mapa 200 in 2238ms
+ GET /mapa 200 in 1580ms
+ GET /mapa 200 in 1509ms
+ ○ Compiling /login ...
+ ✓ Compiled /login in 690ms (1138 modules)
+ GET /login?redirectedFrom=%2F 200 in 1009ms
+ GET /login?redirectedFrom=%2F 200 in 62ms
+ GET /login?redirectedFrom=%2Fclientes 200 in 60ms
+ GET /login?redirectedFrom=%2Fmapa 200 in 98ms
+[?25h

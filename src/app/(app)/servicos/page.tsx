@@ -1,13 +1,17 @@
 import Link from "next/link";
 import { PeriodFilter } from "@/components/filters/period-filter";
-import { ServiceCardForm } from "@/components/forms/service-card-form";
 import { ServiceKanban } from "@/components/kanban/service-kanban";
 import { PageHeader } from "@/components/layout/page-header";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
+import { NewServiceModal } from "@/components/services/new-service-modal";
+import { requireUser } from "@/lib/auth";
 import { filterByPeriod, resolvePeriodRange } from "@/lib/period";
+import { getInitialServiceColumn } from "@/lib/services/service-flow";
+import { serviceTypeToBoardSlug } from "@/lib/services/service-cards";
+import { getCurrentOrganizationForUser } from "@/lib/organization";
 import { createServerSupabase } from "@/lib/supabase/server";
 import { cn } from "@/lib/utils";
+import type { ProposalServiceType } from "@/types/database";
 
 export default async function ServicesPage({
   searchParams,
@@ -18,32 +22,56 @@ export default async function ServicesPage({
   const board = Array.isArray(params.board) ? params.board[0] : params.board;
   const periodRange = resolvePeriodRange(params);
   const supabase = await createServerSupabase();
+  const user = await requireUser(supabase);
+  const organization = await getCurrentOrganizationForUser(supabase, user.id);
   const [boardsResult, clientsResult] = await Promise.all([
     supabase.from("service_boards").select("*").order("position"),
-    supabase.from("clients").select("*").order("name"),
+    supabase.from("clients").select("*").eq("organization_id", organization.id).order("name"),
   ]);
   const boards = boardsResult.data ?? [];
   const clients = clientsResult.data ?? [];
 
   const selectedBoard = boards.find((item) => item.slug === board) ?? boards[0];
-  const columnsResult = selectedBoard
+  const boardIds = boards.map((item) => item.id);
+  const allColumnsResult = boardIds.length
     ? await supabase
         .from("service_columns")
         .select("*")
-        .eq("board_id", selectedBoard.id)
+        .in("board_id", boardIds)
         .order("position")
     : { data: [] };
-  const columns = columnsResult.data ?? [];
+  const allColumns = allColumnsResult.data ?? [];
+  const columns = selectedBoard
+    ? allColumns.filter((column) => column.board_id === selectedBoard.id)
+    : [];
+  const columnByServiceType = buildInitialColumnByServiceType(boards, allColumns);
 
   const columnIds = columns.map((column) => column.id);
   const cardsResult = columnIds.length
-    ? await supabase.from("service_cards").select("*").in("column_id", columnIds)
+    ? await supabase
+        .from("service_cards")
+        .select("*")
+        .eq("organization_id", organization.id)
+        .in("column_id", columnIds)
     : { data: [] };
   const cards = filterByPeriod(
     cardsResult.data ?? [],
     periodRange,
-    (card) => card.due_date ?? card.created_at,
+    (card) => card.due_date,
   );
+
+  if (process.env.NODE_ENV !== "production") {
+    console.info("[servicos:list]", {
+      organizationId: organization.id,
+      board: selectedBoard?.slug,
+      columns: columnIds.length,
+      cardsBeforePeriod: cardsResult.data?.length ?? 0,
+      cardsAfterPeriod: cards.length,
+      period: periodRange.period,
+      from: periodRange.from,
+      to: periodRange.to,
+    });
+  }
 
   const clientMap = new Map(clients.map((client) => [client.id, client]));
   const cardsWithClients = cards.map((card) => ({
@@ -53,10 +81,17 @@ export default async function ServicesPage({
 
   return (
     <div>
-      <PageHeader
-        title="Servicos tecnicos"
-        description="Quadros flexiveis para GEO, CAR, ITR/CCIR e demais demandas."
-      />
+      <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+        <PageHeader
+          title="Servicos"
+          description="Centro da operacao: documentos, proposta, contrato, execucao, equipe e financeiro em um quadro simples."
+        />
+        <NewServiceModal
+          clients={clients}
+          columns={allColumns}
+          columnByServiceType={columnByServiceType}
+        />
+      </div>
 
       <PeriodFilter
         range={periodRange}
@@ -82,18 +117,28 @@ export default async function ServicesPage({
       {!selectedBoard ? (
         <EmptyState title="Execute o seed para criar os quadros padrao." />
       ) : (
-        <div className="grid gap-6 2xl:grid-cols-[420px_minmax(0,1fr)]">
-          <Card>
-            <CardHeader>
-              <CardTitle>Novo card</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ServiceCardForm clients={clients} columns={columns} />
-            </CardContent>
-          </Card>
+        <div className="grid gap-6">
           <ServiceKanban columns={columns} cards={cardsWithClients} />
         </div>
       )}
     </div>
   );
+}
+
+function buildInitialColumnByServiceType(
+  boards: Array<{ id: string; slug: string }>,
+  columns: Array<{ id: string; board_id: string; slug: string; position: number; name: string; created_at: string; updated_at?: string | null }>,
+) {
+  const map: Partial<Record<ProposalServiceType, string>> = {};
+  (Object.entries(serviceTypeToBoardSlug) as Array<[ProposalServiceType, string]>).forEach(
+    ([serviceType, boardSlug]) => {
+      const board = boards.find((item) => item.slug === boardSlug);
+      if (!board) return;
+      const initialColumn = getInitialServiceColumn(
+        columns.filter((column) => column.board_id === board.id),
+      );
+      if (initialColumn) map[serviceType] = initialColumn.id;
+    },
+  );
+  return map;
 }

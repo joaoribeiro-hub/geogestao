@@ -1,0 +1,12 @@
+geoquery.alerts.imported.rpc.failed {
+  codCar: 'GO-5219753-80EEBF1E6C744118A4C94B2EB35DAE83',
+  bufferMeters: 500,
+  includeNearbyAlerts: false,
+  rpcName: 'find_alerts_by_car_app',
+  error: {
+    code: '57014',
+    message: 'canceling statement due to statement timeout',
+    details: undefined,
+    hint: undefined
+  }
+}

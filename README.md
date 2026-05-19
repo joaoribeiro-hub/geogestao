@@ -66,6 +66,8 @@ Ou, em um projeto remoto, execute o SQL de:
 - `supabase/migrations/007_ux2_proposals_contracts_documents.sql` para UX-2: status comercial, documentos, wizards e metadados de PDF
 - `supabase/migrations/008_account1_organizations_profiles_ai.sql` para ACCOUNT-1: Minha Conta, organizacoes, planos, quotas e Chat IA
 - `supabase/migrations/009_geoquery_car_incra_alerts.sql` para GEOQUERY-1: busca de imovel por CAR Federal, CAR, INCRA, alertas e historico
+- `supabase/migrations/010_geoquery_spatial_matching_mapbiomas.sql` para GEOQUERY-3: cruzamento espacial CAR x SIGEF e alertas MapBiomas
+- `supabase/migrations/015_ux_org_services_center.sql` para UX-ORG-SERVICES-1: Servicos como centro, membros/eventos, Terras Reunidas e novas colunas GEO
 - `supabase/seed.sql`
 
 5. Crie ao menos um usuario no Supabase Auth.
@@ -97,6 +99,24 @@ npm run typecheck
 npm run test
 npm run test:coverage
 npm run test:e2e
+npm run admin:ensure-terras
+npm run admin:reset-org
+```
+
+Scripts admin usam `SUPABASE_SERVICE_ROLE_KEY` apenas no terminal local/admin. Nunca use service role no frontend.
+
+Exemplo para garantir a empresa Terras Reunidas no Supabase de teste:
+
+```powershell
+$env:NEXT_PUBLIC_SUPABASE_URL="https://seu-projeto-de-teste.supabase.co"
+$env:SUPABASE_SERVICE_ROLE_KEY="sua-service-role-de-teste"
+npm run admin:ensure-terras -- --owner-email=voce@empresa.com
+```
+
+Dry-run do reset seguro:
+
+```powershell
+npm run admin:reset-org -- --slug=terras-reunidas
 ```
 
 ## Testes
@@ -292,9 +312,27 @@ GOOGLE_DRIVE_FOLDER_ID=
 GOOGLE_SERVICE_ACCOUNT_EMAIL=
 GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY=
 GOOGLE_APPLICATION_CREDENTIALS=
+MAPBIOMAS_ALERT_API_URL=https://plataforma.alerta.mapbiomas.org/api/v2/graphql
+MAPBIOMAS_ALERT_EMAIL=
+MAPBIOMAS_ALERT_PASSWORD=
+MAPBIOMAS_ALERT_TOKEN=
 ```
 
 O GeoGestao nao automatiza login gov.br, nao armazena senha gov.br e nao burla captcha. Para demonstrativo CAR ou CAR atualizado, use os links oficiais, baixe o documento manualmente e anexe pelo fluxo de documentos/anexos. Detalhes em `docs/GEOQUERY.md`.
+
+SIGEF/INCRA nao possui CAR Federal como chave confiavel. A correspondencia e feita por PostGIS, cruzando a geometria do CAR com perimetros SIGEF e aceitando, por padrao, sobreposicao de pelo menos 60% da area do CAR. Para habilitar isso em banco remoto, rode primeiro no Supabase de teste:
+
+```text
+supabase/migrations/010_geoquery_spatial_matching_mapbiomas.sql
+```
+
+Depois execute:
+
+```sql
+select * from public.refresh_geoquery_geometries(true);
+```
+
+MapBiomas Alerta usa API GraphQL oficial server-side. Configure `MAPBIOMAS_ALERT_TOKEN` ou `MAPBIOMAS_ALERT_EMAIL`/`MAPBIOMAS_ALERT_PASSWORD` apenas no servidor; nunca use variaveis `NEXT_PUBLIC_` para isso. O GeoGestao consulta `ruralProperty(carCode)` para descobrir alertas do CAR e `alert(alertCode, carCode)` para os detalhes. Quando a API nao fornece PDF oficial direto, o endpoint `/api/geoquery/mapbiomas-alert/report` gera um PDF interno "Laudo GeoGestao - Dados MapBiomas Alerta" com os dados retornados pela API.
 
 ## Mapa com KML/KMZ
 
