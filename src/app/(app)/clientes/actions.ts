@@ -60,6 +60,31 @@ export async function deleteClientAction(clientId: string) {
   const user = await requireUser(supabase);
   const organization = await getCurrentOrganizationForUser(supabase, user.id);
 
+  const { count: servicesCount, error: servicesError } = await supabase
+    .from("service_cards")
+    .select("id", { count: "exact", head: true })
+    .eq("organization_id", organization.id)
+    .eq("client_id", clientId);
+  if (servicesError) throw new Error(servicesError.message);
+  if ((servicesCount ?? 0) > 0) {
+    throw new Error(
+      "Este cliente possui servicos vinculados. Remova ou altere o vinculo antes de apagar.",
+    );
+  }
+
+  const { count: attachmentsCount, error: attachmentsError } = await supabase
+    .from("attachments")
+    .select("id", { count: "exact", head: true })
+    .eq("organization_id", organization.id)
+    .eq("entity_type", "client")
+    .eq("entity_id", clientId);
+  if (attachmentsError) throw new Error(attachmentsError.message);
+  if ((attachmentsCount ?? 0) > 0) {
+    throw new Error(
+      "Este cliente possui documentos anexados. Apague os documentos do cliente antes de apagar o cadastro.",
+    );
+  }
+
   const { error } = await supabase
     .from("clients")
     .delete()

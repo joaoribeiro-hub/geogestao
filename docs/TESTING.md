@@ -331,6 +331,14 @@ Coberto agora:
 - UX-ORG-SERVICES-1: regras puras do fluxo de Servicos, incluindo coluna inicial `Aguardando documentos`, destino de prioridade alta, botao Proximo, checklists padrao por tipo e resumo automatico sem IA.
 - UX-ORG-SERVICES-1 correcao: colunas por tipo de servico, permissao owner/admin de Minha Empresa, path de storage por organizacao e regra de despesa mensal de membro de equipe.
 - UX-ORG-SERVICES-1 correcao RLS/financeiro: migration sem policy recursiva em `organization_members`, parser BRL de valores de servico, lucro estimado/efetuado/perdido e coluna `Servico perdido`.
+- Correcao de isolamento por empresa: Dashboard ignora dados sem `organization_id` ou de outra empresa; helpers de Storage bloqueiam path fora de `organizations/{organization_id}/`; despesas mensais de equipe continuam idempotentes.
+- Correcao de Servicos: filtro por intervalo operacional, servico criado hoje com prazo futuro visivel no periodo atual, coluna `Em atraso`, servico concluido/perdido fora do atraso e nomes de documentos do cliente.
+- ASSISTANT-1: detector local de intencoes do Assistente IA e fallback sem provedor externo.
+- AI-ASSISTANT-INTENTS-1: parser de exemplos/intents privados, normalizacao, JSONL/TSV/seta, deduplicacao e hash do arquivo.
+- AI-ASSISTANT-ACTIONS-CHECKLIST-1: criacao de servico detectada como escrita com confirmacao, migration de checklist/feedback/activity log e remocao do menu lateral Assistente IA.
+- AI-ASSISTANT-CONTEXT-LEARNING-2: contexto curto para membro citado, status atual por checklist, sanitizacao de feedback negativo e migration de exemplos globais sanitizados.
+- AUTH-ORG-PLANS-1: validacao de CPF/senha/cadastro, reset de senha, limite de 3 usuarios do plano Iniciante e presenca das funcoes/RLS principais da migration 023.
+- TEAM-COMMS-CHECKLIST-BADGES-1: helpers de badges do Checklist e Chat da equipe, migration de chat com RLS/realtime e presenca dos widgets/badges flutuantes.
 - status comercial de proposta nao aprovada/perdida;
 - receita pendente/a receber para pagamento nao pago;
 - pagina de login em E2E.
@@ -351,3 +359,4 @@ Pendente:
 - teste de importacao real de shapefile/GeoJSON em Supabase de teste;
 - teste de intersecao espacial/buffer depois de ativar PostGIS e carregar fixtures geograficas.
 - E2E completo do novo fluxo de Servicos com anexos, criacao de cliente pelo servico, proposta/contrato vinculados e reset seguro em Supabase de teste.
+- E2E real de cadastro publico, confirmacao de e-mail, onboarding por codigo e reset de senha, pois depende de Supabase Auth configurado com redirects do ambiente.

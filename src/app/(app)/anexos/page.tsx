@@ -1,4 +1,6 @@
-import { AttachmentUploader, type AttachmentEntityOption } from "@/components/forms/attachment-uploader";
+import { AttachmentActions } from "@/components/files/attachment-actions";
+import { AttachmentUploadModal } from "@/components/files/attachment-upload-modal";
+import type { AttachmentEntityOption } from "@/components/forms/attachment-uploader";
 import { PageHeader } from "@/components/layout/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -54,57 +56,44 @@ export default async function AttachmentsPage() {
     ...legislation.map((item) => ({ id: item.id, type: "legislation_item" as const, label: item.title })),
   ];
 
-  const signed = await Promise.all(
-    attachments.map(async (attachment) => {
-      const { data } = await supabase.storage
-        .from("attachments")
-        .createSignedUrl(attachment.storage_path ?? attachment.file_path, 60 * 60);
-      return { ...attachment, signedUrl: data?.signedUrl ?? null };
-    }),
-  );
-
   return (
     <div>
-      <PageHeader title="Anexos" description="Upload privado no Supabase Storage, vinculado a clientes, propostas, servicos e financeiro." />
-      <div className="grid gap-6 xl:grid-cols-[420px_minmax(0,1fr)]">
-        <Card>
-          <CardHeader>
-            <CardTitle>Novo anexo</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {entities.length ? (
-              <AttachmentUploader entities={entities} />
-            ) : (
-              <EmptyState title="Crie algum registro antes de anexar arquivos." />
-            )}
-          </CardContent>
-        </Card>
+      <PageHeader title="Anexos" description="Upload privado no Supabase Storage, vinculado a clientes, propostas, servicos e financeiro.">
+        {entities.length ? <AttachmentUploadModal entities={entities} /> : null}
+      </PageHeader>
+      <div className="grid gap-6">
         <Card>
           <CardHeader>
             <CardTitle>Arquivos</CardTitle>
           </CardHeader>
           <CardContent>
-            {signed.length ? (
+            {attachments.length ? (
               <div className="space-y-3">
-                {signed.map((attachment) => (
+                {attachments.map((attachment) => (
                   <div key={attachment.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-background p-4">
                     <div>
                       <p className="font-medium">{attachment.file_name}</p>
                       <div className="mt-2 flex flex-wrap gap-2">
                         <Badge variant="secondary">{attachment.entity_type}</Badge>
                         <Badge variant="outline">{formatDate(attachment.created_at)}</Badge>
+                        {attachment.is_global ? <Badge variant="outline">Global/Oficial</Badge> : null}
                       </div>
                     </div>
-                    {attachment.signedUrl ? (
-                      <a className="text-sm font-medium text-primary hover:underline" href={attachment.signedUrl}>
-                        Baixar
-                      </a>
-                    ) : null}
+                    <AttachmentActions
+                      id={attachment.id}
+                      fileName={attachment.file_name}
+                      mimeType={attachment.mime_type}
+                      category={attachment.category}
+                      entityType={attachment.entity_type}
+                      entityId={attachment.entity_id}
+                      canDelete={!attachment.is_global && attachment.organization_id === organization.id}
+                      canEdit={!attachment.is_global && attachment.organization_id === organization.id}
+                    />
                   </div>
                 ))}
               </div>
             ) : (
-              <EmptyState title="Nenhum anexo enviado." />
+              <EmptyState title={entities.length ? "Nenhum anexo enviado." : "Crie algum registro antes de anexar arquivos."} />
             )}
           </CardContent>
         </Card>

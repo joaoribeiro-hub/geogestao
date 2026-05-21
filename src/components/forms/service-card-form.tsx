@@ -46,6 +46,7 @@ export function ServiceCardForm({
       service_type: defaultServiceType,
       priority: "medium",
       payment_status: "pagamento_nao_efetuado",
+      service_date: todayDate(),
       due_date: "",
       custom_fields_json: "{}",
     },
@@ -86,6 +87,7 @@ export function ServiceCardForm({
             title: "",
             description: "",
             client_id: values.client_id ?? "",
+            service_date: todayDate(),
             custom_fields_json: "{}",
           });
           setEstimatedValue("");
@@ -168,7 +170,7 @@ export function ServiceCardForm({
         />
       </div>
 
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-4">
         <div className="space-y-2">
           <Label htmlFor="service-priority">Prioridade</Label>
           <select
@@ -181,6 +183,10 @@ export function ServiceCardForm({
             <option value="medium">Media</option>
             <option value="high">Alta</option>
           </select>
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="service-date">Data de criacao</Label>
+          <Input id="service-date" type="date" {...form.register("service_date")} />
         </div>
         <div className="space-y-2">
           <Label htmlFor="service-due-date">Data prevista / prazo</Label>
@@ -248,4 +254,8 @@ export function ServiceCardForm({
       ) : null}
     </form>
   );
+}
+
+function todayDate() {
+  return new Date().toISOString().slice(0, 10);
 }

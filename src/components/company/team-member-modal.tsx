@@ -5,33 +5,46 @@ import { useRouter } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Loader2, Plus, X } from "lucide-react";
 import { useForm } from "react-hook-form";
-import { createTeamMemberAction } from "@/app/(app)/minha-empresa/actions";
+import {
+  createTeamMemberAction,
+  updateTeamMemberAction,
+} from "@/app/(app)/minha-empresa/actions";
 import { teamMemberSchema, type TeamMemberFormValues } from "@/lib/schemas";
 import { formatBrlCurrency, parseBrlCurrencyInput } from "@/lib/services/service-finance";
+import type { Json, TeamMember } from "@/types/database";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 
-export function TeamMemberModal({ canEdit }: { canEdit: boolean }) {
+export function TeamMemberModal({
+  canEdit,
+  member,
+  triggerLabel,
+}: {
+  canEdit: boolean;
+  member?: TeamMember;
+  triggerLabel?: string;
+}) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
   const [feedback, setFeedback] = useState<string | null>(null);
+  const bankDetails = asRecord(member?.bank_details);
   const form = useForm<TeamMemberFormValues>({
     resolver: zodResolver(teamMemberSchema),
     defaultValues: {
-      name: "",
-      email: "",
-      document_number: "",
-      pix_key: "",
-      bank_name: "",
-      bank_agency: "",
-      bank_account: "",
-      monthly_amount: "",
-      role_title: "",
-      notes: "",
-      status: "active",
+      name: member?.name ?? "",
+      email: member?.email ?? "",
+      document_number: member?.document_number ?? "",
+      pix_key: member?.pix_key ?? "",
+      bank_name: textValue(bankDetails.bank_name),
+      bank_agency: textValue(bankDetails.bank_agency),
+      bank_account: textValue(bankDetails.bank_account),
+      monthly_amount: member?.monthly_amount ? formatBrlCurrency(member.monthly_amount) : "",
+      role_title: member?.role_title ?? "",
+      notes: member?.notes ?? "",
+      status: member?.status ?? "active",
     },
   });
 
@@ -45,7 +58,11 @@ export function TeamMemberModal({ canEdit }: { canEdit: boolean }) {
       void (async () => {
         setFeedback(null);
         try {
-          await createTeamMemberAction(formData);
+          if (member) {
+            await updateTeamMemberAction(member.id, formData);
+          } else {
+            await createTeamMemberAction(formData);
+          }
           form.reset();
           setOpen(false);
           router.refresh();
@@ -65,8 +82,8 @@ export function TeamMemberModal({ canEdit }: { canEdit: boolean }) {
   return (
     <>
       <Button onClick={() => setOpen(true)}>
-        <Plus aria-hidden="true" />
-        Cadastrar membro
+        {member ? null : <Plus aria-hidden="true" />}
+        {triggerLabel ?? (member ? "Editar" : "Cadastrar membro")}
       </Button>
 
       {open ? (
@@ -74,12 +91,14 @@ export function TeamMemberModal({ canEdit }: { canEdit: boolean }) {
           className="fixed inset-0 z-50 grid place-items-center bg-foreground/35 p-4"
           role="dialog"
           aria-modal="true"
-          aria-label="Cadastrar membro"
+          aria-label={member ? "Editar membro" : "Cadastrar membro"}
         >
           <div className="max-h-[92vh] w-full max-w-4xl overflow-y-auto rounded-lg border bg-card shadow-xl">
             <div className="flex items-start justify-between gap-4 border-b p-5">
               <div>
-                <h2 className="text-lg font-semibold">Cadastrar membro</h2>
+                <h2 className="text-lg font-semibold">
+                  {member ? "Editar membro" : "Cadastrar membro"}
+                </h2>
                 <p className="text-sm text-muted-foreground">
                   Membro operacional da empresa. Convite de acesso fica para etapa futura.
                 </p>
@@ -155,7 +174,7 @@ export function TeamMemberModal({ canEdit }: { canEdit: boolean }) {
 
               <Button disabled={pending}>
                 {pending ? <Loader2 className="animate-spin" aria-hidden="true" /> : <Plus aria-hidden="true" />}
-                Cadastrar membro
+                {member ? "Salvar alteracoes" : "Cadastrar membro"}
               </Button>
 
               {feedback ? <p className="rounded-md bg-destructive/10 p-2 text-sm text-destructive">{feedback}</p> : null}
@@ -165,6 +184,17 @@ export function TeamMemberModal({ canEdit }: { canEdit: boolean }) {
       ) : null}
     </>
   );
+}
+
+function asRecord(value: Json | undefined): Record<string, Json> {
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    return value as Record<string, Json>;
+  }
+  return {};
+}
+
+function textValue(value: Json | undefined) {
+  return typeof value === "string" ? value : "";
 }
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {

@@ -1,17 +1,16 @@
 import { Save } from "lucide-react";
 import { updateProfileAction } from "@/app/(app)/minha-conta/actions";
 import { AvatarUploader } from "@/components/account/avatar-uploader";
+import { PlansModal } from "@/components/account/plans-modal";
 import { PageHeader } from "@/components/layout/page-header";
+import { OrganizationOnboarding } from "@/components/onboarding/organization-onboarding";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { requireUser } from "@/lib/auth";
-import {
-  getCurrentOrganizationForUser,
-  getCurrentProfile,
-} from "@/lib/organization";
+import { getCurrentOrganizationContext } from "@/lib/organization";
 import { calculateStorageUsage, mbToBytes } from "@/lib/services/storage-quota";
 import { createServerSupabase } from "@/lib/supabase/server";
 import type { Json } from "@/types/database";
@@ -21,24 +20,29 @@ type PreferenceMap = Record<string, boolean>;
 export default async function AccountPage() {
   const supabase = await createServerSupabase();
   const user = await requireUser(supabase);
-  const [profile, organization] = await Promise.all([
-    getCurrentProfile(supabase, user.id),
-    getCurrentOrganizationForUser(supabase, user.id),
-  ]);
+  const { profile, organization, membership } = await getCurrentOrganizationContext(supabase, user.id);
 
-  const { data: attachments } = await supabase
-    .from("attachments")
-    .select("file_size,size_bytes")
-    .eq("organization_id", organization.id);
+  const { data: attachments } = organization
+    ? await supabase
+        .from("attachments")
+        .select("file_size,size_bytes")
+        .eq("organization_id", organization.id)
+    : { data: [] };
   const usedBytes = calculateStorageUsage(attachments ?? []);
 
-  const avatarUrl = profile.avatar_path
+  const avatarUrl = organization && profile.avatar_path
     ? (
         await supabase.storage
           .from("attachments")
           .createSignedUrl(profile.avatar_path, 60 * 60)
       ).data?.signedUrl ?? null
     : null;
+  const { data: plans } = await supabase
+    .from("plans")
+    .select("*")
+    .eq("is_active", true)
+    .eq("is_public", true)
+    .order("price_monthly_cents", { ascending: true });
 
   const emailPreferences = asPreferenceMap(profile.email_preferences);
   const accountPreferences = asPreferenceMap(profile.account_preferences);
@@ -58,7 +62,13 @@ export default async function AccountPage() {
           </CardHeader>
           <CardContent>
             <form action={updateProfileAction} className="grid gap-5" data-testid="account-profile-form">
-              <AvatarUploader currentUrl={avatarUrl} currentPath={profile.avatar_path} />
+              {organization ? (
+                <AvatarUploader currentUrl={avatarUrl} currentPath={profile.avatar_path} />
+              ) : (
+                <div className="rounded-md bg-secondary px-3 py-2 text-sm text-muted-foreground">
+                  A foto de perfil fica disponivel depois que voce entrar ou criar uma empresa.
+                </div>
+              )}
 
               <div className="grid gap-4 md:grid-cols-2">
                 <Field label="Nome completo">
@@ -164,29 +174,45 @@ export default async function AccountPage() {
               <CardTitle>Organizacao</CardTitle>
             </CardHeader>
             <CardContent className="grid gap-3 text-sm">
-              <div>
-                <p className="text-muted-foreground">Empresa</p>
-                <p className="font-medium">{organization.trade_name ?? organization.name}</p>
-              </div>
-              <div>
-                <p className="text-muted-foreground">Plano atual</p>
-                <div className="mt-1 flex flex-wrap items-center gap-2">
-                  <Badge variant="secondary">
-                    {organization.plan?.name ?? "Plano nao definido"}
-                  </Badge>
-                  <span className="text-muted-foreground">
-                    {organization.status}
-                  </span>
+              {organization && membership ? (
+                <>
+                  <div>
+                    <p className="text-muted-foreground">Empresa</p>
+                    <p className="font-medium">{organization.trade_name ?? organization.name}</p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground">Seu papel</p>
+                    <Badge variant="secondary">
+                      {membership.role === "owner" ? "Proprietario" : "Admin operacional"}
+                    </Badge>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground">Plano atual</p>
+                    <div className="mt-1 flex flex-wrap items-center gap-2">
+                      <Badge variant="secondary">
+                        {organization.plan?.name ?? "Plano nao definido"}
+                      </Badge>
+                      <span className="text-muted-foreground">
+                        {organization.status}
+                      </span>
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground">Armazenamento</p>
+                    <p className="font-medium">
+                      {formatBytes(usedBytes)} de {formatBytes(mbToBytes(organization.storage_quota_mb))}
+                    </p>
+                  </div>
+                  <PlansModal plans={plans ?? []} currentPlanId={organization.plan_id} />
+                </>
+              ) : (
+                <div className="rounded-md bg-secondary px-3 py-2 text-sm text-muted-foreground">
+                  Sua conta ainda nao participa de uma empresa. Conclua o onboarding para liberar o sistema.
                 </div>
-              </div>
-              <div>
-                <p className="text-muted-foreground">Armazenamento</p>
-                <p className="font-medium">
-                  {formatBytes(usedBytes)} de {formatBytes(mbToBytes(organization.storage_quota_mb))}
-                </p>
-              </div>
+              )}
             </CardContent>
           </Card>
+          {!organization || !membership ? <OrganizationOnboarding /> : null}
         </aside>
       </div>
     </div>

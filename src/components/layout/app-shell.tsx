@@ -14,7 +14,7 @@ import {
 } from "lucide-react";
 import { ptBR } from "@/lib/i18n/pt-br";
 import { cn } from "@/lib/utils";
-import { AiChatWidget } from "@/components/ai/ai-chat-widget";
+import { FloatingWidgets } from "@/components/floating/floating-widgets";
 import { SignOutButton } from "@/components/layout/sign-out-button";
 
 const mainNav = [
@@ -32,16 +32,23 @@ const settingsNav = [
   { href: "/anexos", label: ptBR.nav.attachments, icon: Paperclip },
 ] as const;
 
-const mobileNav = [...mainNav, ...settingsNav].slice(0, 8);
-
 export async function AppShell({
   children,
   userEmail,
+  limitedMode = false,
 }: {
   children: React.ReactNode;
   userEmail?: string | null;
+  limitedMode?: boolean;
 }) {
   const pathname = (await headers()).get("x-pathname") ?? "/";
+  const visibleMainNav = limitedMode ? [] : mainNav;
+  const visibleSettingsNav = limitedMode
+    ? settingsNav.filter((item) => item.href === "/minha-conta")
+    : settingsNav;
+  const visibleMobileNav = limitedMode
+    ? visibleSettingsNav
+    : [...visibleMainNav, ...visibleSettingsNav].slice(0, 8);
 
   return (
     <div className="min-h-screen bg-background" data-testid="app-shell">
@@ -54,8 +61,14 @@ export async function AppShell({
           </div>
         </div>
         <nav className="space-y-5 p-3">
-          <NavSection label="MENU" pathname={pathname} items={mainNav} />
-          <NavSection label="CONFIGURACOES" pathname={pathname} items={settingsNav} />
+          {!limitedMode ? (
+            <NavSection label="MENU" pathname={pathname} items={visibleMainNav} />
+          ) : (
+            <div className="rounded-md bg-secondary px-3 py-2 text-sm text-muted-foreground">
+              Conclua o cadastro da empresa para liberar o sistema.
+            </div>
+          )}
+          <NavSection label="CONFIGURACOES" pathname={pathname} items={visibleSettingsNav} />
         </nav>
       </aside>
 
@@ -77,10 +90,10 @@ export async function AppShell({
         <main className="app-grid min-h-[calc(100vh-4rem)] p-4 pb-24 lg:p-8">{children}</main>
       </div>
 
-      <AiChatWidget />
+      {!limitedMode ? <FloatingWidgets /> : null}
 
       <nav className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-4 border-t bg-card p-2 lg:hidden">
-        {mobileNav.map((item) => {
+        {visibleMobileNav.map((item) => {
           const Icon = item.icon;
           const active =
             item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);

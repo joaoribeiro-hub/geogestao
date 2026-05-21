@@ -1,7 +1,10 @@
 import Link from "next/link";
 import { Search } from "lucide-react";
+import { deleteTeamMemberAction } from "@/app/(app)/minha-empresa/actions";
 import { TeamMemberModal } from "@/components/company/team-member-modal";
+import { CompanyJoinCode } from "@/components/company/company-join-code";
 import { ClientCreateModal } from "@/components/clients/client-create-modal";
+import { DeleteButton } from "@/components/delete-button";
 import { CompanyBankForm } from "@/components/forms/company-bank-form";
 import { CompanyInfoForm } from "@/components/forms/company-info-form";
 import { CompanyServiceForm } from "@/components/forms/company-service-form";
@@ -54,6 +57,14 @@ export default async function CompanyPage({
   ]);
   const canEditCompany = canManageOrganization({ profile, membership });
   const canViewCompanySettings = canViewOrganizationSettings({ membership });
+  const { data: joinCode } = canEditCompany
+    ? await supabase
+        .from("organization_join_codes")
+        .select("code")
+        .eq("organization_id", organization.id)
+        .eq("status", "active")
+        .maybeSingle()
+    : { data: null };
 
   return (
     <div>
@@ -76,6 +87,12 @@ export default async function CompanyPage({
           </Link>
         ))}
       </nav>
+
+      {canEditCompany && joinCode?.code ? (
+        <div className="mb-6">
+          <CompanyJoinCode code={joinCode.code} />
+        </div>
+      ) : null}
 
       {activeTab === "informacoes" ? (
         <CompanyInfoSection
@@ -204,8 +221,10 @@ async function CompanyTeamSection({
                 <tr>
                   <th className="px-4 py-3 font-medium">Membro</th>
                   <th className="px-4 py-3 font-medium">Funcao</th>
+                  <th className="px-4 py-3 font-medium">Documento/PIX</th>
                   <th className="px-4 py-3 font-medium">Valor mensal</th>
                   <th className="px-4 py-3 font-medium">Status</th>
+                  <th className="px-4 py-3 text-right font-medium">Acoes</th>
                 </tr>
               </thead>
               <tbody>
@@ -220,6 +239,10 @@ async function CompanyTeamSection({
                       <td className="px-4 py-3 text-muted-foreground">
                         {member.role_title ?? "-"}
                       </td>
+                      <td className="px-4 py-3 text-muted-foreground">
+                        <p>{member.document_number ?? "-"}</p>
+                        <p className="text-xs">{member.pix_key ? `PIX: ${member.pix_key}` : "PIX nao informado"}</p>
+                      </td>
                       <td className="px-4 py-3">
                         <p>{formatCurrency(member.monthly_amount ?? 0)}</p>
                         {recurring ? (
@@ -230,6 +253,23 @@ async function CompanyTeamSection({
                         <Badge variant={member.status === "active" ? "secondary" : "outline"}>
                           {member.status === "active" ? "Ativo" : "Inativo"}
                         </Badge>
+                      </td>
+                      <td className="px-4 py-3">
+                        {canEdit ? (
+                          <div className="flex justify-end gap-2">
+                            <TeamMemberModal canEdit={canEdit} member={member} triggerLabel="Editar" />
+                            <DeleteButton
+                              label="Apagar"
+                              confirmMessage="Apagar este membro? Despesas mensais pendentes vinculadas tambem serao removidas."
+                              action={async () => {
+                                "use server";
+                                await deleteTeamMemberAction(member.id);
+                              }}
+                            />
+                          </div>
+                        ) : (
+                          <span className="block text-right text-xs text-muted-foreground">Somente leitura</span>
+                        )}
                       </td>
                     </tr>
                   );

@@ -3,7 +3,7 @@ import { createServerClient } from "@supabase/ssr";
 import type { Database } from "@/types/database";
 import { getSupabaseEnv } from "@/lib/supabase/env";
 
-const publicRoutes = ["/login"];
+const publicRoutes = ["/login", "/reset-password", "/api/auth/request-password-reset"];
 
 export async function updateSession(request: NextRequest) {
   const requestHeaders = new Headers(request.headers);

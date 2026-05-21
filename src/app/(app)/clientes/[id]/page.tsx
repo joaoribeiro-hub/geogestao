@@ -1,8 +1,9 @@
 import { notFound } from "next/navigation";
+import { ClientInteractionModal } from "@/components/clients/client-interaction-modal";
 import { DeleteButton } from "@/components/delete-button";
-import { AttachmentUploader } from "@/components/forms/attachment-uploader";
+import { AttachmentActions } from "@/components/files/attachment-actions";
+import { AttachmentUploadModal } from "@/components/files/attachment-upload-modal";
 import { ClientForm } from "@/components/forms/client-form";
-import { InteractionForm } from "@/components/forms/interaction-form";
 import { PageHeader } from "@/components/layout/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,8 +11,8 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { deleteClientAction } from "@/app/(app)/clientes/actions";
 import { requireUser } from "@/lib/auth";
 import { getCurrentOrganizationForUser } from "@/lib/organization";
-import { formatDate } from "@/lib/utils";
 import { createServerSupabase } from "@/lib/supabase/server";
+import { formatDate } from "@/lib/utils";
 
 export default async function ClientDetailPage({
   params,
@@ -37,6 +38,7 @@ export default async function ClientDetailPage({
     .eq("client_id", id)
     .order("occurred_at", { ascending: false });
   const interactions = interactionsData ?? [];
+
   const { data: attachmentsData } = await supabase
     .from("attachments")
     .select("*")
@@ -50,7 +52,7 @@ export default async function ClientDetailPage({
     <div>
       <PageHeader title={client.name} description={client.document ?? "Cliente cadastrado"}>
         <DeleteButton
-          confirmMessage="Excluir este cliente? Clientes vinculados a propostas ou financeiro nao poderao ser excluidos."
+          confirmMessage="Excluir este cliente? Se houver servicos vinculados ou documentos anexados, a exclusao sera bloqueada ate voce remover esses vinculos."
           action={async () => {
             "use server";
             await deleteClientAction(client.id);
@@ -70,42 +72,9 @@ export default async function ClientDetailPage({
 
         <div className="space-y-6">
           <Card>
-            <CardHeader>
-              <CardTitle>Nova interacao</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <InteractionForm clientId={client.id} />
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Documentos do cliente</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <AttachmentUploader
-                entities={[{ id: client.id, type: "client", label: client.name }]}
-              />
-              {attachments.length ? (
-                <div className="space-y-2">
-                  {attachments.map((attachment) => (
-                    <div key={attachment.id} className="rounded-md border bg-background p-3 text-sm">
-                      <p className="font-medium">{attachment.file_name}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {attachment.category ?? "Documento"} · {formatDate(attachment.created_at)}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <EmptyState title="Nenhum documento anexado." />
-              )}
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
+            <CardHeader className="flex-row items-center justify-between gap-3">
               <CardTitle>Historico</CardTitle>
+              <ClientInteractionModal clientId={client.id} />
             </CardHeader>
             <CardContent>
               {interactions.length ? (
@@ -124,6 +93,47 @@ export default async function ClientDetailPage({
                 </div>
               ) : (
                 <EmptyState title="Nenhuma interacao registrada." />
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex-row items-center justify-between gap-3">
+              <CardTitle>Documentos do cliente</CardTitle>
+              <AttachmentUploadModal
+                label="Documento do cliente"
+                entities={[{ id: client.id, type: "client", label: client.name }]}
+              />
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {attachments.length ? (
+                <div className="space-y-2">
+                  {attachments.map((attachment) => (
+                    <div
+                      key={attachment.id}
+                      className="flex flex-wrap items-center justify-between gap-3 rounded-md border bg-background p-3 text-sm"
+                    >
+                      <div>
+                        <p className="font-medium">{attachment.file_name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {attachment.category ?? "Documento"} · {formatDate(attachment.created_at)}
+                        </p>
+                      </div>
+                      <AttachmentActions
+                        id={attachment.id}
+                        fileName={attachment.file_name}
+                        mimeType={attachment.mime_type}
+                        category={attachment.category}
+                        entityType={attachment.entity_type}
+                        entityId={attachment.entity_id}
+                        canEdit
+                        canDelete
+                      />
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <EmptyState title="Nenhum documento anexado." />
               )}
             </CardContent>
           </Card>

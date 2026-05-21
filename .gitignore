@@ -13,6 +13,9 @@ dist
 supabase/.branches
 supabase/.temp
 data/geo/
+data/private/
+*.local.txt
+geogestao_assistente_frases_*.txt
 *.shp
 *.shx
 *.dbf

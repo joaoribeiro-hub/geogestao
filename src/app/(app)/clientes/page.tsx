@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Search } from "lucide-react";
+import { ClientActions } from "@/components/clients/client-actions";
 import { ClientCreateModal } from "@/components/clients/client-create-modal";
 import { PageHeader } from "@/components/layout/page-header";
 import { Badge } from "@/components/ui/badge";
@@ -66,6 +67,7 @@ export default async function ClientsPage({
                       <th className="px-4 py-3 font-medium">Cliente</th>
                       <th className="px-4 py-3 font-medium">Contato</th>
                       <th className="px-4 py-3 font-medium">Tipo</th>
+                      <th className="px-4 py-3 text-right font-medium">Acoes</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -83,6 +85,9 @@ export default async function ClientsPage({
                         </td>
                         <td className="px-4 py-3">
                           <Badge variant="secondary">{client.kind === "pf" ? "PF" : "PJ"}</Badge>
+                        </td>
+                        <td className="px-4 py-3">
+                          <ClientActions client={client} />
                         </td>
                       </tr>
                     ))}

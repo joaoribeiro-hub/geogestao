@@ -11,6 +11,7 @@ import {
   calculateServiceFinanceSummary,
   isServiceLostColumn,
 } from "@/lib/services/service-finance";
+import { filterServiceCardsByOperationalPeriod } from "@/lib/services/service-period";
 import { createServerSupabase } from "@/lib/supabase/server";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import type { Expense, FinanceStatus, Revenue, ServiceCard } from "@/types/database";
@@ -60,10 +61,10 @@ export default async function FinancePage({
   const serviceColumnById = new Map(
     serviceColumns.map((column) => [column.id, column]),
   );
-  const serviceCardsInPeriod = filterByPeriod(
+  const serviceCardsInPeriod = filterServiceCardsByOperationalPeriod(
     serviceCards,
+    serviceColumnById,
     periodRange,
-    (card) => card.due_date,
   );
   const lostServiceIds = new Set(
     serviceCards

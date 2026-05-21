@@ -17,7 +17,13 @@ type Values = {
   description: string;
 };
 
-export function InteractionForm({ clientId }: { clientId: string }) {
+export function InteractionForm({
+  clientId,
+  onSaved,
+}: {
+  clientId: string;
+  onSaved?: () => void;
+}) {
   const [pending, startTransition] = useTransition();
   const form = useForm<Values>({
     resolver: zodResolver(interactionSchema),
@@ -33,8 +39,11 @@ export function InteractionForm({ clientId }: { clientId: string }) {
     const formData = new FormData();
     Object.entries(values).forEach(([key, value]) => formData.set(key, value));
     startTransition(() => {
-      void createInteractionAction(formData);
-      form.reset({ ...values, description: "" });
+      void (async () => {
+        await createInteractionAction(formData);
+        form.reset({ ...values, description: "" });
+        onSaved?.();
+      })();
     });
   }
 

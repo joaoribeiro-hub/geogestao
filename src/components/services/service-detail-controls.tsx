@@ -7,6 +7,7 @@ import {
   createClientForServiceAction,
   createContractForServiceAction,
   createProposalForServiceAction,
+  createServiceInteractionAction,
   updateServicePaymentStatusAction,
   updateServicePriorityAction,
   updateServiceStageAction,
@@ -245,3 +246,57 @@ export function ServiceMemberForm({
   );
 }
 
+export function ServiceInteractionForm({ serviceCardId }: { serviceCardId: string }) {
+  const [open, setOpen] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+
+  return (
+    <div className="space-y-3">
+      <Button type="button" variant="outline" onClick={() => setOpen((value) => !value)}>
+        <Plus aria-hidden="true" />
+        Criar interacao
+      </Button>
+      {open ? (
+        <form
+          className="grid gap-3 rounded-md border bg-background p-3"
+          onSubmit={(event) => {
+            event.preventDefault();
+            const form = event.currentTarget;
+            const formData = new FormData(form);
+            formData.set("service_card_id", serviceCardId);
+            startTransition(() => {
+              void (async () => {
+                setMessage(null);
+                try {
+                  await createServiceInteractionAction(formData);
+                  setMessage("Interacao registrada no historico do servico.");
+                  form.reset();
+                  setOpen(false);
+                } catch (error) {
+                  setMessage(error instanceof Error ? error.message : "Nao foi possivel registrar a interacao.");
+                }
+              })();
+            });
+          }}
+        >
+          <div className="space-y-2">
+            <Label>Titulo</Label>
+            <Input name="title" defaultValue="Interacao registrada" />
+          </div>
+          <div className="space-y-2">
+            <Label>Descricao</Label>
+            <Textarea name="description" required placeholder="Ex.: Cliente pediu retorno sobre documentos." />
+          </div>
+          {message ? <p className="text-xs text-muted-foreground">{message}</p> : null}
+          <Button disabled={pending}>
+            {pending ? <Loader2 className="animate-spin" aria-hidden="true" /> : <Plus aria-hidden="true" />}
+            Registrar interacao
+          </Button>
+        </form>
+      ) : message ? (
+        <p className="text-xs text-muted-foreground">{message}</p>
+      ) : null}
+    </div>
+  );
+}

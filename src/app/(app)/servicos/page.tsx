@@ -5,13 +5,18 @@ import { PageHeader } from "@/components/layout/page-header";
 import { EmptyState } from "@/components/ui/empty-state";
 import { NewServiceModal } from "@/components/services/new-service-modal";
 import { requireUser } from "@/lib/auth";
-import { filterByPeriod, resolvePeriodRange } from "@/lib/period";
+import { resolvePeriodRange } from "@/lib/period";
 import { getInitialServiceColumn } from "@/lib/services/service-flow";
 import { serviceTypeToBoardSlug } from "@/lib/services/service-cards";
+import {
+  filterServiceCardsByOperationalPeriod,
+  isOverdueServiceColumn,
+  isServiceOverdue,
+} from "@/lib/services/service-period";
 import { getCurrentOrganizationForUser } from "@/lib/organization";
 import { createServerSupabase } from "@/lib/supabase/server";
 import { cn } from "@/lib/utils";
-import type { ProposalServiceType } from "@/types/database";
+import type { ProposalServiceType, ServiceCard } from "@/types/database";
 
 export default async function ServicesPage({
   searchParams,
@@ -54,11 +59,13 @@ export default async function ServicesPage({
         .eq("organization_id", organization.id)
         .in("column_id", columnIds)
     : { data: [] };
-  const cards = filterByPeriod(
+  const columnsById = new Map(columns.map((column) => [column.id, column]));
+  const cards = filterServiceCardsByOperationalPeriod(
     cardsResult.data ?? [],
+    columnsById,
     periodRange,
-    (card) => card.due_date,
   );
+  const overdueColumn = columns.find((column) => isOverdueServiceColumn(column));
 
   if (process.env.NODE_ENV !== "production") {
     console.info("[servicos:list]", {
@@ -75,7 +82,7 @@ export default async function ServicesPage({
 
   const clientMap = new Map(clients.map((client) => [client.id, client]));
   const cardsWithClients = cards.map((card) => ({
-    ...card,
+    ...displayCardInOverdueColumn(card, columnsById, overdueColumn),
     client: card.client_id ? clientMap.get(card.client_id) ?? null : null,
   }));
 
@@ -123,6 +130,19 @@ export default async function ServicesPage({
       )}
     </div>
   );
+}
+
+function displayCardInOverdueColumn(
+  card: ServiceCard,
+  columnsById: Map<string, { slug: string; name: string }>,
+  overdueColumn: { id: string; slug: string; name: string } | undefined,
+) {
+  if (!overdueColumn) return card;
+  const currentColumn = columnsById.get(card.column_id);
+  if (!isServiceOverdue(card, currentColumn)) {
+    return card;
+  }
+  return { ...card, column_id: overdueColumn.id };
 }
 
 function buildInitialColumnByServiceType(

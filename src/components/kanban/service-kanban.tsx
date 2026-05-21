@@ -11,12 +11,14 @@ import {
   GripVertical,
   Paperclip,
   RotateCcw,
+  X,
 } from "lucide-react";
 import {
   advanceServiceCardAction,
   completeServiceDocumentationAction,
   createContractForServiceAction,
   createProposalForServiceAction,
+  deleteServiceCardAction,
   moveServiceCardAction,
   moveServiceToExecutionAction,
   revertServiceToProposal,
@@ -184,6 +186,30 @@ function ServiceCardView({
     });
   }
 
+  function deleteCard() {
+    const confirmed = window.confirm(
+      "Tem certeza que deseja apagar este servico?\n\nO servico sera apagado; propostas e contratos criados a partir dele serao apagados; o financeiro sera recalculado/atualizado. Cliente e documentos do cliente NAO serao apagados.",
+    );
+    if (!confirmed) return;
+
+    startTransition(() => {
+      void (async () => {
+        setFeedback(null);
+        try {
+          await deleteServiceCardAction(card.id);
+          setFeedback({ type: "success", message: "Servico apagado." });
+          router.refresh();
+        } catch (error) {
+          setFeedback({
+            type: "error",
+            message:
+              error instanceof Error ? error.message : "Nao foi possivel apagar o servico.",
+          });
+        }
+      })();
+    });
+  }
+
   return (
     <article
       ref={setNodeRef}
@@ -200,7 +226,22 @@ function ServiceCardView({
         if (event.key === "Enter") router.push(`/servicos/${card.id}`);
       }}
     >
-      <div className={`mb-3 h-1.5 rounded-full ${toneClasses}`} />
+      <div className="mb-3 flex items-center gap-2">
+        <div className={`h-1.5 flex-1 rounded-full ${toneClasses}`} />
+        <button
+          type="button"
+          className="grid size-7 place-items-center rounded-full bg-destructive text-destructive-foreground shadow-sm transition hover:opacity-90"
+          aria-label="Apagar servico"
+          title="Apagar servico"
+          disabled={pending}
+          onClick={(event) => {
+            event.stopPropagation();
+            deleteCard();
+          }}
+        >
+          <X className="size-4" aria-hidden="true" />
+        </button>
+      </div>
       <div className="flex items-start gap-2">
         <button
           className="mt-0.5 cursor-grab rounded p-1 text-muted-foreground active:cursor-grabbing"

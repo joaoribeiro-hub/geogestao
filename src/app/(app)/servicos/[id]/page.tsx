@@ -9,6 +9,7 @@ import { AttachmentUploader } from "@/components/forms/attachment-uploader";
 import {
   ServiceClientCreatePanel,
   ServiceFieldSelect,
+  ServiceInteractionForm,
   ServiceMemberForm,
   ServiceQuickActionButton,
 } from "@/components/services/service-detail-controls";
@@ -363,12 +364,16 @@ export default async function ServiceDetailPage({
             <CardHeader>
               <CardTitle>Historico</CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="space-y-4">
+              <ServiceInteractionForm serviceCardId={card.id} />
               {events.length || movements.length ? (
                 <div className="space-y-3">
                   {events.map((event) => (
                     <div key={event.id} className="rounded-md border bg-background p-3 text-sm">
                       <p className="font-medium">{event.title}</p>
+                      {event.description ? (
+                        <p className="mt-1 text-sm text-muted-foreground">{event.description}</p>
+                      ) : null}
                       <p className="text-xs text-muted-foreground">{formatDate(event.created_at)}</p>
                     </div>
                   ))}

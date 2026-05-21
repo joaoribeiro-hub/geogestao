@@ -43,6 +43,13 @@ E2E_TEST_PASSWORD=
 E2E_RUN_MUTATION_TESTS=false
 OPENAI_API_KEY=
 OPENAI_MODEL=gpt-5.5
+AI_PROVIDER=
+GEMINI_API_KEY=
+GEMINI_MODEL=gemini-1.5-flash
+OPENROUTER_API_KEY=
+OPENROUTER_MODEL=google/gemini-flash-1.5
+GROQ_API_KEY=
+GROQ_MODEL=llama-3.1-8b-instant
 GOOGLE_DRIVE_FOLDER_ID=
 GOOGLE_SERVICE_ACCOUNT_EMAIL=
 GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY=
@@ -66,6 +73,7 @@ Observacoes:
 - `OPENAI_API_KEY` e server-side. Nunca criar `NEXT_PUBLIC_OPENAI_API_KEY`.
 - Se `OPENAI_API_KEY` nao estiver configurada, o Chat IA retorna erro claro de configuracao e nao chama a OpenAI.
 - O Chat IA usa o SDK oficial `openai` e a Responses API apenas com texto nesta fase.
+- O Assistente IA em `/assistente-ia` funciona sem API externa por interpretador local. `AI_PROVIDER`, `GEMINI_API_KEY`, `OPENROUTER_API_KEY` e `GROQ_API_KEY` sao opcionais, server-side e usados apenas para classificar intencoes.
 - Variaveis Google/Drive sao opcionais e servem apenas para a origem bruta das bases geograficas. A consulta do app deve usar tabelas ja importadas no Supabase/Postgres.
 - `SUPABASE_SERVICE_ROLE_KEY` e permitido apenas em scripts locais/admin de importacao geografica. Nunca usar no frontend.
 - Variaveis MapBiomas Alerta sao server-side. Nunca criar `NEXT_PUBLIC_MAPBIOMAS_*`.
@@ -211,6 +219,41 @@ No ultimo ciclo de implementacao da Fase 1, essas validacoes passaram.
 
 Status da Fase ACCOUNT-1: parcial/implementada no codigo. Pendente aplicar `supabase/migrations/008_account1_organizations_profiles_ai.sql` no Supabase de teste, validar manualmente Minha Conta, Minha Empresa, upload de avatar/anexos e Chat IA, e depois avaliar aplicacao no Supabase oficial.
 
+### Assistente IA / Chat Inteligente
+
+- Rota `/assistente-ia` criada como modulo operacional de conversa com o GeoGestao.
+- API route `/api/assistant` criada para interpretar mensagens, consultar dados e executar acoes permitidas.
+- Arquitetura segura com action registry em `src/lib/assistant/actions.ts`.
+- Detector local de intencoes em `src/lib/assistant/intent-detector.ts`, sem depender de API paga.
+- Provider opcional em `src/lib/assistant/llm-provider.ts` para Gemini, OpenRouter ou Groq, usado apenas para classificar intencao/extrair parametros.
+- Tabelas novas previstas em `supabase/migrations/021_assistant_module.sql`:
+  - `assistant_conversations`;
+  - `assistant_messages`;
+  - `assistant_intents`;
+  - `assistant_action_logs`;
+  - `assistant_tasks`.
+- Intencoes iniciais:
+  - listar servicos de hoje, do mes e atrasados;
+  - listar tarefas pendentes;
+  - listar clientes sem movimentacao;
+  - buscar/resumir cliente;
+  - criar tarefa do cliente;
+  - criar interacao do cliente;
+  - listar servicos, propostas e contratos por cliente.
+- Escritas pelo assistente sao registradas em `assistant_action_logs`.
+- O assistente nao executa SQL livre, nao apaga dados e nao expoe chaves no frontend.
+- Fase AI-ASSISTANT-INTENTS-1 prepara base privada/admin de exemplos de intents:
+  - migration `022_assistant_intent_examples_dataset.sql`;
+  - script `npm run assistant:import-intents`;
+  - tabelas `assistant_intent_examples` e `assistant_dataset_imports`;
+  - consulta de poucos exemplos similares antes de chamar Gemini, sem enviar dataset completo ao modelo.
+- Fase AI-ASSISTANT-ACTIONS-CHECKLIST-1 move o assistente para chat flutuante global, remove o item do menu lateral e adiciona feedback supervisionado.
+- Intencoes de escrita como `create_service`, checklist e atribuicao de tarefas exigem confirmacao visual antes de gravar.
+- Checklist diario flutuante registra itens por usuario/data e grava eventos em `organization_activity_log`.
+- Fase AI-ASSISTANT-CONTEXT-LEARNING-2 adiciona memoria curta de conversa, consulta de checklist/atividade de membro com itens concluidos e item atual provavel, e aprendizado global sanitizado a partir de feedback negativo.
+
+Status da Fase ASSISTANT-1: implementada no codigo. Pendente aplicar `supabase/migrations/021_assistant_module.sql`, `022_assistant_intent_examples_dataset.sql`, `027_assistant_checklist_feedback.sql` e `028_assistant_context_learning.sql` no Supabase de teste, importar a base privada com dry-run/confirm e validar manualmente o chat flutuante.
+
 ### Propostas
 
 - Kanban com colunas comerciais.
@@ -282,8 +325,13 @@ Status da Fase ACCOUNT-1: parcial/implementada no codigo. Pendente aplicar `supa
 - Migration corretiva `018_company_owner_only_permissions.sql` criada para separar `owner` de `admin`: owner edita Minha Empresa; admin operacional visualiza Minha Empresa e continua operando os modulos do sistema.
 - Campo de valor do servico usa formato monetario brasileiro, preservando `R$ 16.000,00` como 16000.00.
 - Financeiro de Servicos passa a calcular lucro estimado, lucro efetuado e lucro perdido por `organization_id`.
+- Migration corretiva `020_services_operational_date_overdue_delete.sql` adiciona `service_date`, `completed_at`, coluna `Em atraso` nos fluxos e indices para filtros por data operacional.
+- Filtro de Servicos passou a considerar o intervalo operacional `service_date` -> `due_date/completed_at`, mantendo servicos atrasados visiveis.
+- Cards de servico possuem botao vermelho `X` para excluir o servico, propostas/contratos vinculados e receitas automaticas, preservando cliente e documentos do cliente.
+- Base de Clientes ganhou botoes explicitos Visualizar, Editar e Apagar.
+- Documentos do cliente ganharam campo `Nome do documento` com opcoes padrao rurais/imobiliarias e nome personalizado para `Outros`.
 
-Status da Fase UX-ORG-SERVICES-1: parcial/implementada no codigo. Pendente aplicar `supabase/migrations/015_ux_org_services_center.sql` no Supabase de teste, rodar/validar scripts admin e testar o fluxo completo manualmente.
+Status da Fase UX-ORG-SERVICES-1: parcial/implementada no codigo. Pendente aplicar `supabase/migrations/015_ux_org_services_center.sql` a `020_services_operational_date_overdue_delete.sql` no Supabase de teste, rodar/validar scripts admin e testar o fluxo completo manualmente.
 
 ### Financeiro
 
@@ -305,11 +353,15 @@ Status da Fase UX-ORG-SERVICES-1: parcial/implementada no codigo. Pendente aplic
 
 - Biblioteca de modelos/documentos.
 - Campos de titulo, categoria, versao, status, descricao e arquivo/anexo.
+- Upload passou a usar botao `Anexar arquivo` em modal, com Storage por organizacao.
+- Lista mostra origem Empresa ou Global/Oficial e acoes Visualizar, Baixar e Apagar.
+- Exclusao remove metadata e objeto no Supabase Storage quando o arquivo pertence a organizacao.
 
 ### Legislacao
 
 - Biblioteca de normas/legislacao.
 - Busca e campos de apoio tecnico.
+- Segue a mesma regra de Documentos: upload em modal, arquivos por organizacao, globais/oficiais somente leitura para empresas e acoes Visualizar/Baixar/Apagar.
 
 ### Fazer busca de imovel / GeoQuery
 
@@ -611,6 +663,78 @@ Correcao de permissao da FASE UX-ORG-SERVICES-1:
 - vincula `nataliasilva.terras@gmail.com` e `romeu@teste.com.br` como admins operacionais quando existirem no Auth;
 - recarrega schema cache do Supabase/PostgREST.
 
+### `supabase/migrations/019_documents_attachments_org_storage.sql`
+
+Correcao de isolamento, documentos e storage:
+
+- adiciona `is_global` e metadados de arquivo em `document_templates`, `legislation_items` e `attachments`;
+- separa documentos da empresa de documentos globais/oficiais;
+- recria RLS de Documentos, Legislacao, Anexos e Storage para respeitar `organization_id`;
+- permite leitura de globais a usuarios autenticados e mutacao global apenas para admin global;
+- restringe Storage a `organizations/{organization_id}/...` ou `shared/...`;
+- recarrega schema cache do Supabase/PostgREST.
+
+### `supabase/migrations/020_services_operational_date_overdue_delete.sql`
+
+Correcao da FASE UX-ORG-SERVICES-1:
+
+- adiciona `service_cards.service_date` com default `current_date`;
+- adiciona `service_cards.completed_at`;
+- faz backfill de `service_date` para servicos antigos;
+- adiciona a coluna `Em atraso` aos fluxos de Georreferenciamento, CAR, ITR/CCIR e Outros Servicos;
+- reposiciona colunas dos fluxos de servicos;
+- cria indices para filtros por organizacao, data operacional, prazo e conclusao;
+- recarrega schema cache do Supabase/PostgREST.
+
+### `supabase/migrations/021_assistant_module.sql`
+
+Adiciona a Fase ASSISTANT-1:
+
+- cria `assistant_conversations`;
+- cria `assistant_messages`;
+- cria `assistant_intents`;
+- cria `assistant_action_logs`;
+- cria `assistant_tasks`;
+- cria funcao `assistant_is_org_member`;
+- adiciona RLS para conversas/mensagens/logs/tarefas por usuario e organizacao;
+- permite leitura de intents habilitadas para usuarios autenticados;
+- seeda intents iniciais;
+- recarrega schema cache do Supabase/PostgREST.
+
+### `supabase/migrations/022_assistant_intent_examples_dataset.sql`
+
+Adiciona a Fase AI-ASSISTANT-INTENTS-1:
+
+- adiciona `category` e `updated_at` em `assistant_intents`;
+- cria `assistant_intent_examples`;
+- cria `assistant_dataset_imports`;
+- cria indices para busca textual e deduplicacao por intent/texto/source;
+- habilita RLS;
+- permite uso server-side/admin da base privada de exemplos;
+- recarrega schema cache do Supabase/PostgREST.
+
+### `supabase/migrations/023_auth_org_plans_onboarding.sql`
+
+Adiciona a Fase AUTH-ORG-PLANS-1:
+
+- adiciona dados de cadastro publico em `profiles`;
+- altera `handle_new_user()` para criar profile sem organizacao;
+- cria `organization_join_codes`;
+- cria `organization_subscriptions` e `billing_orders`;
+- prepara plano `Iniciante` com limite de 3 usuarios ativos;
+- cria RPCs para criar organizacao, participar por codigo e validar recuperacao de senha;
+- restringe atualizacao de organizacao ao `owner`;
+- recarrega schema cache do Supabase/PostgREST.
+
+### `supabase/migrations/024_onboarding_company_creation_debug_fix.sql`
+
+Correcao da Fase AUTH-ORG-PLANS-1:
+
+- corrige a unicidade de `company_settings` para multiempresa;
+- remove a constraint global antiga de `singleton_key`;
+- recria a RPC de criacao de empresa com etapa de erro explicita;
+- preserva a transacao de onboarding sem abrir RLS.
+
 ## Tipos principais
 
 O arquivo `src/types/database.ts` concentra os tipos TypeScript principais, incluindo:
@@ -669,6 +793,9 @@ O arquivo `src/types/database.ts` concentra os tipos TypeScript principais, incl
 - Os testes E2E autenticados dependem de `E2E_TEST_EMAIL`, `E2E_TEST_PASSWORD` e de usuario criado no Supabase Auth.
 - Os testes E2E que escrevem no banco dependem de `E2E_RUN_MUTATION_TESTS=true` e devem rodar apenas em banco de teste.
 - A migration `008_account1_organizations_profiles_ai.sql` precisa ser aplicada no Supabase de teste antes de validar `/minha-conta`, Chat IA com contexto e filtros por `organization_id`.
+- A migration `023_auth_org_plans_onboarding.sql` precisa ser aplicada no Supabase de teste antes de validar cadastro publico, reset de senha, onboarding por codigo e planos.
+- A migration `024_onboarding_company_creation_debug_fix.sql` deve ser aplicada depois da 023 se o cadastro de empresa falhar e a organizacao nao aparecer no banco.
+- A migration `029_team_comms_checklist_badges.sql` precisa ser aplicada no Supabase de teste antes de validar Chat da equipe, badges de mensagens nao lidas e badges do Checklist.
 - `OPENAI_API_KEY` deve existir apenas no ambiente do servidor. Sem ela, o chat retorna mensagem de configuracao ausente.
 - O CI precisa de secrets `NEXT_PUBLIC_SUPABASE_URL` e `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` ou `NEXT_PUBLIC_SUPABASE_ANON_KEY` para validar build/E2E em ambiente GitHub quando necessario.
 - O mapa usa OpenStreetMap; camada de satelite ainda e futura e depende de provedor/API apropriado.
@@ -688,6 +815,7 @@ O arquivo `src/types/database.ts` concentra os tipos TypeScript principais, incl
 - Supabase Auth, Database e Storage permanecem como fundacao.
 - Chaves secretas nunca devem ser expostas.
 - `.env.local` nao deve ser commitado.
+- O app possui tres widgets flutuantes operacionais: Chat da equipe, Checklist diario e Assistente IA.
 
 ## Proximos passos planejados
 

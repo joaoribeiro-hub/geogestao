@@ -5,7 +5,11 @@ import { PageHeader } from "@/components/layout/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
+import { requireUser } from "@/lib/auth";
+import { getCurrentOrganizationForUser } from "@/lib/organization";
 import { filterByPeriod, resolvePeriodRange } from "@/lib/period";
+import { filterOrganizationRows } from "@/lib/services/dashboard-metrics";
+import { calculateServiceFinanceSummary } from "@/lib/services/service-finance";
 import { createServerSupabase } from "@/lib/supabase/server";
 import { formatCurrency, formatDate } from "@/lib/utils";
 
@@ -16,40 +20,49 @@ export default async function DashboardPage({
 }) {
   const periodRange = resolvePeriodRange(await searchParams);
   const supabase = await createServerSupabase();
+  const user = await requireUser(supabase);
+  const organization = await getCurrentOrganizationForUser(supabase, user.id);
   const [
     clientsResult,
     proposalsResult,
+    contractsResult,
     cardsResult,
     columnsResult,
     revenuesResult,
     expensesResult,
   ] = await Promise.all([
-    supabase.from("clients").select("id"),
-    supabase.from("proposals").select("*"),
-    supabase.from("service_cards").select("*").order("due_date"),
+    supabase.from("clients").select("id,organization_id").eq("organization_id", organization.id),
+    supabase.from("proposals").select("*").eq("organization_id", organization.id),
+    supabase.from("contracts").select("*").eq("organization_id", organization.id),
+    supabase.from("service_cards").select("*").eq("organization_id", organization.id).order("due_date"),
     supabase.from("service_columns").select("*"),
-    supabase.from("revenues").select("*").order("due_date"),
-    supabase.from("expenses").select("*").order("due_date"),
+    supabase.from("revenues").select("*").eq("organization_id", organization.id).order("due_date"),
+    supabase.from("expenses").select("*").eq("organization_id", organization.id).order("due_date"),
   ]);
-  const clients = clientsResult.data ?? [];
+  const clients = filterOrganizationRows(clientsResult.data ?? [], organization.id);
   const proposals = filterByPeriod(
-    proposalsResult.data ?? [],
+    filterOrganizationRows(proposalsResult.data ?? [], organization.id),
     periodRange,
     (proposal) => proposal.sent_at ?? proposal.created_at,
   );
+  const contracts = filterByPeriod(
+    filterOrganizationRows(contractsResult.data ?? [], organization.id),
+    periodRange,
+    (contract) => contract.sent_at ?? contract.signed_at ?? contract.created_at,
+  );
   const cards = filterByPeriod(
-    cardsResult.data ?? [],
+    filterOrganizationRows(cardsResult.data ?? [], organization.id),
     periodRange,
     (card) => card.due_date ?? card.created_at,
   );
   const columns = columnsResult.data ?? [];
   const revenues = filterByPeriod(
-    revenuesResult.data ?? [],
+    filterOrganizationRows(revenuesResult.data ?? [], organization.id),
     periodRange,
     (revenue) => revenue.due_date ?? revenue.created_at,
   );
   const expenses = filterByPeriod(
-    expensesResult.data ?? [],
+    filterOrganizationRows(expensesResult.data ?? [], organization.id),
     periodRange,
     (expense) => expense.due_date ?? expense.created_at,
   );
@@ -68,9 +81,11 @@ export default async function DashboardPage({
   );
   const negotiationProposals = proposals.filter((proposal) => proposal.stage === "negotiation");
   const lostProposals = proposals.filter((proposal) => proposal.stage === "lost");
-  const activeContracts = approvedProposals.filter((proposal) => proposal.contract_id);
-  const pendingContracts = proposals.filter(
-    (proposal) => proposal.stage === "execution" && !proposal.contract_id,
+  const activeContracts = contracts.filter((contract) =>
+    ["assinado", "em_execucao", "finalizado"].includes(contract.status),
+  );
+  const pendingContracts = contracts.filter(
+    (contract) => !["assinado", "em_execucao", "finalizado", "cancelado"].includes(contract.status),
   );
   const receivedRevenues = revenues.filter((item) => item.status === "paid");
   const lostProposalAmount = lostProposals.reduce(
@@ -83,6 +98,20 @@ export default async function DashboardPage({
     0,
   );
   const expenseAmount = expenses.reduce((sum, item) => sum + Number(item.amount), 0);
+  const serviceFinance = calculateServiceFinanceSummary(cards, columnMap);
+
+  if (process.env.NODE_ENV !== "production") {
+    console.info("[dashboard:organization-scope]", {
+      userId: user.id,
+      organizationId: organization.id,
+      clients: clients.length,
+      proposals: proposals.length,
+      contracts: contracts.length,
+      serviceCards: cards.length,
+      revenues: revenues.length,
+      expenses: expenses.length,
+    });
+  }
 
   const nextDue = [
     ...revenues
@@ -124,7 +153,7 @@ export default async function DashboardPage({
         <Metric title="Receitas recebidas" value={formatCurrency(receivedRevenueAmount)} icon={<CircleDollarSign />} />
         <Metric title="Receitas a receber" value={formatCurrency(pendingRevenues.reduce((sum, item) => sum + Number(item.amount), 0))} icon={<CircleDollarSign />} />
         <Metric title="Despesas" value={formatCurrency(expenseAmount)} icon={<CircleDollarSign />} />
-        <Metric title="Lucro estimado" value={formatCurrency(receivedRevenueAmount - expenseAmount)} icon={<CircleDollarSign />} />
+        <Metric title="Lucro estimado" value={formatCurrency(serviceFinance.estimatedProfit)} icon={<CircleDollarSign />} />
         <Metric title="Projetos em andamento" value={inProgressCards.length.toString()} icon={<CalendarClock />} />
         <Metric title="Projetos atrasados" value={overdueCards.length.toString()} icon={<AlertTriangle />} />
       </div>

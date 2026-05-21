@@ -1,12 +1,13 @@
 import Link from "next/link";
-import { DeleteButton } from "@/components/delete-button";
-import { LegislationForm } from "@/components/forms/legislation-form";
+import { LibraryFileActions } from "@/components/files/library-file-actions";
+import { LibraryUploadModal } from "@/components/files/library-upload-modal";
 import { PageHeader } from "@/components/layout/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
-import { deleteLegislationAction } from "@/app/(app)/legislacao/actions";
+import { requireUser } from "@/lib/auth";
+import { getCurrentOrganizationForUser } from "@/lib/organization";
 import { createServerSupabase } from "@/lib/supabase/server";
 
 export default async function LegislationPage({
@@ -16,9 +17,12 @@ export default async function LegislationPage({
 }) {
   const { q = "" } = await searchParams;
   const supabase = await createServerSupabase();
+  const user = await requireUser(supabase);
+  const organization = await getCurrentOrganizationForUser(supabase, user.id);
   const { data } = await supabase
     .from("legislation_items")
     .select("*")
+    .or(`organization_id.eq.${organization.id},is_global.eq.true`)
     .order("updated_at", { ascending: false });
   const items = data ?? [];
 
@@ -33,16 +37,10 @@ export default async function LegislationPage({
 
   return (
     <div>
-      <PageHeader title="Biblioteca de legislacao" description="Normas, links oficiais e observacoes praticas para consulta tecnica." />
-      <div className="grid gap-6 xl:grid-cols-[420px_minmax(0,1fr)]">
-        <Card>
-          <CardHeader>
-            <CardTitle>Nova norma</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <LegislationForm />
-          </CardContent>
-        </Card>
+      <PageHeader title="Biblioteca de legislacao" description="Normas, links oficiais e observacoes praticas para consulta tecnica.">
+        <LibraryUploadModal kind="legislation" />
+      </PageHeader>
+      <div className="grid gap-6">
         <Card>
           <CardHeader>
             <CardTitle>Legislacao</CardTitle>
@@ -63,19 +61,25 @@ export default async function LegislationPage({
                         <div className="mt-2 flex flex-wrap gap-2">
                           <Badge variant="secondary">{item.category}</Badge>
                           <Badge variant={item.status === "vigente" ? "default" : "outline"}>{item.status}</Badge>
+                          <Badge variant={item.is_global ? "outline" : "secondary"}>
+                            {item.is_global ? "Global/Oficial" : "Empresa"}
+                          </Badge>
                           {item.official_link ? (
                             <Link className="text-sm font-medium text-primary hover:underline" href={item.official_link} target="_blank">
                               Link oficial
                             </Link>
                           ) : null}
                         </div>
+                        <p className="mt-2 text-xs text-muted-foreground">
+                          {item.file_name ?? item.storage_path ?? "Sem arquivo anexado"}
+                        </p>
                       </div>
-                      <DeleteButton
-                        confirmMessage="Excluir esta norma?"
-                        action={async () => {
-                          "use server";
-                          await deleteLegislationAction(item.id);
-                        }}
+                      <LibraryFileActions
+                        id={item.id}
+                        kind="legislation"
+                        fileName={item.file_name}
+                        mimeType={item.mime_type}
+                        canDelete={!item.is_global && item.organization_id === organization.id}
                       />
                     </div>
                   </div>

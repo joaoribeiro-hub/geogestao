@@ -1,11 +1,12 @@
-import { DeleteButton } from "@/components/delete-button";
-import { DocumentTemplateForm } from "@/components/forms/document-template-form";
+import { LibraryFileActions } from "@/components/files/library-file-actions";
+import { LibraryUploadModal } from "@/components/files/library-upload-modal";
 import { PageHeader } from "@/components/layout/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
-import { deleteDocumentTemplateAction } from "@/app/(app)/documentos/actions";
+import { requireUser } from "@/lib/auth";
+import { getCurrentOrganizationForUser } from "@/lib/organization";
 import { createServerSupabase } from "@/lib/supabase/server";
 
 export default async function DocumentsPage({
@@ -15,9 +16,12 @@ export default async function DocumentsPage({
 }) {
   const { q = "" } = await searchParams;
   const supabase = await createServerSupabase();
+  const user = await requireUser(supabase);
+  const organization = await getCurrentOrganizationForUser(supabase, user.id);
   const { data } = await supabase
     .from("document_templates")
     .select("*")
+    .or(`organization_id.eq.${organization.id},is_global.eq.true`)
     .order("updated_at", { ascending: false });
   const documents = data ?? [];
 
@@ -32,16 +36,10 @@ export default async function DocumentsPage({
 
   return (
     <div>
-      <PageHeader title="Biblioteca de documentos" description="Modelos e documentos operacionais versionados." />
-      <div className="grid gap-6 xl:grid-cols-[420px_minmax(0,1fr)]">
-        <Card>
-          <CardHeader>
-            <CardTitle>Novo documento</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <DocumentTemplateForm />
-          </CardContent>
-        </Card>
+      <PageHeader title="Biblioteca de documentos" description="Modelos e documentos operacionais versionados.">
+        <LibraryUploadModal kind="document" />
+      </PageHeader>
+      <div className="grid gap-6">
         <Card>
           <CardHeader>
             <CardTitle>Documentos</CardTitle>
@@ -64,15 +62,20 @@ export default async function DocumentsPage({
                           <Badge variant={document.status === "vigente" ? "default" : "destructive"}>
                             {document.status}
                           </Badge>
+                          <Badge variant={document.is_global ? "outline" : "secondary"}>
+                            {document.is_global ? "Global/Oficial" : "Empresa"}
+                          </Badge>
                         </div>
+                        <p className="mt-2 text-xs text-muted-foreground">
+                          {document.file_name ?? document.storage_path ?? "Sem arquivo anexado"}
+                        </p>
                       </div>
-                      <DeleteButton
-                        label="Excluir"
-                        confirmMessage="Excluir este documento?"
-                        action={async () => {
-                          "use server";
-                          await deleteDocumentTemplateAction(document.id);
-                        }}
+                      <LibraryFileActions
+                        id={document.id}
+                        kind="document"
+                        fileName={document.file_name}
+                        mimeType={document.mime_type}
+                        canDelete={!document.is_global && document.organization_id === organization.id}
                       />
                     </div>
                   </div>

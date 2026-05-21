@@ -44,6 +44,7 @@ describe("service-flow", () => {
       "Proposta/Contrato",
       "Geo em Andamento",
       "Prioridade",
+      "Em atraso",
       "Geo Protocolado no Cartorio",
       "Geo Protocolado no INCRA",
       "Geo - Pendencia de Confrontante",
@@ -53,6 +54,9 @@ describe("service-flow", () => {
     expect(serviceWorkflowDefinitions.car.some((item) => item.name === "CAR em Andamento")).toBe(true);
     expect(serviceWorkflowDefinitions.itr_ccir.some((item) => item.name === "ITR/CCIR em Andamento")).toBe(true);
     expect(serviceWorkflowDefinitions.outros_servicos.some((item) => item.name === "Em Andamento")).toBe(true);
+    expect(serviceWorkflowDefinitions.car.some((item) => item.slug === serviceFlowSlugs.overdue)).toBe(true);
+    expect(serviceWorkflowDefinitions.itr_ccir.some((item) => item.slug === serviceFlowSlugs.overdue)).toBe(true);
+    expect(serviceWorkflowDefinitions.outros_servicos.some((item) => item.slug === serviceFlowSlugs.overdue)).toBe(true);
     expect(serviceWorkflowDefinitions.car.some((item) => item.slug === serviceFlowSlugs.lost)).toBe(true);
     expect(serviceWorkflowDefinitions.itr_ccir.some((item) => item.slug === serviceFlowSlugs.lost)).toBe(true);
     expect(serviceWorkflowDefinitions.outros_servicos.some((item) => item.slug === serviceFlowSlugs.lost)).toBe(true);

@@ -74,6 +74,76 @@ Escopo:
 
 Status: parcial/implementado no codigo. Pendente aplicar `supabase/migrations/008_account1_organizations_profiles_ai.sql` no Supabase de teste, validar manualmente conta, organizacao, uploads e Chat IA, e depois avaliar aplicacao no Supabase oficial.
 
+### Fase AUTH-ORG-PLANS-1: Cadastro publico, onboarding e planos
+
+Objetivo: permitir cadastro publico com confirmacao de e-mail, recuperacao de senha, onboarding de empresa e base inicial de planos, sem pagamento real.
+
+Escopo implementado:
+
+- Tela de login com `Criar cadastro` e `Esqueci minha senha`.
+- Cadastro publico por Supabase Auth.
+- Trigger de Auth criando profile sem organizacao.
+- Bloqueio de app operacional para usuario sem empresa.
+- Onboarding para participar por ID da empresa ou criar nova empresa.
+- Codigo de entrada por organizacao visivel apenas para owner.
+- Entrada por codigo como `admin` operacional.
+- Plano Iniciante com limite de 3 usuarios ativos.
+- Base `organization_subscriptions` e `billing_orders` para cobranca futura.
+- Minha Conta com visualizacao de plano.
+- Reset de senha com mensagem generica e fluxo nativo Supabase.
+- Documentacao `docs/AUTH_ONBOARDING.md` e `docs/PLANS_BILLING.md`.
+- Correcao `024_onboarding_company_creation_debug_fix.sql` para constraint multiempresa de `company_settings` e diagnostico detalhado de falha.
+
+Status: implementado no codigo. Pendente aplicar `supabase/migrations/023_auth_org_plans_onboarding.sql` e `024_onboarding_company_creation_debug_fix.sql` no Supabase de teste e validar cadastro, e-mail, onboarding, limite de usuarios e reset.
+
+### Fase ASSISTANT-1: Assistente IA / Chat Inteligente
+
+Objetivo: criar um chat operacional dentro do GeoGestao que consulta dados reais e executa acoes internas permitidas, funcionando primeiro por regras locais e ficando preparado para classificador externo opcional.
+
+Escopo implementado:
+
+- Rota `/assistente-ia`.
+- API route `/api/assistant`.
+- Action registry segura em `src/lib/assistant/actions.ts`.
+- Detector local de intencoes.
+- Provider opcional para Gemini, OpenRouter ou Groq apenas para classificacao de intencao.
+- Historico, mensagens, intents, logs de acao e tarefas do assistente em migration nova.
+- Intencoes iniciais para servicos, tarefas, clientes, propostas/contratos e interacoes.
+
+Status: implementado no codigo. Pendente aplicar `supabase/migrations/021_assistant_module.sql` no Supabase de teste e validar manualmente.
+
+### Fase AI-ASSISTANT-INTENTS-1: Base privada de exemplos/intents
+
+Objetivo: importar uma base privada de frases reais para melhorar a deteccao de intencoes do Assistente IA, sem treinar modelo externo e sem expor dados reais no frontend.
+
+Escopo implementado:
+
+- Migration `022_assistant_intent_examples_dataset.sql`.
+- Tabelas `assistant_intent_examples` e `assistant_dataset_imports`.
+- Parser tolerante para TSV/CSV, JSONL, `frase -> intent`, chave/valor e linhas sem intent.
+- Script admin `npm run assistant:import-intents`, com dry-run por padrao e importacao real apenas com `--confirm`.
+- Deduplicacao por intent, texto normalizado e source.
+- Helper server-side para buscar poucos exemplos similares.
+- Gemini recebe somente exemplos relevantes quando o interpretador local nao tem confianca alta.
+- Documentacao em `docs/ASSISTANT_INTENTS.md`.
+
+Status: implementado no codigo. Pendente aplicar a migration 022 no Supabase de teste, rodar dry-run com o arquivo privado e importar com `--confirm` depois de conferir as contagens.
+
+### Fase AI-ASSISTANT-ACTIONS-CHECKLIST-1: Actions, feedback e checklist
+
+Objetivo: corrigir intencoes de escrita do assistente, exigir confirmacao antes de gravar, trocar o acesso para chat flutuante global e criar checklist diario por usuario.
+
+Escopo implementado:
+
+- Detector local prioriza verbos de criacao para `create_service`.
+- Action registry cria servicos, itens de checklist e atribuicoes por owner.
+- Feedback positivo/negativo salvo em `assistant_feedback`.
+- Chat flutuante oficial usa `/api/assistant`.
+- Menu lateral nao mostra mais Assistente IA.
+- Checklist diario flutuante com data, emergencia e activity log.
+
+Status: implementado no codigo. Pendente aplicar `supabase/migrations/027_assistant_checklist_feedback.sql` no Supabase de teste e validar manualmente.
+
 ## Servicos como centro do sistema
 
 ### Fase UX-ORG-SERVICES-1: Servicos, multiempresa e simplificacao visual
@@ -104,12 +174,14 @@ Escopo implementado:
 - Criar migration `015_ux_org_services_center.sql`.
 - Criar migration corretiva `016_services_workflow_company_team_permissions.sql` para colunas por tipo de servico, equipe, dados bancarios e permissoes owner/admin.
 - Criar migration corretiva `017_org_members_rls_service_lost_finance.sql` para remover recursao de RLS, adicionar `Servico perdido` e calcular lucro estimado/efetuado/perdido por servico.
+- Criar migration corretiva `019_documents_attachments_org_storage.sql` para isolar Dashboard/arquivos por empresa, separar documentos globais e documentos da empresa, e reforcar policies de Storage.
+- Criar migration corretiva `020_services_operational_date_overdue_delete.sql` para data operacional de servico, coluna `Em atraso` e apoio a exclusao segura de servicos.
 - Criar scripts admin:
   - `npm run admin:ensure-terras`;
   - `npm run admin:reset-org`.
 - Criar documentacao `docs/SERVICES_FLOW.md` e `docs/ADMIN_ORGANIZATIONS.md`.
 
-Status: parcial/implementado no codigo. Pendente aplicar `supabase/migrations/015_ux_org_services_center.sql`, `supabase/migrations/016_services_workflow_company_team_permissions.sql` e `supabase/migrations/017_org_members_rls_service_lost_finance.sql` no Supabase de teste, vincular owner da Terras Reunidas e validar manualmente o fluxo completo com dados reais.
+Status: parcial/implementado no codigo. Pendente aplicar `supabase/migrations/015_ux_org_services_center.sql`, `016_services_workflow_company_team_permissions.sql`, `017_org_members_rls_service_lost_finance.sql`, `018_company_owner_only_permissions.sql`, `019_documents_attachments_org_storage.sql` e `020_services_operational_date_overdue_delete.sql` no Supabase de teste, vincular owner da Terras Reunidas e validar manualmente o fluxo completo com dados reais.
 
 ## GeoQuery e bases geograficas
 
@@ -329,3 +401,15 @@ Melhorias futuras:
 - Suporte visual a multiplas camadas por propriedade.
 - Validacao geoespacial mais robusta para KML/KMZ complexos.
 - Medicao/calculo automatico de area a partir da geometria.
+
+## Fase Comunicacao: Chat da equipe e badges
+
+Status: implementado no codigo com migration `029_team_comms_checklist_badges.sql`, pendente aplicar no Supabase de teste e validar com usuarios owner/admin.
+
+Escopo:
+
+- badges no Checklist diario para itens abertos e itens atribuidos pelo owner;
+- Chat da equipe flutuante por organizacao;
+- badges de mensagens nao lidas, separando mensagens do owner;
+- Supabase Realtime com polling leve como fallback;
+- activity log para mensagens enviadas.

@@ -15,10 +15,12 @@
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:report": "playwright show-report",
     "admin:ensure-terras": "npx --yes tsx scripts/admin/ensure-terras-reunidas.ts",
-    "admin:reset-org": "npx --yes tsx scripts/admin/reset-organization-data.ts"
+    "admin:reset-org": "npx --yes tsx scripts/admin/reset-organization-data.ts",
+    "assistant:import-intents": "npx --yes tsx scripts/assistant/import-intent-examples.ts"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
+    "@google/genai": "^2.4.0",
     "@hookform/resolvers": "^3.10.0",
     "@radix-ui/react-label": "^2.1.7",
     "@radix-ui/react-slot": "^1.2.3",

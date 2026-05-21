@@ -38,11 +38,12 @@ Georreferenciamento:
 2. Proposta/Contrato
 3. Geo em Andamento
 4. Prioridade
-5. Geo Protocolado no Cartorio
-6. Geo Protocolado no INCRA
-7. Geo - Pendencia de Confrontante
-8. Geo Concluido
-9. Servico perdido
+5. Em atraso
+6. Geo Protocolado no Cartorio
+7. Geo Protocolado no INCRA
+8. Geo - Pendencia de Confrontante
+9. Geo Concluido
+10. Servico perdido
 
 CAR:
 
@@ -50,9 +51,10 @@ CAR:
 2. Proposta/Contrato
 3. CAR em Andamento
 4. Prioridade
-5. CAR Protocolado/Em Analise
-6. CAR Concluido
-7. Servico perdido
+5. Em atraso
+6. CAR Protocolado/Em Analise
+7. CAR Concluido
+8. Servico perdido
 
 ITR/CCIR:
 
@@ -60,9 +62,10 @@ ITR/CCIR:
 2. Proposta/Contrato
 3. ITR/CCIR em Andamento
 4. Prioridade
-5. Protocolado/Enviado
-6. Concluido
-7. Servico perdido
+5. Em atraso
+6. Protocolado/Enviado
+7. Concluido
+8. Servico perdido
 
 Outros Servicos:
 
@@ -70,8 +73,9 @@ Outros Servicos:
 2. Proposta/Contrato
 3. Em Andamento
 4. Prioridade
-5. Concluido
-6. Servico perdido
+5. Em atraso
+6. Concluido
+7. Servico perdido
 
 Todo servico novo deve entrar primeiro em `Aguardando documentos`.
 
@@ -84,6 +88,7 @@ A tela `/servicos` possui o botao `Novo Servico`, abrindo um modal grande com:
 - cliente opcional;
 - descricao/observacoes;
 - prioridade;
+- data de criacao operacional;
 - data prevista;
 - status de pagamento;
 - valor previsto;
@@ -104,6 +109,13 @@ Ao criar o servico:
 - um checklist padrao e criado conforme o tipo de servico.
 - o servidor recalcula a coluna inicial a partir do `service_type`, evitando depender apenas de um campo escondido do formulario.
 - apos sucesso, o modal fecha, a tela atualiza e o usuario e levado para a aba do tipo de servico criado.
+
+O filtro de periodo da tela de Servicos usa o intervalo operacional do servico:
+
+- inicio: `service_date`, com fallback para `created_at`;
+- fim: `completed_at` quando concluido, senao `due_date`, senao a data inicial.
+
+Assim, um servico criado hoje com prazo para daqui dois meses aparece no filtro "Este mes" e continua aparecendo ate sair do intervalo operacional.
 
 ## Regras de movimentacao
 
@@ -136,6 +148,17 @@ A coluna `Servico perdido` existe em todos os fluxos. Quando um servico entra ne
 - o historico registra o servico como perdido.
 
 Se o servico sair de `Servico perdido`, ele volta a contar no lucro estimado e so volta ao lucro efetuado se o pagamento estiver marcado como efetuado.
+
+A coluna `Em atraso` existe em todos os fluxos. Um servico e considerado atrasado quando `due_date` ja passou, a etapa nao e concluida e o servico nao esta em `Servico perdido`. A tela pode exibir dinamicamente esses cards em `Em atraso` mesmo quando o filtro de periodo selecionado nao incluiria o intervalo original.
+
+Todo card de servico possui um botao vermelho `X` para exclusao. A exclusao pede confirmacao e remove:
+
+- o servico;
+- propostas vinculadas ao servico;
+- contratos vinculados ao servico;
+- receitas automaticas vinculadas ao servico.
+
+A exclusao nao remove cliente, documentos do cliente, documentos globais, bases geograficas ou anexos do proprio servico nesta fase.
 
 ## Card limpo
 

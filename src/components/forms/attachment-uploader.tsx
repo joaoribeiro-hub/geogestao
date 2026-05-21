@@ -6,6 +6,10 @@ import {
   prepareAttachmentUploadAction,
   registerAttachmentAction,
 } from "@/app/(app)/anexos/actions";
+import {
+  clientDocumentNameOptions,
+  resolveClientDocumentName,
+} from "@/lib/services/client-documents";
 import { createBrowserSupabase } from "@/lib/supabase/browser";
 import type { AttachmentEntityType } from "@/types/database";
 import { Button } from "@/components/ui/button";
@@ -29,7 +33,13 @@ const entityLabels: Record<AttachmentEntityType, string> = {
   legislation_item: "Legislacao",
 };
 
-export function AttachmentUploader({ entities }: { entities: AttachmentEntityOption[] }) {
+export function AttachmentUploader({
+  entities,
+  onUploaded,
+}: {
+  entities: AttachmentEntityOption[];
+  onUploaded?: () => void;
+}) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [entityType, setEntityType] = useState<AttachmentEntityType>(
     entities[0]?.type ?? "client",
@@ -43,6 +53,8 @@ export function AttachmentUploader({ entities }: { entities: AttachmentEntityOpt
     [entities, entityType],
   );
   const [entityId, setEntityId] = useState(filtered[0]?.id ?? "");
+  const [documentName, setDocumentName] = useState("Documentos pessoais");
+  const [customDocumentName, setCustomDocumentName] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [pending, startTransition] = useTransition();
@@ -96,6 +108,15 @@ export function AttachmentUploader({ entities }: { entities: AttachmentEntityOpt
     formData.set("mime_type", file.type);
     formData.set("size_bytes", file.size.toString());
     formData.set("file_size", file.size.toString());
+    if (entityType === "client") {
+      formData.set(
+        "category",
+        resolveClientDocumentName({
+          selectedName: documentName,
+          customName: customDocumentName,
+        }),
+      );
+    }
 
     startTransition(() => {
       void (async () => {
@@ -103,6 +124,7 @@ export function AttachmentUploader({ entities }: { entities: AttachmentEntityOpt
           await registerAttachmentAction(formData);
           setMessage("Arquivo enviado.");
           if (fileRef.current) fileRef.current.value = "";
+          onUploaded?.();
         } catch (error) {
           setMessage(error instanceof Error ? error.message : "Nao foi possivel registrar o anexo.");
         }
@@ -147,6 +169,35 @@ export function AttachmentUploader({ entities }: { entities: AttachmentEntityOpt
           </select>
         </div>
       </div>
+      {entityType === "client" ? (
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="space-y-2">
+            <Label>Nome do documento</Label>
+            <select
+              className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+              value={documentName}
+              onChange={(event) => setDocumentName(event.target.value)}
+            >
+              {clientDocumentNameOptions.map((option) => (
+                <option key={option} value={option}>
+                  {option}
+                </option>
+              ))}
+            </select>
+          </div>
+          {documentName === "Outros" ? (
+            <div className="space-y-2">
+              <Label>Nome personalizado</Label>
+              <input
+                className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                value={customDocumentName}
+                onChange={(event) => setCustomDocumentName(event.target.value)}
+                placeholder="Ex.: Certidao municipal"
+              />
+            </div>
+          ) : null}
+        </div>
+      ) : null}
       <input ref={fileRef} type="file" className="text-sm" />
       {message ? <p className="text-sm text-muted-foreground">{message}</p> : null}
       <Button type="button" onClick={upload} disabled={pending || uploading || !filtered.length}>

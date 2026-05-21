@@ -8,6 +8,7 @@ export const ptBR = {
     contracts: "Contratos",
     services: "Servicos",
     finance: "Financeiro",
+    assistant: "Assistente IA",
     documents: "Documentos",
     legislation: "Legislacao",
     attachments: "Anexos",

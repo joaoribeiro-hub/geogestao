@@ -10,6 +10,11 @@ export type UserRole = "admin" | "gerente" | "tecnico" | "financeiro" | "leitura
 export type OrganizationRole = "owner" | "admin" | "gerente" | "tecnico" | "financeiro" | "leitura";
 export type OrganizationStatus = "active" | "trialing" | "suspended" | "canceled";
 export type OrganizationMemberStatus = "active" | "invited" | "suspended";
+export type ProfileOnboardingStatus = "pending_organization" | "complete";
+export type OrganizationJoinCodeStatus = "active" | "revoked";
+export type SubscriptionStatus = "active" | "trialing" | "past_due" | "canceled" | "expired";
+export type BillingInterval = "monthly" | "quarterly" | "yearly";
+export type BillingOrderStatus = "draft" | "pending" | "paid" | "canceled" | "expired";
 export type ClientKind = "pf" | "pj";
 export type InteractionType = "ligacao" | "email" | "reuniao" | "whatsapp" | "nota";
 export type ProposalStage =
@@ -71,6 +76,8 @@ export type Database = {
       profiles: {
         Row: {
           id: string;
+          email: string | null;
+          cpf: string | null;
           organization_id: string | null;
           full_name: string | null;
           phone: string | null;
@@ -81,11 +88,14 @@ export type Database = {
           email_preferences: Json;
           account_preferences: Json;
           role: UserRole;
+          onboarding_status: ProfileOnboardingStatus;
           created_at: string;
           updated_at: string;
         };
         Insert: {
           id: string;
+          email?: string | null;
+          cpf?: string | null;
           organization_id?: string | null;
           full_name?: string | null;
           phone?: string | null;
@@ -96,10 +106,13 @@ export type Database = {
           email_preferences?: Json;
           account_preferences?: Json;
           role?: UserRole;
+          onboarding_status?: ProfileOnboardingStatus;
           created_at?: string;
           updated_at?: string;
         };
         Update: {
+          email?: string | null;
+          cpf?: string | null;
           organization_id?: string | null;
           full_name?: string | null;
           phone?: string | null;
@@ -110,6 +123,7 @@ export type Database = {
           email_preferences?: Json;
           account_preferences?: Json;
           role?: UserRole;
+          onboarding_status?: ProfileOnboardingStatus;
           updated_at?: string;
         };
         Relationships: [];
@@ -119,41 +133,59 @@ export type Database = {
           id: string;
           name: string;
           slug: string;
+          description: string | null;
           price_monthly: number;
+          price_monthly_cents: number;
           max_users: number;
           storage_quota_mb: number;
+          storage_limit_mb: number | null;
           max_proposals_per_month: number | null;
           max_contracts_per_month: number | null;
           max_finance_records_per_month: number | null;
+          ai_enabled: boolean;
           features: Json;
           is_active: boolean;
+          is_public: boolean;
           created_at: string;
+          updated_at: string;
         };
         Insert: {
           id?: string;
           name: string;
           slug: string;
+          description?: string | null;
           price_monthly?: number;
+          price_monthly_cents?: number;
           max_users?: number;
           storage_quota_mb?: number;
+          storage_limit_mb?: number | null;
           max_proposals_per_month?: number | null;
           max_contracts_per_month?: number | null;
           max_finance_records_per_month?: number | null;
+          ai_enabled?: boolean;
           features?: Json;
           is_active?: boolean;
+          is_public?: boolean;
           created_at?: string;
+          updated_at?: string;
         };
         Update: {
           name?: string;
           slug?: string;
+          description?: string | null;
           price_monthly?: number;
+          price_monthly_cents?: number;
           max_users?: number;
           storage_quota_mb?: number;
+          storage_limit_mb?: number | null;
           max_proposals_per_month?: number | null;
           max_contracts_per_month?: number | null;
           max_finance_records_per_month?: number | null;
+          ai_enabled?: boolean;
           features?: Json;
           is_active?: boolean;
+          is_public?: boolean;
+          updated_at?: string;
         };
         Relationships: [];
       };
@@ -219,6 +251,114 @@ export type Database = {
           user_id?: string;
           role?: OrganizationRole;
           status?: OrganizationMemberStatus;
+        };
+        Relationships: [];
+      };
+      organization_join_codes: {
+        Row: {
+          id: string;
+          organization_id: string;
+          code: string;
+          status: OrganizationJoinCodeStatus;
+          created_by: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          organization_id: string;
+          code: string;
+          status?: OrganizationJoinCodeStatus;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          organization_id?: string;
+          code?: string;
+          status?: OrganizationJoinCodeStatus;
+          created_by?: string | null;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      organization_subscriptions: {
+        Row: {
+          id: string;
+          organization_id: string;
+          plan_id: string;
+          status: SubscriptionStatus;
+          current_period_start: string | null;
+          current_period_end: string | null;
+          billing_interval: BillingInterval;
+          provider: string | null;
+          provider_subscription_id: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          organization_id: string;
+          plan_id: string;
+          status?: SubscriptionStatus;
+          current_period_start?: string | null;
+          current_period_end?: string | null;
+          billing_interval?: BillingInterval;
+          provider?: string | null;
+          provider_subscription_id?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          organization_id?: string;
+          plan_id?: string;
+          status?: SubscriptionStatus;
+          current_period_start?: string | null;
+          current_period_end?: string | null;
+          billing_interval?: BillingInterval;
+          provider?: string | null;
+          provider_subscription_id?: string | null;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      billing_orders: {
+        Row: {
+          id: string;
+          organization_id: string;
+          plan_id: string;
+          amount_cents: number;
+          billing_period_months: number;
+          status: BillingOrderStatus;
+          provider: string | null;
+          provider_checkout_url: string | null;
+          provider_payment_id: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          organization_id: string;
+          plan_id: string;
+          amount_cents?: number;
+          billing_period_months?: number;
+          status?: BillingOrderStatus;
+          provider?: string | null;
+          provider_checkout_url?: string | null;
+          provider_payment_id?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          organization_id?: string;
+          plan_id?: string;
+          amount_cents?: number;
+          billing_period_months?: number;
+          status?: BillingOrderStatus;
+          provider?: string | null;
+          provider_checkout_url?: string | null;
+          provider_payment_id?: string | null;
+          updated_at?: string;
         };
         Relationships: [];
       };
@@ -1032,7 +1172,9 @@ export type Database = {
           title: string;
           description: string | null;
           priority: Priority;
+          service_date: string | null;
           due_date: string | null;
+          completed_at: string | null;
           checklist_percent: number | null;
           custom_fields_json: Json;
           position: number;
@@ -1051,7 +1193,9 @@ export type Database = {
           title: string;
           description?: string | null;
           priority?: Priority;
+          service_date?: string | null;
           due_date?: string | null;
+          completed_at?: string | null;
           checklist_percent?: number | null;
           custom_fields_json?: Json;
           position?: number;
@@ -1071,7 +1215,9 @@ export type Database = {
           title?: string;
           description?: string | null;
           priority?: Priority;
+          service_date?: string | null;
           due_date?: string | null;
+          completed_at?: string | null;
           checklist_percent?: number | null;
           custom_fields_json?: Json;
           position?: number;
@@ -1184,6 +1330,62 @@ export type Database = {
           notes?: string | null;
           status?: "active" | "inactive";
           created_by?: string | null;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      team_chat_messages: {
+        Row: {
+          id: string;
+          organization_id: string;
+          sender_user_id: string;
+          message: string;
+          message_type: "text";
+          created_at: string;
+          updated_at: string;
+          deleted_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          organization_id: string;
+          sender_user_id: string;
+          message: string;
+          message_type?: "text";
+          created_at?: string;
+          updated_at?: string;
+          deleted_at?: string | null;
+        };
+        Update: {
+          organization_id?: string;
+          sender_user_id?: string;
+          message?: string;
+          message_type?: "text";
+          updated_at?: string;
+          deleted_at?: string | null;
+        };
+        Relationships: [];
+      };
+      team_chat_reads: {
+        Row: {
+          id: string;
+          organization_id: string;
+          user_id: string;
+          last_read_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          organization_id: string;
+          user_id: string;
+          last_read_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          organization_id?: string;
+          user_id?: string;
+          last_read_at?: string | null;
           updated_at?: string;
         };
         Relationships: [];
@@ -1380,6 +1582,7 @@ export type Database = {
         Row: {
           id: string;
           organization_id: string | null;
+          is_global: boolean;
           entity_type: AttachmentEntityType;
           entity_id: string;
           bucket: string;
@@ -1397,6 +1600,7 @@ export type Database = {
         Insert: {
           id?: string;
           organization_id?: string | null;
+          is_global?: boolean;
           entity_type: AttachmentEntityType;
           entity_id: string;
           bucket?: string;
@@ -1413,6 +1617,7 @@ export type Database = {
         };
         Update: {
           organization_id?: string | null;
+          is_global?: boolean;
           entity_type?: AttachmentEntityType;
           entity_id?: string;
           bucket?: string;
@@ -1642,33 +1847,51 @@ export type Database = {
       document_templates: {
         Row: BaseRow & {
           organization_id: string | null;
+          is_global: boolean;
           title: string;
           category: string;
           version: string;
           status: DocumentStatus;
           description: string | null;
           file_path: string | null;
+          bucket: string;
+          storage_path: string | null;
+          file_name: string | null;
+          mime_type: string | null;
+          size_bytes: number | null;
         };
         Insert: {
           id?: string;
           organization_id?: string | null;
+          is_global?: boolean;
           title: string;
           category: string;
           version: string;
           status?: DocumentStatus;
           description?: string | null;
           file_path?: string | null;
+          bucket?: string;
+          storage_path?: string | null;
+          file_name?: string | null;
+          mime_type?: string | null;
+          size_bytes?: number | null;
           created_at?: string;
           updated_at?: string;
         };
         Update: {
           title?: string;
           organization_id?: string | null;
+          is_global?: boolean;
           category?: string;
           version?: string;
           status?: DocumentStatus;
           description?: string | null;
           file_path?: string | null;
+          bucket?: string;
+          storage_path?: string | null;
+          file_name?: string | null;
+          mime_type?: string | null;
+          size_bytes?: number | null;
           updated_at?: string;
         };
         Relationships: [];
@@ -1676,35 +1899,513 @@ export type Database = {
       legislation_items: {
         Row: BaseRow & {
           organization_id: string | null;
+          is_global: boolean;
           title: string;
           category: string;
           official_link: string | null;
           technical_summary: string | null;
           practical_points: string | null;
           status: LegislationStatus;
+          file_path: string | null;
+          bucket: string;
+          storage_path: string | null;
+          file_name: string | null;
+          mime_type: string | null;
+          size_bytes: number | null;
         };
         Insert: {
           id?: string;
           organization_id?: string | null;
+          is_global?: boolean;
           title: string;
           category: string;
           official_link?: string | null;
           technical_summary?: string | null;
           practical_points?: string | null;
           status?: LegislationStatus;
+          file_path?: string | null;
+          bucket?: string;
+          storage_path?: string | null;
+          file_name?: string | null;
+          mime_type?: string | null;
+          size_bytes?: number | null;
           created_at?: string;
           updated_at?: string;
         };
         Update: {
           title?: string;
           organization_id?: string | null;
+          is_global?: boolean;
           category?: string;
           official_link?: string | null;
           technical_summary?: string | null;
           practical_points?: string | null;
           status?: LegislationStatus;
+          file_path?: string | null;
+          bucket?: string;
+          storage_path?: string | null;
+          file_name?: string | null;
+          mime_type?: string | null;
+          size_bytes?: number | null;
           updated_at?: string;
         };
+        Relationships: [];
+      };
+      assistant_conversations: {
+        Row: BaseRow & {
+          organization_id: string;
+          user_id: string;
+          title: string | null;
+        };
+        Insert: {
+          id?: string;
+          organization_id: string;
+          user_id: string;
+          title?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          organization_id?: string;
+          user_id?: string;
+          title?: string | null;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      assistant_messages: {
+        Row: {
+          id: string;
+          organization_id: string;
+          conversation_id: string;
+          user_id: string;
+          role: "user" | "assistant";
+          content: string;
+          metadata: Json;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          organization_id: string;
+          conversation_id: string;
+          user_id: string;
+          role: "user" | "assistant";
+          content: string;
+          metadata?: Json;
+          created_at?: string;
+        };
+        Update: {
+          organization_id?: string;
+          conversation_id?: string;
+          user_id?: string;
+          role?: "user" | "assistant";
+          content?: string;
+          metadata?: Json;
+        };
+        Relationships: [];
+      };
+      assistant_intents: {
+        Row: {
+          id: string;
+          name: string;
+          description: string | null;
+          category: string | null;
+          examples: Json;
+          patterns: Json;
+          action_name: string;
+          enabled: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          name: string;
+          description?: string | null;
+          category?: string | null;
+          examples?: Json;
+          patterns?: Json;
+          action_name: string;
+          enabled?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          name?: string;
+          description?: string | null;
+          category?: string | null;
+          examples?: Json;
+          patterns?: Json;
+          action_name?: string;
+          enabled?: boolean;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      assistant_intent_examples: {
+        Row: {
+          id: string;
+          intent_id: string;
+          raw_text: string;
+          normalized_text: string;
+          source: string;
+          source_file: string | null;
+          source_line: number | null;
+          synonym: string | null;
+          params_sample: Json;
+          entities_sample: Json;
+          requires_confirmation: boolean | null;
+          confidence: number | null;
+          is_real_data: boolean;
+          is_active: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          intent_id: string;
+          raw_text: string;
+          normalized_text: string;
+          source?: string;
+          source_file?: string | null;
+          source_line?: number | null;
+          synonym?: string | null;
+          params_sample?: Json;
+          entities_sample?: Json;
+          requires_confirmation?: boolean | null;
+          confidence?: number | null;
+          is_real_data?: boolean;
+          is_active?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          intent_id?: string;
+          raw_text?: string;
+          normalized_text?: string;
+          source?: string;
+          source_file?: string | null;
+          source_line?: number | null;
+          synonym?: string | null;
+          params_sample?: Json;
+          entities_sample?: Json;
+          requires_confirmation?: boolean | null;
+          confidence?: number | null;
+          is_real_data?: boolean;
+          is_active?: boolean;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      assistant_dataset_imports: {
+        Row: {
+          id: string;
+          source_file: string;
+          source_hash: string | null;
+          total_lines: number;
+          imported_count: number;
+          skipped_count: number;
+          duplicate_count: number;
+          unknown_count: number;
+          imported_at: string;
+          notes: string | null;
+        };
+        Insert: {
+          id?: string;
+          source_file: string;
+          source_hash?: string | null;
+          total_lines?: number;
+          imported_count?: number;
+          skipped_count?: number;
+          duplicate_count?: number;
+          unknown_count?: number;
+          imported_at?: string;
+          notes?: string | null;
+        };
+        Update: {
+          source_file?: string;
+          source_hash?: string | null;
+          total_lines?: number;
+          imported_count?: number;
+          skipped_count?: number;
+          duplicate_count?: number;
+          unknown_count?: number;
+          notes?: string | null;
+        };
+        Relationships: [];
+      };
+      assistant_action_logs: {
+        Row: {
+          id: string;
+          organization_id: string;
+          user_id: string;
+          conversation_id: string | null;
+          message_id: string | null;
+          action_name: string;
+          input: Json;
+          output: Json;
+          status: "ok" | "needs_confirmation" | "error";
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          organization_id: string;
+          user_id: string;
+          conversation_id?: string | null;
+          message_id?: string | null;
+          action_name: string;
+          input?: Json;
+          output?: Json;
+          status: "ok" | "needs_confirmation" | "error";
+          created_at?: string;
+        };
+        Update: {
+          organization_id?: string;
+          user_id?: string;
+          conversation_id?: string | null;
+          message_id?: string | null;
+          action_name?: string;
+          input?: Json;
+          output?: Json;
+          status?: "ok" | "needs_confirmation" | "error";
+        };
+        Relationships: [];
+      };
+      assistant_tasks: {
+        Row: BaseRow & {
+          organization_id: string;
+          user_id: string;
+          client_id: string | null;
+          service_card_id: string | null;
+          title: string;
+          description: string | null;
+          due_date: string | null;
+          status: "pending" | "done" | "canceled";
+        };
+        Insert: {
+          id?: string;
+          organization_id: string;
+          user_id: string;
+          client_id?: string | null;
+          service_card_id?: string | null;
+          title: string;
+          description?: string | null;
+          due_date?: string | null;
+          status?: "pending" | "done" | "canceled";
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          organization_id?: string;
+          user_id?: string;
+          client_id?: string | null;
+          service_card_id?: string | null;
+          title?: string;
+          description?: string | null;
+          due_date?: string | null;
+          status?: "pending" | "done" | "canceled";
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      assistant_feedback: {
+        Row: {
+          id: string;
+          organization_id: string | null;
+          user_id: string;
+          conversation_id: string | null;
+          message_id: string | null;
+          message_text: string;
+          assistant_response: string;
+          detected_intent: string | null;
+          detected_params: Json;
+          rating: "positive" | "negative";
+          correction_text: string | null;
+          corrected_intent: string | null;
+          corrected_params: Json | null;
+          source: string | null;
+          conversation_context: Json;
+          is_resolved: boolean;
+          resolved_at: string | null;
+          resolved_by: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          organization_id?: string | null;
+          user_id: string;
+          conversation_id?: string | null;
+          message_id?: string | null;
+          message_text: string;
+          assistant_response: string;
+          detected_intent?: string | null;
+          detected_params?: Json;
+          rating: "positive" | "negative";
+          correction_text?: string | null;
+          corrected_intent?: string | null;
+          corrected_params?: Json | null;
+          source?: string | null;
+          conversation_context?: Json;
+          is_resolved?: boolean;
+          resolved_at?: string | null;
+          resolved_by?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          detected_intent?: string | null;
+          detected_params?: Json;
+          rating?: "positive" | "negative";
+          correction_text?: string | null;
+          corrected_intent?: string | null;
+          corrected_params?: Json | null;
+          source?: string | null;
+          conversation_context?: Json;
+          is_resolved?: boolean;
+          resolved_at?: string | null;
+          resolved_by?: string | null;
+        };
+        Relationships: [];
+      };
+      assistant_global_learning_examples: {
+        Row: {
+          id: string;
+          promoted_from_feedback_id: string | null;
+          original_sanitized: string;
+          correction_sanitized: string;
+          corrected_intent: string | null;
+          params_schema: Json;
+          source: string;
+          is_sanitized: boolean;
+          privacy_level: "global_sanitized";
+          needs_review: boolean;
+          is_active: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          promoted_from_feedback_id?: string | null;
+          original_sanitized: string;
+          correction_sanitized: string;
+          corrected_intent?: string | null;
+          params_schema?: Json;
+          source?: string;
+          is_sanitized?: boolean;
+          privacy_level?: "global_sanitized";
+          needs_review?: boolean;
+          is_active?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          promoted_from_feedback_id?: string | null;
+          original_sanitized?: string;
+          correction_sanitized?: string;
+          corrected_intent?: string | null;
+          params_schema?: Json;
+          source?: string;
+          is_sanitized?: boolean;
+          privacy_level?: "global_sanitized";
+          needs_review?: boolean;
+          is_active?: boolean;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      daily_checklists: {
+        Row: BaseRow & {
+          organization_id: string;
+          user_id: string;
+          checklist_date: string;
+        };
+        Insert: {
+          id?: string;
+          organization_id: string;
+          user_id: string;
+          checklist_date: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          organization_id?: string;
+          user_id?: string;
+          checklist_date?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      daily_checklist_items: {
+        Row: BaseRow & {
+          checklist_id: string;
+          organization_id: string;
+          assigned_to: string;
+          created_by: string;
+          title: string;
+          description: string | null;
+          status: "open" | "done" | "canceled";
+          is_emergency: boolean;
+          source: "self" | "owner_assignment" | "assistant";
+          related_service_id: string | null;
+          due_date: string | null;
+          completed_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          checklist_id: string;
+          organization_id: string;
+          assigned_to: string;
+          created_by: string;
+          title: string;
+          description?: string | null;
+          status?: "open" | "done" | "canceled";
+          is_emergency?: boolean;
+          source?: "self" | "owner_assignment" | "assistant";
+          related_service_id?: string | null;
+          due_date?: string | null;
+          completed_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          checklist_id?: string;
+          organization_id?: string;
+          assigned_to?: string;
+          created_by?: string;
+          title?: string;
+          description?: string | null;
+          status?: "open" | "done" | "canceled";
+          is_emergency?: boolean;
+          source?: "self" | "owner_assignment" | "assistant";
+          related_service_id?: string | null;
+          due_date?: string | null;
+          completed_at?: string | null;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      organization_activity_log: {
+        Row: {
+          id: string;
+          organization_id: string;
+          actor_user_id: string;
+          target_user_id: string | null;
+          activity_type: string;
+          entity_type: string | null;
+          entity_id: string | null;
+          metadata: Json;
+          occurred_at: string;
+        };
+        Insert: {
+          id?: string;
+          organization_id: string;
+          actor_user_id: string;
+          target_user_id?: string | null;
+          activity_type: string;
+          entity_type?: string | null;
+          entity_id?: string | null;
+          metadata?: Json;
+          occurred_at?: string;
+        };
+        Update: never;
         Relationships: [];
       };
       audit_logs: {
@@ -1732,6 +2433,49 @@ export type Database = {
     };
     Views: Record<string, never>;
     Functions: {
+      can_request_password_reset: {
+        Args: {
+          p_email: string;
+          p_birth_date: string;
+        };
+        Returns: boolean;
+      };
+      create_organization_for_current_user: {
+        Args: {
+          p_name: string;
+          p_document_number?: string | null;
+          p_phone?: string | null;
+          p_email?: string | null;
+          p_address?: string | null;
+          p_city?: string | null;
+          p_state?: string | null;
+          p_notes?: string | null;
+        };
+        Returns: Array<{
+          organization_id: string;
+          join_code: string;
+        }>;
+      };
+      join_organization_by_code: {
+        Args: {
+          p_join_code: string;
+        };
+        Returns: Array<{
+          organization_id: string;
+          role: string;
+        }>;
+      };
+      get_organization_usage: {
+        Args: {
+          p_organization_id: string;
+        };
+        Returns: Array<{
+          users_count: number;
+          storage_used_mb: number;
+          services_count: number;
+          documents_count: number;
+        }>;
+      };
       find_alerts_by_car_app: {
         Args: {
           p_cod_car: string;
@@ -1841,6 +2585,19 @@ export type Database = {
           skipped_count: number;
         }>;
       };
+      find_assistant_intent_examples: {
+        Args: {
+          p_normalized_text: string;
+          p_limit?: number;
+        };
+        Returns: Array<{
+          raw_text: string;
+          normalized_text: string;
+          synonym: string | null;
+          intent_name: string;
+          action_name: string;
+        }>;
+      };
     };
     Enums: Record<string, never>;
     CompositeTypes: Record<string, never>;
@@ -1852,6 +2609,10 @@ export type Profile = Database["public"]["Tables"]["profiles"]["Row"];
 export type Plan = Database["public"]["Tables"]["plans"]["Row"];
 export type Organization = Database["public"]["Tables"]["organizations"]["Row"];
 export type OrganizationMember = Database["public"]["Tables"]["organization_members"]["Row"];
+export type OrganizationJoinCode = Database["public"]["Tables"]["organization_join_codes"]["Row"];
+export type OrganizationSubscription =
+  Database["public"]["Tables"]["organization_subscriptions"]["Row"];
+export type BillingOrder = Database["public"]["Tables"]["billing_orders"]["Row"];
 export type CompanySettings = Database["public"]["Tables"]["company_settings"]["Row"];
 export type CompanyService = Database["public"]["Tables"]["company_services"]["Row"];
 export type Property = Database["public"]["Tables"]["properties"]["Row"];
@@ -1875,6 +2636,8 @@ export type ServiceCard = Database["public"]["Tables"]["service_cards"]["Row"];
 export type ServiceMember = Database["public"]["Tables"]["service_members"]["Row"];
 export type ServiceEvent = Database["public"]["Tables"]["service_events"]["Row"];
 export type TeamMember = Database["public"]["Tables"]["team_members"]["Row"];
+export type TeamChatMessage = Database["public"]["Tables"]["team_chat_messages"]["Row"];
+export type TeamChatRead = Database["public"]["Tables"]["team_chat_reads"]["Row"];
 export type RecurringExpense = Database["public"]["Tables"]["recurring_expenses"]["Row"];
 export type Contract = Database["public"]["Tables"]["contracts"]["Row"];
 export type ProposalService = Database["public"]["Tables"]["proposal_services"]["Row"];
@@ -1882,3 +2645,15 @@ export type ContractService = Database["public"]["Tables"]["contract_services"][
 export type PaymentInstallment = Database["public"]["Tables"]["payment_installments"]["Row"];
 export type Revenue = Database["public"]["Tables"]["revenues"]["Row"];
 export type Expense = Database["public"]["Tables"]["expenses"]["Row"];
+export type AssistantConversation = Database["public"]["Tables"]["assistant_conversations"]["Row"];
+export type AssistantMessage = Database["public"]["Tables"]["assistant_messages"]["Row"];
+export type AssistantIntent = Database["public"]["Tables"]["assistant_intents"]["Row"];
+export type AssistantIntentExample = Database["public"]["Tables"]["assistant_intent_examples"]["Row"];
+export type AssistantDatasetImport = Database["public"]["Tables"]["assistant_dataset_imports"]["Row"];
+export type AssistantActionLog = Database["public"]["Tables"]["assistant_action_logs"]["Row"];
+export type AssistantTask = Database["public"]["Tables"]["assistant_tasks"]["Row"];
+export type AssistantFeedback = Database["public"]["Tables"]["assistant_feedback"]["Row"];
+export type AssistantGlobalLearningExample = Database["public"]["Tables"]["assistant_global_learning_examples"]["Row"];
+export type DailyChecklist = Database["public"]["Tables"]["daily_checklists"]["Row"];
+export type DailyChecklistItem = Database["public"]["Tables"]["daily_checklist_items"]["Row"];
+export type OrganizationActivityLog = Database["public"]["Tables"]["organization_activity_log"]["Row"];

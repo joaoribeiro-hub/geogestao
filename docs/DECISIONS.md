@@ -124,3 +124,35 @@ Data do checkpoint: 2026-05-11
 52. Valores de servico devem usar formato monetario brasileiro na interface. O valor `16.000` representa `R$ 16.000,00`.
 
 53. Em `organization_members`, `owner` e `admin` tem responsabilidades diferentes: `owner` edita Minha Empresa e regras da empresa; `admin` e administrador operacional dos modulos, mas apenas visualiza Minha Empresa.
+
+54. Dashboard, Documentos, Legislacao, Anexos, Clientes, Servicos e Financeiro devem filtrar dados operacionais pela organizacao atual. Dados sem `organization_id` nao devem aparecer como dados da empresa atual.
+
+55. Documentos e legislacao podem ser da empresa ou globais/oficiais. Arquivos da empresa usam `organizations/{organization_id}/...`; arquivos globais usam `shared/...` e sao somente leitura para empresas.
+
+56. O filtro de Servicos deve usar intervalo operacional, nao apenas prazo final. A data inicial e `service_date` com fallback para `created_at`, e a data final e `completed_at` quando concluido ou `due_date` quando ainda em andamento.
+
+57. Servicos atrasados aparecem na coluna `Em atraso` em todos os fluxos quando o prazo passou, a etapa nao e concluida e o servico nao esta perdido. Servicos atrasados permanecem visiveis mesmo que o filtro de periodo nao os incluiria.
+
+58. Cliente deve ter acoes explicitas de Visualizar, Editar e Apagar na Base de Clientes. A exclusao de cliente e bloqueada quando houver servicos vinculados ou documentos do cliente anexados.
+
+59. Documentos do cliente devem registrar um nome documental legivel, com opcoes padrao rurais/imobiliarias e nome personalizado para `Outros`.
+
+60. A exclusao de servico pelo card remove servico, propostas/contratos vinculados e receitas automaticas do servico, mas preserva cliente, documentos do cliente, documentos globais, bases geograficas e anexos do proprio servico nesta fase.
+
+61. O Assistente IA deve executar apenas acoes registradas em action registry. Ele nao pode receber SQL livre, apagar dados ou afirmar que uma escrita foi feita sem a action server-side executar.
+
+62. O Assistente IA deve funcionar sem API paga por interpretador local de intencoes. APIs externas como Gemini, OpenRouter ou Groq podem ser usadas futuramente apenas para classificar intencao e extrair parametros, nunca para consultar dados fora das actions internas.
+
+63. Toda escrita feita pelo Assistente IA deve ser registrada em `assistant_action_logs` e respeitar `organization_id`.
+
+64. Cadastro publico cria usuario sem empresa. O app fica limitado ate o usuario participar de uma organizacao por ID/codigo da empresa ou criar uma nova organizacao. O codigo de entrada e sensivel, visivel apenas para `owner`, e entrada por codigo cria `admin` operacional limitado pelo plano atual.
+
+65. O Assistente IA deixa de ser menu principal e passa a ser acesso flutuante global. Escritas feitas pelo assistente exigem confirmacao visual e feedback supervisionado.
+
+66. Checklist diario e activity log pertencem a organizacao atual. Membros podem consultar atividades internas da propria empresa, e owner pode atribuir itens de checklist para membros.
+
+67. Correcoes feitas pelo botao "Nao" geram feedback bruto por organizacao e exemplos sanitizados globais para melhorar o Assistente IA sem vazar dados privados.
+
+68. O Assistente IA usa memoria curta de conversa para resolver pronomes como "ele" e "esse membro" dentro da mesma sessao, sempre limitado a `organization_id`.
+
+69. Comunicacao rapida da empresa passa a ter Chat da equipe flutuante, separado do Assistente IA e do Checklist diario. Mensagens, leituras e badges sao sempre filtrados por `organization_id`.

@@ -259,6 +259,7 @@ export const serviceCardSchema = z.object({
     .enum(["pagamento_nao_efetuado", "pagamento_efetuado"])
     .default("pagamento_nao_efetuado"),
   priority: z.enum(["low", "medium", "high", "urgent"]),
+  service_date: dateString,
   due_date: dateString,
   custom_fields_json: z
     .string()

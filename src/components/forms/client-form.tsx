@@ -15,7 +15,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 
-export function ClientForm({ client }: { client?: Client }) {
+export function ClientForm({
+  client,
+  onSaved,
+}: {
+  client?: Client;
+  onSaved?: () => void;
+}) {
   const [pending, startTransition] = useTransition();
   const form = useForm<ClientFormValues>({
     resolver: zodResolver(clientSchema),
@@ -37,9 +43,15 @@ export function ClientForm({ client }: { client?: Client }) {
     );
 
     startTransition(() => {
-      void (client
-        ? updateClientAction(client.id, formData)
-        : createClientAction(formData));
+      void (async () => {
+        if (client) {
+          await updateClientAction(client.id, formData);
+          onSaved?.();
+          return;
+        }
+
+        await createClientAction(formData);
+      })();
     });
   }
 
