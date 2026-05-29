@@ -8,11 +8,14 @@ import {
   clientSchema,
   checklistItemSchema,
   checklistSchema,
+  serviceEditSchema,
+  servicePropertyInfoSchema,
+  serviceReceiptSchema,
   serviceCardSchema,
 } from "@/lib/schemas";
-import { getCurrentOrganizationForUser } from "@/lib/organization";
+import { canManageOrganization, getCurrentOrganizationContext, getCurrentOrganizationForUser } from "@/lib/organization";
+import { generateReminderNotifications, NOTIFICATION_ON_CONFLICT } from "@/lib/notifications/reminders";
 import {
-  getDefaultChecklistItems,
   getExecutionColumn,
   getNextColumn,
   getProposalContractColumn,
@@ -30,7 +33,7 @@ import {
 import { serviceTypeToBoardSlug } from "@/lib/services/service-cards";
 import { createServerSupabase } from "@/lib/supabase/server";
 import { revertServiceToProposal as revertServiceToProposalAction } from "@/app/(app)/propostas/actions";
-import type { Json, PaymentStatus, Priority, ProposalServiceType, ServiceCard, ServiceColumn } from "@/types/database";
+import type { Json, OrganizationMember, PaymentStatus, Priority, ProposalServiceType, ServiceCard, ServiceColumn } from "@/types/database";
 
 export async function revertServiceToProposal(cardId: string) {
   return revertServiceToProposalAction(cardId);
@@ -85,10 +88,10 @@ export async function createServiceCardAction(formData: FormData) {
     }
     throw new Error(error.message);
   }
-  await createDefaultChecklistForService(
+  await ensureEmptyServiceChecklists(
     supabase,
     data.id,
-    data.service_type ?? parsed.service_type ?? "outros_servicos",
+    organization.id,
   );
   await recordServiceEvent(supabase, {
     organizationId: organization.id,
@@ -380,16 +383,198 @@ export async function updateServicePaymentStatusAction(
   revalidatePath("/financeiro");
 }
 
-export async function createClientForServiceAction(cardId: string, formData: FormData) {
+export async function updateServiceDetailsAction(cardId: string, formData: FormData) {
+  const supabase = await createServerSupabase();
+  const user = await requireUser(supabase);
+  const context = await getCurrentOrganizationContext(supabase, user.id);
+  if (!context.organization || !context.membership) throw new Error("Usuario sem organizacao.");
+  const card = await getServiceCardForOrganization(supabase, cardId, context.organization.id);
+  assertCanEditService(context.membership, user.id, card);
+
+  const parsed = serviceEditSchema.parse(formDataToObject(formData));
+  const metadata = asRecord(card.custom_fields_json);
+  const nextMetadata = {
+    ...metadata,
+    valor_previsto: parsed.estimated_value,
+  };
+
+  const { error } = await supabase
+    .from("service_cards")
+    .update({
+      client_id: parsed.client_id,
+      title: parsed.title,
+      description: parsed.description,
+      municipality: parsed.municipality,
+      responsible_user_id: parsed.responsible_user_id,
+      service_type: parsed.service_type,
+      custom_service_name: parsed.custom_service_name,
+      due_date: parsed.due_date,
+      payment_condition: parsed.payment_condition,
+      custom_fields_json: nextMetadata,
+    })
+    .eq("id", card.id)
+    .eq("organization_id", context.organization.id);
+  if (error) throw new Error(error.message);
+
+  await syncAutomaticServiceRevenueForCard(supabase, {
+    serviceCardId: card.id,
+    userId: user.id,
+  });
+  await recordServiceEvent(supabase, {
+    organizationId: context.organization.id,
+    serviceCardId: card.id,
+    userId: user.id,
+    eventType: "service.updated",
+    title: "Servico editado",
+  });
+  if (parsed.responsible_user_id && parsed.responsible_user_id !== card.responsible_user_id) {
+    await supabase.from("notifications").upsert(
+      {
+        organization_id: context.organization.id,
+        recipient_user_id: parsed.responsible_user_id,
+        actor_user_id: user.id,
+        type: "service_responsible_defined",
+        title: "Responsavel por servico",
+        message: `Voce foi definido como responsavel pelo servico ${parsed.title}.`,
+        entity_type: "service_card",
+        entity_id: card.id,
+        action_url: `/servicos/${card.id}`,
+        metadata: { category: "Projetos", service_card_id: card.id },
+        scheduled_for: new Date().toISOString(),
+        dedupe_key: `service-responsible:${context.organization.id}:${card.id}:${parsed.responsible_user_id}`,
+      },
+      { onConflict: NOTIFICATION_ON_CONFLICT },
+    );
+  }
+
+  revalidatePath("/servicos");
+  revalidatePath(`/servicos/${card.id}`);
+  revalidatePath("/financeiro");
+}
+
+export async function addServiceReceiptAction(formData: FormData) {
+  const supabase = await createServerSupabase();
+  const user = await requireUser(supabase);
+  const context = await getCurrentOrganizationContext(supabase, user.id);
+  if (!context.organization || !context.membership) throw new Error("Usuario sem organizacao.");
+  const parsed = serviceReceiptSchema.parse(formDataToObject(formData));
+  const card = await getServiceCardForOrganization(supabase, parsed.service_card_id, context.organization.id);
+  assertCanEditService(context.membership, user.id, card);
+  if (!card.client_id) throw new Error("Vincule um cliente antes de lancar recebimento.");
+
+  const { data: revenue, error } = await supabase
+    .from("revenues")
+    .insert({
+      organization_id: context.organization.id,
+      client_id: card.client_id,
+      proposal_id: card.proposal_id,
+      contract_id: card.contract_id,
+      service_card_id: card.id,
+      auto_generated: false,
+      description: parsed.description ?? `Recebimento - ${card.title}`,
+      category: "Recebimento de servico",
+      amount: parsed.amount,
+      due_date: parsed.paid_at,
+      paid_at: parsed.paid_at,
+      status: "paid",
+    })
+    .select("id")
+    .single();
+  if (error) throw new Error(error.message);
+
+  await recordServiceEvent(supabase, {
+    organizationId: context.organization.id,
+    serviceCardId: card.id,
+    userId: user.id,
+    eventType: "service.receipt_added",
+    title: "Recebimento adicionado",
+    metadata: { revenue_id: revenue.id, amount: parsed.amount },
+  });
+  revalidatePath(`/servicos/${card.id}`);
+  revalidatePath("/financeiro");
+  if (card.client_id) revalidatePath(`/clientes/${card.client_id}`);
+}
+
+export async function deleteServiceReceiptAction(revenueId: string) {
+  const supabase = await createServerSupabase();
+  const user = await requireUser(supabase);
+  const context = await getCurrentOrganizationContext(supabase, user.id);
+  if (!context.organization || !context.membership) throw new Error("Usuario sem organizacao.");
+  const { data: revenue, error: revenueError } = await supabase
+    .from("revenues")
+    .select("*")
+    .eq("id", revenueId)
+    .eq("organization_id", context.organization.id)
+    .single();
+  if (revenueError) throw new Error(revenueError.message);
+  if (!revenue.service_card_id) throw new Error("Recebimento sem servico vinculado.");
+  const card = await getServiceCardForOrganization(supabase, revenue.service_card_id, context.organization.id);
+  assertCanEditService(context.membership, user.id, card);
+
+  const { error } = await supabase
+    .from("revenues")
+    .delete()
+    .eq("id", revenue.id)
+    .eq("organization_id", context.organization.id);
+  if (error) throw new Error(error.message);
+
+  await recordServiceEvent(supabase, {
+    organizationId: context.organization.id,
+    serviceCardId: card.id,
+    userId: user.id,
+    eventType: "service.receipt_deleted",
+    title: "Recebimento removido",
+    metadata: { revenue_id: revenue.id, amount: revenue.amount },
+  });
+  revalidatePath(`/servicos/${card.id}`);
+  revalidatePath("/financeiro");
+  if (card.client_id) revalidatePath(`/clientes/${card.client_id}`);
+}
+
+export async function addServicePropertyInfoAction(formData: FormData) {
   const supabase = await createServerSupabase();
   const user = await requireUser(supabase);
   const organization = await getCurrentOrganizationForUser(supabase, user.id);
+  const parsed = servicePropertyInfoSchema.parse(formDataToObject(formData));
+  await getServiceCardForOrganization(supabase, parsed.service_card_id, organization.id);
+  const { error } = await supabase.from("service_property_infos").insert({
+    organization_id: organization.id,
+    service_card_id: parsed.service_card_id,
+    title: parsed.title,
+    value: parsed.value,
+    created_by: user.id,
+  });
+  if (error) throw new Error(error.message);
+  revalidatePath(`/servicos/${parsed.service_card_id}`);
+}
+
+export async function deleteServicePropertyInfoAction(infoId: string, serviceCardId: string) {
+  const supabase = await createServerSupabase();
+  const user = await requireUser(supabase);
+  const organization = await getCurrentOrganizationForUser(supabase, user.id);
+  const { error } = await supabase
+    .from("service_property_infos")
+    .delete()
+    .eq("id", infoId)
+    .eq("service_card_id", serviceCardId)
+    .eq("organization_id", organization.id);
+  if (error) throw new Error(error.message);
+  revalidatePath(`/servicos/${serviceCardId}`);
+}
+
+export async function createClientForServiceAction(cardId: string, formData: FormData) {
+  const supabase = await createServerSupabase();
+  const user = await requireUser(supabase);
+  const context = await getCurrentOrganizationContext(supabase, user.id);
+  if (!context.organization || !context.membership) throw new Error("Usuario sem organizacao.");
+  const card = await getServiceCardForOrganization(supabase, cardId, context.organization.id);
+  assertCanEditService(context.membership, user.id, card);
   const parsed = clientSchema.parse(formDataToObject(formData));
 
   const { data: client, error } = await supabase
     .from("clients")
-    .insert({ ...parsed, organization_id: organization.id, created_by: user.id })
-    .select("id")
+    .insert({ ...parsed, organization_id: context.organization.id, created_by: user.id })
+    .select("id,name")
     .single();
   if (error) throw new Error(error.message);
 
@@ -397,7 +582,7 @@ export async function createClientForServiceAction(cardId: string, formData: For
     .from("service_cards")
     .update({ client_id: client.id })
     .eq("id", cardId)
-    .eq("organization_id", organization.id);
+    .eq("organization_id", context.organization.id);
   if (cardError) throw new Error(cardError.message);
   await syncAutomaticServiceRevenueForCard(supabase, {
     serviceCardId: cardId,
@@ -405,18 +590,62 @@ export async function createClientForServiceAction(cardId: string, formData: For
   });
 
   await recordServiceEvent(supabase, {
-    organizationId: organization.id,
+    organizationId: context.organization.id,
     serviceCardId: cardId,
     userId: user.id,
     eventType: "service.client_created",
     title: "Cliente cadastrado e vinculado",
-    metadata: { client_id: client.id },
+    metadata: { client_id: client.id, client_name: client.name },
   });
 
   revalidatePath("/clientes");
   revalidatePath("/minha-empresa");
   revalidatePath("/servicos");
   revalidatePath(`/servicos/${cardId}`);
+  revalidatePath("/financeiro");
+  return { ok: true, clientId: client.id };
+}
+
+export async function linkExistingClientToServiceAction(cardId: string, clientId: string) {
+  const supabase = await createServerSupabase();
+  const user = await requireUser(supabase);
+  const context = await getCurrentOrganizationContext(supabase, user.id);
+  if (!context.organization || !context.membership) throw new Error("Usuario sem organizacao.");
+  const card = await getServiceCardForOrganization(supabase, cardId, context.organization.id);
+  assertCanEditService(context.membership, user.id, card);
+
+  const { data: client, error: clientError } = await supabase
+    .from("clients")
+    .select("id,name")
+    .eq("id", clientId)
+    .eq("organization_id", context.organization.id)
+    .single();
+  if (clientError) throw new Error(clientError.message);
+
+  const { error } = await supabase
+    .from("service_cards")
+    .update({ client_id: client.id })
+    .eq("id", card.id)
+    .eq("organization_id", context.organization.id);
+  if (error) throw new Error(error.message);
+
+  await syncAutomaticServiceRevenueForCard(supabase, {
+    serviceCardId: card.id,
+    userId: user.id,
+  });
+  await recordServiceEvent(supabase, {
+    organizationId: context.organization.id,
+    serviceCardId: card.id,
+    userId: user.id,
+    eventType: "service.client_linked",
+    title: `Cliente ${client.name} vinculado ao servico.`,
+    metadata: { client_id: client.id, client_name: client.name },
+  });
+
+  revalidatePath("/clientes");
+  revalidatePath(`/clientes/${client.id}`);
+  revalidatePath("/servicos");
+  revalidatePath(`/servicos/${card.id}`);
   revalidatePath("/financeiro");
   return { ok: true, clientId: client.id };
 }
@@ -536,6 +765,29 @@ export async function addServiceMemberAction(formData: FormData) {
     title: "Membro adicionado",
     metadata: { user_id: userId, role },
   });
+  const { data: service } = await supabase
+    .from("service_cards")
+    .select("title")
+    .eq("id", serviceCardId)
+    .eq("organization_id", organization.id)
+    .maybeSingle();
+  await supabase.from("notifications").upsert(
+    {
+      organization_id: organization.id,
+      recipient_user_id: userId,
+      actor_user_id: user.id,
+      type: "service_member_added",
+      title: "Voce foi adicionado a um servico",
+      message: `Voce foi adicionado ao servico ${service?.title ?? "servico"}.`,
+      entity_type: "service_card",
+      entity_id: serviceCardId,
+      action_url: `/servicos/${serviceCardId}`,
+      metadata: { category: "Projetos", service_card_id: serviceCardId },
+      scheduled_for: new Date().toISOString(),
+      dedupe_key: `service-member-added:${organization.id}:${serviceCardId}:${userId}`,
+    },
+    { onConflict: NOTIFICATION_ON_CONFLICT },
+  );
   revalidatePath(`/servicos/${serviceCardId}`);
 }
 
@@ -546,10 +798,12 @@ export async function createServiceInteractionAction(formData: FormData) {
   const serviceCardId = formData.get("service_card_id")?.toString() ?? "";
   const title = formData.get("title")?.toString().trim() || "Interacao registrada";
   const description = formData.get("description")?.toString().trim() ?? "";
+  const reminderDate = formData.get("reminder_date")?.toString() || null;
+  const reminderTime = formData.get("reminder_time")?.toString() || null;
   if (!serviceCardId) throw new Error("Servico invalido.");
   if (!description) throw new Error("Descreva a interacao.");
 
-  await getServiceCardForOrganization(supabase, serviceCardId, organization.id);
+  const card = await getServiceCardForOrganization(supabase, serviceCardId, organization.id);
   await recordServiceEvent(supabase, {
     organizationId: organization.id,
     serviceCardId,
@@ -557,7 +811,25 @@ export async function createServiceInteractionAction(formData: FormData) {
     eventType: "service.interaction",
     title,
     description,
+    metadata: {
+      reminder_date: reminderDate,
+      reminder_time: reminderTime,
+      kind: reminderDate ? "lembrete" : "interacao",
+    },
   });
+  if (reminderDate) {
+    await createAgendaReminderForEntity(supabase, {
+      organizationId: organization.id,
+      entityType: "service_card",
+      entityId: serviceCardId,
+      title,
+      description: `Servico ${card.title}: ${description || title}`,
+      reminderDate,
+      reminderTime,
+      createdBy: user.id,
+      recipientUserIds: [card.responsible_user_id, user.id].filter(Boolean) as string[],
+    });
+  }
 
   revalidatePath(`/servicos/${serviceCardId}`);
   revalidatePath("/servicos");
@@ -566,10 +838,14 @@ export async function createServiceInteractionAction(formData: FormData) {
 
 export async function createChecklistAction(formData: FormData) {
   const supabase = await createServerSupabase();
-  await requireUser(supabase);
+  const user = await requireUser(supabase);
+  const organization = await getCurrentOrganizationForUser(supabase, user.id);
   const parsed = checklistSchema.parse(formDataToObject(formData));
 
-  const { error } = await supabase.from("checklists").insert(parsed);
+  const { error } = await supabase.from("checklists").insert({
+    ...parsed,
+    organization_id: organization.id,
+  });
   if (error) throw new Error(error.message);
 
   await logAudit(supabase, {
@@ -583,20 +859,70 @@ export async function createChecklistAction(formData: FormData) {
 
 export async function createChecklistItemAction(formData: FormData) {
   const supabase = await createServerSupabase();
-  await requireUser(supabase);
+  const user = await requireUser(supabase);
   const parsed = checklistItemSchema.parse(formDataToObject(formData));
 
   const { data: checklist, error: checklistError } = await supabase
     .from("checklists")
-    .select("service_card_id")
+    .select("service_card_id,checklist_type,organization_id")
     .eq("id", parsed.checklist_id)
     .single();
   if (checklistError) throw new Error(checklistError.message);
 
-  const { error } = await supabase.from("checklist_items").insert(parsed);
+  const scheduledAt =
+    parsed.due_date && parsed.due_time
+      ? new Date(`${parsed.due_date}T${parsed.due_time}:00-03:00`).toISOString()
+      : null;
+  const { data: item, error } = await supabase
+    .from("checklist_items")
+    .insert({
+      ...parsed,
+      scheduled_at: scheduledAt,
+    })
+    .select("id,title,due_date,due_time")
+    .single();
   if (error) throw new Error(error.message);
 
   await refreshChecklistPercent(supabase, checklist.service_card_id);
+  if (item?.due_date && checklist.checklist_type === "steps" && checklist.organization_id) {
+    const { data: card } = await supabase
+      .from("service_cards")
+      .select("title,responsible_user_id")
+      .eq("id", checklist.service_card_id)
+      .eq("organization_id", checklist.organization_id)
+      .maybeSingle();
+    const { data: owners } = await supabase
+      .from("organization_members")
+      .select("user_id")
+      .eq("organization_id", checklist.organization_id)
+      .eq("status", "active")
+      .eq("role", "owner");
+    const recipients = [
+      user.id,
+      card?.responsible_user_id,
+      ...((owners ?? []).map((owner) => owner.user_id) ?? []),
+    ].filter(Boolean) as string[];
+    await createAgendaReminderForEntity(supabase, {
+      organizationId: checklist.organization_id,
+      entityType: "service_card",
+      entityId: checklist.service_card_id,
+      title: `Etapa: ${item.title}`,
+      description: `Servico ${card?.title ?? "servico"}: ${item.title}`,
+      reminderDate: item.due_date,
+      reminderTime: item.due_time,
+      createdBy: user.id,
+      recipientUserIds: recipients,
+      category: "Servicos",
+    });
+  }
+  if (parsed.is_done && checklist.checklist_type === "steps" && checklist.organization_id) {
+    await notifyOwnersAboutServiceStepCompletion(supabase, {
+      organizationId: checklist.organization_id,
+      actorUserId: user.id,
+      serviceCardId: checklist.service_card_id,
+      itemTitle: parsed.title,
+    });
+  }
   revalidatePath(`/servicos/${checklist.service_card_id}`);
   revalidatePath("/servicos");
 }
@@ -607,24 +933,75 @@ export async function toggleChecklistItemAction(
   isDone: boolean,
 ) {
   const supabase = await createServerSupabase();
-  await requireUser(supabase);
+  const user = await requireUser(supabase);
 
   const { data: checklist, error: checklistError } = await supabase
     .from("checklists")
-    .select("service_card_id")
+    .select("service_card_id,checklist_type,organization_id")
     .eq("id", checklistId)
     .single();
   if (checklistError) throw new Error(checklistError.message);
 
   const { error } = await supabase
     .from("checklist_items")
-    .update({ is_done: isDone })
+    .update({
+      is_done: isDone,
+      completed_at: isDone ? new Date().toISOString() : null,
+      completed_by: isDone ? user.id : null,
+    })
     .eq("id", itemId);
   if (error) throw new Error(error.message);
 
   await refreshChecklistPercent(supabase, checklist.service_card_id);
+  if (isDone && checklist.checklist_type === "steps" && checklist.organization_id) {
+    const { data: item } = await supabase
+      .from("checklist_items")
+      .select("title")
+      .eq("id", itemId)
+      .maybeSingle();
+    await notifyOwnersAboutServiceStepCompletion(supabase, {
+      organizationId: checklist.organization_id,
+      actorUserId: user.id,
+      serviceCardId: checklist.service_card_id,
+      itemTitle: item?.title ?? "Etapa",
+    });
+  }
   revalidatePath(`/servicos/${checklist.service_card_id}`);
   revalidatePath("/servicos");
+}
+
+export async function deleteChecklistItemAction(itemId: string, checklistId: string) {
+  const supabase = await createServerSupabase();
+  await requireUser(supabase);
+  const { data: checklist, error: checklistError } = await supabase
+    .from("checklists")
+    .select("service_card_id")
+    .eq("id", checklistId)
+    .single();
+  if (checklistError) throw new Error(checklistError.message);
+  const { error } = await supabase
+    .from("checklist_items")
+    .delete()
+    .eq("id", itemId)
+    .eq("checklist_id", checklistId);
+  if (error) throw new Error(error.message);
+  await refreshChecklistPercent(supabase, checklist.service_card_id);
+  revalidatePath(`/servicos/${checklist.service_card_id}`);
+  revalidatePath("/servicos");
+}
+
+export async function deleteServiceEventAction(eventId: string, serviceCardId: string) {
+  const supabase = await createServerSupabase();
+  const user = await requireUser(supabase);
+  const organization = await getCurrentOrganizationForUser(supabase, user.id);
+  const { error } = await supabase
+    .from("service_events")
+    .delete()
+    .eq("id", eventId)
+    .eq("service_card_id", serviceCardId)
+    .eq("organization_id", organization.id);
+  if (error) throw new Error(error.message);
+  revalidatePath(`/servicos/${serviceCardId}`);
 }
 
 async function refreshChecklistPercent(
@@ -634,7 +1011,8 @@ async function refreshChecklistPercent(
   const { data: checklistsData } = await supabase
     .from("checklists")
     .select("id")
-    .eq("service_card_id", serviceCardId);
+    .eq("service_card_id", serviceCardId)
+    .eq("checklist_type", "steps");
   const checklists = checklistsData ?? [];
 
   const ids = checklists.map((item) => item.id);
@@ -662,10 +1040,10 @@ async function refreshChecklistPercent(
     .eq("id", serviceCardId);
 }
 
-async function createDefaultChecklistForService(
+async function ensureEmptyServiceChecklists(
   supabase: Awaited<ReturnType<typeof createServerSupabase>>,
   serviceCardId: string,
-  serviceType: ProposalServiceType,
+  organizationId: string,
 ) {
   const { data: existing } = await supabase
     .from("checklists")
@@ -674,27 +1052,23 @@ async function createDefaultChecklistForService(
     .limit(1);
   if (existing?.length) return;
 
-  const { data: checklist, error } = await supabase
-    .from("checklists")
-    .insert({
+  const { error } = await supabase.from("checklists").insert([
+    {
+      organization_id: organizationId,
       service_card_id: serviceCardId,
-      title: "Checklist padrao",
+      title: "Checklist - Documentos",
+      checklist_type: "documents",
       position: 1,
-    })
-    .select("id")
-    .single();
+    },
+    {
+      organization_id: organizationId,
+      service_card_id: serviceCardId,
+      title: "Checklist - Etapas",
+      checklist_type: "steps",
+      position: 2,
+    },
+  ]);
   if (error) throw new Error(error.message);
-
-  const items = getDefaultChecklistItems(serviceType).map((title, index) => ({
-    checklist_id: checklist.id,
-    title,
-    position: index + 1,
-    is_done: false,
-  }));
-  if (items.length) {
-    const { error: itemsError } = await supabase.from("checklist_items").insert(items);
-    if (itemsError) throw new Error(itemsError.message);
-  }
 }
 
 async function getServiceColumnContext(
@@ -1023,6 +1397,147 @@ async function recordServiceEvent(
   if (error && !isMissingRelation(error.message)) {
     throw new Error(error.message);
   }
+}
+
+function assertCanEditService(
+  membership: Pick<OrganizationMember, "role" | "status"> | null,
+  userId: string,
+  card: Pick<ServiceCard, "responsible_user_id">,
+) {
+  if (canManageOrganization({ profile: null, membership })) return;
+  if (card.responsible_user_id === userId) return;
+  throw new Error("Apenas o proprietario da empresa ou o responsavel principal pode editar este servico.");
+}
+
+function asRecord(value: Json | undefined): Record<string, Json> {
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    return value as Record<string, Json>;
+  }
+  return {};
+}
+
+async function createAgendaReminderForEntity(
+  supabase: Awaited<ReturnType<typeof createServerSupabase>>,
+  {
+    organizationId,
+    entityType,
+    entityId,
+    title,
+    description,
+    reminderDate,
+    reminderTime,
+    createdBy,
+    recipientUserIds,
+    category = "Servicos",
+  }: {
+    organizationId: string;
+    entityType: string;
+    entityId: string;
+    title: string;
+    description: string | null;
+    reminderDate: string;
+    reminderTime: string | null;
+    createdBy: string;
+    recipientUserIds: string[];
+    category?: string;
+  },
+) {
+  const recipients = Array.from(new Set(recipientUserIds.filter(Boolean)));
+  const { data: reminder, error: reminderError } = await supabase
+    .from("agenda_reminders")
+    .insert({
+      organization_id: organizationId,
+      title,
+      description,
+      reminder_date: reminderDate,
+      reminder_time: reminderTime,
+      created_by: createdBy,
+      entity_type: entityType,
+      entity_id: entityId,
+      category,
+    })
+    .select("id")
+    .single();
+  if (reminderError) throw new Error(reminderError.message);
+
+  if (recipients.length) {
+    const { error: recipientsError } = await supabase.from("agenda_reminder_recipients").insert(
+      recipients.map((recipientId) => ({
+        organization_id: organizationId,
+        reminder_id: reminder.id,
+        recipient_user_id: recipientId,
+      })),
+    );
+    if (recipientsError) throw new Error(recipientsError.message);
+
+    await generateReminderNotifications(supabase, {
+      organizationId,
+      reminderId: reminder.id,
+      entityType,
+      entityId,
+      title,
+      description,
+      reminderDate,
+      reminderTime,
+      recipientUserIds: recipients,
+      actorUserId: createdBy,
+      actionUrl: entityType === "service_card" ? `/servicos/${entityId}` : `/agenda?month=${reminderDate.slice(0, 7)}`,
+      metadata: { reminder_id: reminder.id },
+    });
+  }
+}
+
+async function notifyOwnersAboutServiceStepCompletion(
+  supabase: Awaited<ReturnType<typeof createServerSupabase>>,
+  {
+    organizationId,
+    serviceCardId,
+    actorUserId,
+    itemTitle,
+  }: {
+    organizationId: string;
+    serviceCardId: string;
+    actorUserId: string;
+    itemTitle: string;
+  },
+) {
+  const { data: owners, error: ownersError } = await supabase
+    .from("organization_members")
+    .select("user_id")
+    .eq("organization_id", organizationId)
+    .eq("status", "active")
+    .eq("role", "owner")
+    .neq("user_id", actorUserId);
+  if (ownersError) throw new Error(ownersError.message);
+  const ownerIds = owners?.map((owner) => owner.user_id).filter(Boolean) ?? [];
+  if (!ownerIds.length) return;
+
+  const [{ data: service }, { data: actor }] = await Promise.all([
+    supabase.from("service_cards").select("title").eq("id", serviceCardId).maybeSingle(),
+    supabase.from("profiles").select("full_name").eq("id", actorUserId).maybeSingle(),
+  ]);
+  const actorName = actor?.full_name || "Um membro";
+  const serviceTitle = service?.title || "servico";
+  const now = new Date().toISOString();
+
+  const { error } = await supabase.from("notifications").upsert(
+    ownerIds.map((ownerId) => ({
+      organization_id: organizationId,
+      recipient_user_id: ownerId,
+      actor_user_id: actorUserId,
+      type: "service_step_completed",
+      title: "Etapa de servico concluida",
+      message: `${actorName} concluiu a etapa ${itemTitle} do servico ${serviceTitle}.`,
+      entity_type: "service_card",
+      entity_id: serviceCardId,
+      action_url: `/servicos/${serviceCardId}`,
+      metadata: { service_card_id: serviceCardId, item_title: itemTitle },
+      scheduled_for: now,
+      dedupe_key: `service-step:${serviceCardId}:${itemTitle}:${actorUserId}:${now.slice(0, 16)}`,
+    })),
+    { onConflict: NOTIFICATION_ON_CONFLICT },
+  );
+  if (error) throw new Error(error.message);
 }
 
 function isMissingRelation(message: string) {

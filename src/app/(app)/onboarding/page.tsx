@@ -11,7 +11,7 @@ export default async function OnboardingPage() {
   const context = await getCurrentOrganizationContext(supabase, user.id);
 
   if (context.organization && context.membership) {
-    redirect("/");
+    redirect("/inicio");
   }
 
   return (

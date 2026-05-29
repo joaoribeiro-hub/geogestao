@@ -17,8 +17,15 @@ type TeamChatMessage = {
   createdAt: string;
 };
 
+type TeamChatMember = {
+  id: string;
+  name: string;
+  role: string;
+};
+
 type TeamChatResponse = {
   organizationId?: string;
+  members?: TeamChatMember[];
   messages?: TeamChatMessage[];
   message?: TeamChatMessage;
   error?: string;
@@ -40,39 +47,69 @@ export function TeamChatWidget({
 }) {
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<TeamChatMessage[]>([]);
+  const [members, setMembers] = useState<TeamChatMember[]>([]);
+  const [conversationValue, setConversationValue] = useState("general");
+  const [dateFilter, setDateFilter] = useState<"today" | "yesterday" | "custom">("today");
+  const [customDate, setCustomDate] = useState(getDateKey());
   const [input, setInput] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [pending, startTransition] = useTransition();
   const listRef = useRef<HTMLDivElement | null>(null);
   const supabase = useMemo(() => createBrowserSupabase(), []);
+  const scope = conversationValue === "general" ? "general" : "direct";
+  const selectedMemberId = scope === "direct" ? conversationValue : null;
+  const selectedMember = members.find((member) => member.id === selectedMemberId);
+  const selectedDate = useMemo(() => {
+    if (dateFilter === "today") return getDateKey();
+    if (dateFilter === "yesterday") return getDateKey(-1);
+    return customDate || getDateKey();
+  }, [customDate, dateFilter]);
 
   const markRead = useCallback(async () => {
     await fetch("/api/team-chat/read", {
       method: "POST",
+      headers: { "Content-Type": "application/json" },
       cache: "no-store",
+      body: JSON.stringify({ scope, recipientUserId: selectedMemberId }),
     }).catch(() => null);
     onCountsChanged?.();
-  }, [onCountsChanged]);
+  }, [onCountsChanged, scope, selectedMemberId]);
 
   const loadMessages = useCallback(async (markAsRead: boolean) => {
+    if (scope === "direct" && !selectedMemberId) {
+      setMessages([]);
+      return;
+    }
     setLoading(true);
     setError(null);
-    const response = await fetch("/api/team-chat", { cache: "no-store" });
+    const params = new URLSearchParams({
+      scope,
+      date: selectedDate,
+    });
+    if (selectedMemberId) params.set("recipientUserId", selectedMemberId);
+    const response = await fetch(`/api/team-chat?${params.toString()}`, { cache: "no-store" });
     const data = (await response.json().catch(() => null)) as TeamChatResponse | null;
     setLoading(false);
     if (!response.ok || data?.error) {
       setError(data?.error ?? "Nao foi possivel carregar o chat da equipe.");
       return;
     }
+    setMembers(data?.members ?? []);
     setMessages(data?.messages ?? []);
     if (markAsRead) await markRead();
-  }, [markRead]);
+  }, [markRead, scope, selectedDate, selectedMemberId]);
 
   useEffect(() => {
     if (!open) return;
     void loadMessages(true);
   }, [loadMessages, open]);
+
+  useEffect(() => {
+    if (conversationValue !== "general" && members.length && !members.some((member) => member.id === conversationValue)) {
+      setConversationValue("general");
+    }
+  }, [conversationValue, members]);
 
   useEffect(() => {
     if (!organizationId) return;
@@ -111,14 +148,14 @@ export function TeamChatWidget({
   function sendMessage(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const message = input.trim();
-    if (!message || pending) return;
+    if (!message || pending || (scope === "direct" && !selectedMemberId)) return;
     startTransition(() => {
       void (async () => {
         const response = await fetch("/api/team-chat", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           cache: "no-store",
-          body: JSON.stringify({ message }),
+          body: JSON.stringify({ message, scope, recipientUserId: selectedMemberId }),
         });
         const data = (await response.json().catch(() => null)) as TeamChatResponse | null;
         if (!response.ok || data?.error || !data?.message) {
@@ -150,6 +187,49 @@ export function TeamChatWidget({
             </Button>
           </header>
 
+          <div className="space-y-2 border-b p-3">
+            <select
+              value={conversationValue}
+              onChange={(event) => setConversationValue(event.target.value)}
+              className="h-9 w-full rounded-md border border-input bg-background px-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              aria-label="Selecionar conversa"
+              data-testid="team-chat-conversation-select"
+            >
+              <option value="general">Geral da empresa</option>
+              {members.map((member) => (
+                <option key={member.id} value={member.id}>
+                  Direto: {member.name}
+                  {member.role === "owner" ? " (owner)" : ""}
+                </option>
+              ))}
+            </select>
+
+            <div className="flex flex-wrap items-center gap-1.5">
+              {(["today", "yesterday", "custom"] as const).map((filter) => (
+                <Button
+                  key={filter}
+                  type="button"
+                  variant={dateFilter === filter ? "default" : "outline"}
+                  size="sm"
+                  className="h-8 px-2 text-xs"
+                  onClick={() => setDateFilter(filter)}
+                  data-testid={`team-chat-date-${filter}`}
+                >
+                  {filter === "today" ? "Hoje" : filter === "yesterday" ? "Ontem" : "Data"}
+                </Button>
+              ))}
+              {dateFilter === "custom" ? (
+                <input
+                  type="date"
+                  value={customDate}
+                  onChange={(event) => setCustomDate(event.target.value)}
+                  className="h-8 rounded-md border border-input bg-background px-2 text-xs outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  aria-label="Data personalizada do chat"
+                />
+              ) : null}
+            </div>
+          </div>
+
           <div ref={listRef} className="flex-1 space-y-3 overflow-y-auto p-3">
             {loading ? (
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -159,7 +239,11 @@ export function TeamChatWidget({
             ) : null}
             {error ? <p className="rounded-md bg-destructive/10 p-2 text-sm text-destructive">{error}</p> : null}
             {!loading && !messages.length ? (
-              <p className="rounded-md bg-secondary p-3 text-sm text-muted-foreground">Ainda nao ha mensagens da equipe.</p>
+              <p className="rounded-md bg-secondary p-3 text-sm text-muted-foreground">
+                {scope === "direct"
+                  ? "Ainda nao ha mensagens diretas nesta data."
+                  : "Ainda nao ha mensagens da equipe nesta data."}
+              </p>
             ) : null}
             {messages.map((message) => (
               <div
@@ -193,11 +277,17 @@ export function TeamChatWidget({
               value={input}
               onChange={(event) => setInput(event.target.value)}
               className="h-10 min-w-0 flex-1 rounded-md border border-input bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              placeholder="Escreva uma mensagem para a equipe..."
+              placeholder={scope === "direct" && selectedMember ? `Escreva para ${selectedMember.name}...` : "Escreva uma mensagem para a equipe..."}
               maxLength={1000}
               data-testid="team-chat-input"
             />
-            <Button type="submit" size="icon" aria-label="Enviar mensagem para equipe" disabled={pending || !input.trim()} data-testid="team-chat-send">
+            <Button
+              type="submit"
+              size="icon"
+              aria-label="Enviar mensagem para equipe"
+              disabled={pending || !input.trim() || (scope === "direct" && !selectedMemberId)}
+              data-testid="team-chat-send"
+            >
               {pending ? <Loader2 className="animate-spin" aria-hidden="true" /> : <Send aria-hidden="true" />}
             </Button>
           </form>
@@ -232,4 +322,15 @@ export function TeamChatWidget({
       </Button>
     </div>
   );
+}
+
+function getDateKey(offsetDays = 0) {
+  const date = new Date();
+  date.setDate(date.getDate() + offsetDays);
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Sao_Paulo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(date);
 }

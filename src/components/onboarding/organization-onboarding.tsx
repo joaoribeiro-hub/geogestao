@@ -28,7 +28,7 @@ export function OrganizationOnboarding() {
         });
         setMessage(result.message);
         if (result.ok) {
-          router.replace("/");
+          router.replace("/inicio");
           router.refresh();
         }
       })();
@@ -50,7 +50,7 @@ export function OrganizationOnboarding() {
         });
         setMessage(result.message);
         if (result.ok) {
-          router.replace("/");
+          router.replace("/inicio");
           router.refresh();
         }
       })();

@@ -14,7 +14,7 @@ import {
 import { filterServiceCardsByOperationalPeriod } from "@/lib/services/service-period";
 import { createServerSupabase } from "@/lib/supabase/server";
 import { formatCurrency, formatDate } from "@/lib/utils";
-import type { Expense, FinanceStatus, Revenue, ServiceCard } from "@/types/database";
+import type { Expense, FinanceStatus, FinanceTransfer, Revenue, ServiceCard } from "@/types/database";
 
 const statusLabel: Record<FinanceStatus, string> = {
   pending: "Pendente",
@@ -38,6 +38,7 @@ export default async function FinancePage({
     serviceColumnsResult,
     revenuesResult,
     expensesResult,
+    transfersResult,
   ] = await Promise.all([
     supabase.from("clients").select("*").eq("organization_id", organization.id).order("name"),
     supabase
@@ -53,6 +54,11 @@ export default async function FinancePage({
     supabase.from("service_columns").select("*"),
     supabase.from("revenues").select("*").eq("organization_id", organization.id).order("due_date"),
     supabase.from("expenses").select("*").eq("organization_id", organization.id).order("due_date"),
+    supabase
+      .from("finance_transfers")
+      .select("*")
+      .eq("organization_id", organization.id)
+      .order("transfer_date"),
   ]);
   const clients = clientsResult.data ?? [];
   const proposals = proposalsResult.data ?? [];
@@ -83,6 +89,11 @@ export default async function FinancePage({
     expensesResult.data ?? [],
     periodRange,
     (expense) => expense.due_date ?? expense.created_at,
+  );
+  const transfers = filterByPeriod(
+    transfersResult.data ?? [],
+    periodRange,
+    (transfer) => transfer.transfer_date ?? transfer.created_at,
   );
 
   const serviceFinance = calculateServiceFinanceSummary(
@@ -126,20 +137,21 @@ export default async function FinancePage({
         serviceCards={serviceCards}
       />
 
-      <div className="mb-6 grid gap-4 md:grid-cols-3">
-        <SummaryCard title="Receitas do periodo" value={formatCurrency(monthlyRevenue)} />
-        <SummaryCard title="Despesas do periodo" value={formatCurrency(monthlyExpense)} />
-        <SummaryCard title="Lucro estimado" value={formatCurrency(serviceFinance.estimatedProfit)} />
-        <SummaryCard title="Lucro efetuado" value={formatCurrency(serviceFinance.realizedProfit)} />
-        <SummaryCard title="Lucro perdido" value={formatCurrency(serviceFinance.lostProfit)} />
-        <SummaryCard title="Resultado do periodo" value={formatCurrency(serviceFinance.realizedProfit - monthlyExpense)} />
-      </div>
-
-      <ProjectProfitSummary rows={projectRows} />
-
-      <div className="grid gap-6 xl:grid-cols-2">
-        <FinanceTable title="Contas a receber" rows={revenues} kind="revenue" serviceCards={serviceCards} />
-        <FinanceTable title="Contas a pagar" rows={expenses} kind="expense" serviceCards={serviceCards} />
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
+        <div className="space-y-6">
+          <ProjectProfitSummary rows={projectRows} />
+          <FinanceTable title="Entradas" rows={revenues} kind="revenue" serviceCards={serviceCards} />
+          <FinanceTable title="Saidas" rows={expenses} kind="expense" serviceCards={serviceCards} />
+          <TransferTable rows={transfers} />
+        </div>
+        <aside className="space-y-3">
+          <SummaryCard title="Receitas do periodo" value={formatCurrency(monthlyRevenue)} />
+          <SummaryCard title="Despesas do periodo" value={formatCurrency(monthlyExpense)} />
+          <SummaryCard title="Lucro estimado" value={formatCurrency(serviceFinance.estimatedProfit)} />
+          <SummaryCard title="Lucro efetuado" value={formatCurrency(serviceFinance.realizedProfit)} />
+          <SummaryCard title="Lucro perdido" value={formatCurrency(serviceFinance.lostProfit)} />
+          <SummaryCard title="Resultado do periodo" value={formatCurrency(serviceFinance.realizedProfit - monthlyExpense)} />
+        </aside>
       </div>
     </div>
   );
@@ -222,6 +234,9 @@ function FinanceTable({
       total: related.reduce((sum, row) => sum + Number(row.amount), 0),
     };
   });
+  const openRows = rows.filter((row) => row.status !== "paid");
+  const finishedRows = rows.filter((row) => row.status === "paid");
+  const total = rows.reduce((sum, row) => sum + Number(row.amount), 0);
 
   return (
     <Card>
@@ -229,14 +244,20 @@ function FinanceTable({
         <CardTitle>{title}</CardTitle>
       </CardHeader>
       <CardContent data-testid={kind === "revenue" ? "finance-revenues" : "finance-expenses"}>
+        <div className="mb-3 flex flex-wrap gap-2 text-xs">
+          <Badge variant="secondary">Abertas: {openRows.length}</Badge>
+          <Badge variant="secondary">Finalizadas: {finishedRows.length}</Badge>
+        </div>
         {rows.length ? (
           <div className="overflow-hidden rounded-lg border">
             <table className="w-full text-sm">
               <thead className="bg-secondary text-left">
                 <tr>
-                  <th className="px-4 py-3 font-medium">Descricao</th>
+                  <th className="px-4 py-3 font-medium">Nome</th>
                   <th className="px-4 py-3 font-medium">Valor</th>
+                  <th className="px-4 py-3 font-medium">Banco</th>
                   <th className="px-4 py-3 font-medium">Vencimento</th>
+                  <th className="px-4 py-3 font-medium">Pagamento</th>
                   <th className="px-4 py-3 font-medium">Status</th>
                 </tr>
               </thead>
@@ -248,7 +269,9 @@ function FinanceTable({
                       <p className="text-xs text-muted-foreground">{row.category}</p>
                     </td>
                     <td className="px-4 py-3">{formatCurrency(Number(row.amount))}</td>
+                    <td className="px-4 py-3">{row.bank_account ?? "-"}</td>
                     <td className="px-4 py-3">{formatDate(row.due_date)}</td>
+                    <td className="px-4 py-3">{row.paid_at ? formatDate(row.paid_at) : "-"}</td>
                     <td className="px-4 py-3">
                       <Badge variant={row.status === "overdue" ? "destructive" : "secondary"}>
                         {statusLabel[row.status]}
@@ -257,6 +280,13 @@ function FinanceTable({
                   </tr>
                 ))}
               </tbody>
+              <tfoot className="border-t bg-secondary/60">
+                <tr>
+                  <td className="px-4 py-3 font-medium">Total</td>
+                  <td className="px-4 py-3 font-semibold">{formatCurrency(total)}</td>
+                  <td colSpan={4} />
+                </tr>
+              </tfoot>
             </table>
           </div>
         ) : (
@@ -276,6 +306,57 @@ function FinanceTable({
               ))}
           </div>
         </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function TransferTable({ rows }: { rows: FinanceTransfer[] }) {
+  const total = rows.reduce((sum, row) => sum + Number(row.amount), 0);
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Transferencias</CardTitle>
+      </CardHeader>
+      <CardContent>
+        {rows.length ? (
+          <div className="overflow-hidden rounded-lg border">
+            <table className="w-full text-sm">
+              <thead className="bg-secondary text-left">
+                <tr>
+                  <th className="px-4 py-3 font-medium">Nome</th>
+                  <th className="px-4 py-3 font-medium">Valor</th>
+                  <th className="px-4 py-3 font-medium">Saida</th>
+                  <th className="px-4 py-3 font-medium">Entrada</th>
+                  <th className="px-4 py-3 font-medium">Data</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((row) => (
+                  <tr key={row.id} className="border-t bg-card">
+                    <td className="px-4 py-3">
+                      <p className="font-medium">{row.description}</p>
+                      <p className="text-xs text-muted-foreground">{row.notes}</p>
+                    </td>
+                    <td className="px-4 py-3">{formatCurrency(Number(row.amount))}</td>
+                    <td className="px-4 py-3">{row.from_bank_account}</td>
+                    <td className="px-4 py-3">{row.to_bank_account}</td>
+                    <td className="px-4 py-3">{formatDate(row.transfer_date)}</td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot className="border-t bg-secondary/60">
+                <tr>
+                  <td className="px-4 py-3 font-medium">Total movimentado</td>
+                  <td className="px-4 py-3 font-semibold">{formatCurrency(total)}</td>
+                  <td colSpan={3} />
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        ) : (
+          <EmptyState title="Nenhuma transferencia." />
+        )}
       </CardContent>
     </Card>
   );

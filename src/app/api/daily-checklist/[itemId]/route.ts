@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireUser } from "@/lib/auth";
 import { getCurrentOrganizationForUser } from "@/lib/organization";
+import { NOTIFICATION_ON_CONFLICT } from "@/lib/notifications/reminders";
 import { createServerSupabase } from "@/lib/supabase/server";
 
 const updateItemSchema = z.object({
@@ -65,6 +66,40 @@ export async function PATCH(
     entity_id: item.id,
     metadata: { title: item.title },
   });
+
+  if (parsed.data.status === "done") {
+    const { data: actor } = await supabase
+      .from("profiles")
+      .select("full_name")
+      .eq("id", user.id)
+      .maybeSingle();
+    const { data: owners } = await supabase
+      .from("organization_members")
+      .select("user_id")
+      .eq("organization_id", organization.id)
+      .eq("status", "active")
+      .eq("role", "owner")
+      .neq("user_id", user.id);
+    const actorName = actor?.full_name || "Um membro";
+    const now = new Date().toISOString();
+    const notifications = (owners ?? []).map((owner) => ({
+      organization_id: organization.id,
+      recipient_user_id: owner.user_id,
+      actor_user_id: user.id,
+      type: "daily_checklist_completed",
+      title: "Checklist concluido",
+      message: `${actorName} concluiu ${item.title}.`,
+      entity_type: "daily_checklist_item",
+      entity_id: item.id,
+      action_url: "/?checklist=today",
+      metadata: { checklist_item_id: item.id, title: item.title },
+      scheduled_for: now,
+      dedupe_key: `daily-checklist:${item.id}:${owner.user_id}:${now.slice(0, 16)}`,
+    }));
+    if (notifications.length) {
+      await supabase.from("notifications").upsert(notifications, { onConflict: NOTIFICATION_ON_CONFLICT });
+    }
+  }
 
   return NextResponse.json({ item });
 }

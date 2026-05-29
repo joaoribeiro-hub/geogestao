@@ -156,3 +156,59 @@ Data do checkpoint: 2026-05-11
 68. O Assistente IA usa memoria curta de conversa para resolver pronomes como "ele" e "esse membro" dentro da mesma sessao, sempre limitado a `organization_id`.
 
 69. Comunicacao rapida da empresa passa a ter Chat da equipe flutuante, separado do Assistente IA e do Checklist diario. Mensagens, leituras e badges sao sempre filtrados por `organization_id`.
+
+70. Servico agora possui `Checklist - Documentos` e `Checklist - Etapas`; novos servicos nascem sem itens padrao.
+
+71. A porcentagem do servico depende apenas dos itens concluidos em `Checklist - Etapas`.
+
+72. Financeiro por servico e visivel apenas ao owner e ao responsavel principal do servico.
+
+73. Cliente ativo depende de possuir ao menos um servico ativo vinculado; cliente sem servico ativo aparece como inativo.
+
+74. Dashboard e Financeiro ficam restritos ao owner no menu principal. Propostas e Contratos passam a subitens de Servicos.
+
+75. Notificacoes centralizam prazos, lembretes e conclusoes de checklist; Agenda centraliza lembretes e prazos de servicos.
+
+76. Agenda passa a ser calendario mensal visual; eventos aparecem nos dias correspondentes e a navegacao de mes pode ser refletida na URL por `month=YYYY-MM`.
+
+77. Servico sem cliente pode vincular cliente existente no detalhe usando busca por cliente da organizacao. A busca e reaproveitada conceitualmente entre criacao e detalhe do servico.
+
+78. Lembretes de cliente, servico e Agenda usam helper central de notificacoes, com `reminder_due_today`, janelas de 2h/1h/horario e `dedupe_key` idempotente por organizacao/destinatario/entidade/tipo.
+
+79. Notificacoes podem ter `action_url` interno para abrir a origem; fechar uma notificacao marca como lida, nao apaga o registro.
+
+80. Chat da equipe passa a ter conversa geral e conversa direta. Conversas diretas sao privadas entre os dois participantes e leituras sao controladas por `conversation_key`.
+## HOME-ROUTINE-SCHEDULE-FINANCE-COMPANY-1
+
+- Dashboard passa a se chamar Inicio.
+- Inicio vira busca global, tarefas do dia, notificacoes e indicadores reduzidos.
+- Rotina sincroniza com Checklist de Hoje para itens diarios.
+- Agenda suporta categorias, recorrencia semanal, edicao e cancelamento de lembretes.
+- Servicos possuem cronograma mensal proprio alimentado por inicio, prazo e etapas.
+- Financeiro passa a trabalhar visualmente com Entrada, Saida e Transferencia.
+- Minha Empresa ganha base interna de conhecimento.
+- Equipe migra visualmente para Minha Empresa > RH > Colaboradores.
+
+81. Inicio mostra por padrao apenas notificacoes nao lidas. As abas Tudo, Mencoes, Projetos e Notas filtram de verdade sobre notificacoes do usuario atual.
+
+82. Relatorios passam a centralizar tarefas/checklists da organizacao, iniciando por checklist diario e Rotina.
+
+83. Base Interna da empresa passa a ter itens clicaveis, blocos personalizados e checklist proprio, com edicao restrita ao owner.
+
+84. RH passa a ter aniversarios, ferias/faltas e documentos reais com calendario/upload, sempre por `organization_id`.
+
+85. Controle de expediente e operacional interno, nao ponto eletronico legal. A contagem depende de heartbeat com pagina aberta/visivel e fica persistida por `organization_id` e `user_id`.
+
+86. A confirmacao de seguranca ocorre a cada 2 horas de trabalho ativo, com 15 minutos de tolerancia. Intervalo e campo pausam esse ciclo.
+
+87. Relatorios de horas usam jornada configurada no RH, feriados configuraveis e calculo diario antes de somar semana/mes.
+
+88. Documentos profissionais passam a usar Supabase Storage privado no bucket `documentos`, com metadados em `documents`, chunks em `document_chunks`, quota por `organization_id` e download por signed URL. `attachments`, `document_templates`, `hr_documents` e `property_documents` permanecem como compatibilidade legada.
+
+89. O upload profissional reserva quota antes de enviar, confirma uso apenas depois do upload e nunca aceita path arbitrario do frontend.
+
+90. Bases internas da empresa sao organizadas por eixos e paginas por `organization_id`. Eixos/paginas padrao usam seed idempotente, owner edita e admins/membros visualizam.
+
+91. Formularios grandes de criacao pontual devem abrir por botao + modal. Minha Empresa > Informacoes e excecao: permanece na pagina em modo visualizacao com botao Editar.
+
+92. A navegacao padrao autenticada abre em `/inicio`; deep links especificos continuam respeitados.

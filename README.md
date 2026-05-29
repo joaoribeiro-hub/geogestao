@@ -41,10 +41,15 @@ NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=sua-chave-publica
 NEXT_PUBLIC_SUPABASE_ANON_KEY=sua-chave-anon-publica-opcional
 OPENAI_API_KEY=sua-chave-server-side-opcional
 OPENAI_MODEL=gpt-5.5
+AI_PROVIDER=
+GEMINI_API_KEY=
+OPENROUTER_API_KEY=
+GROQ_API_KEY=
 ```
 
 Use apenas a publishable key ou anon key no frontend. Nao coloque service role key no `.env.local` usado pelo Next.js.
 `OPENAI_API_KEY` e somente server-side. Nunca crie `NEXT_PUBLIC_OPENAI_API_KEY`. Em producao, configure essa variavel como secret do ambiente do servidor.
+`AI_PROVIDER`, `GEMINI_API_KEY`, `OPENROUTER_API_KEY` e `GROQ_API_KEY` sao opcionais e server-side. O Assistente IA funciona sem elas usando regras locais.
 
 4. Rode migrations e seed no Supabase.
 
@@ -68,6 +73,7 @@ Ou, em um projeto remoto, execute o SQL de:
 - `supabase/migrations/009_geoquery_car_incra_alerts.sql` para GEOQUERY-1: busca de imovel por CAR Federal, CAR, INCRA, alertas e historico
 - `supabase/migrations/010_geoquery_spatial_matching_mapbiomas.sql` para GEOQUERY-3: cruzamento espacial CAR x SIGEF e alertas MapBiomas
 - `supabase/migrations/015_ux_org_services_center.sql` para UX-ORG-SERVICES-1: Servicos como centro, membros/eventos, Terras Reunidas e novas colunas GEO
+- `supabase/migrations/016_services_workflow_company_team_permissions.sql`, `017_org_members_rls_service_lost_finance.sql`, `018_company_owner_only_permissions.sql` e `019_documents_attachments_org_storage.sql` para completar fluxos de servicos, permissoes owner/admin, equipe, financeiro e storage/documentos por empresa
 - `supabase/seed.sql`
 
 5. Crie ao menos um usuario no Supabase Auth.
@@ -101,6 +107,7 @@ npm run test:coverage
 npm run test:e2e
 npm run admin:ensure-terras
 npm run admin:reset-org
+npm run assistant:import-intents
 ```
 
 Scripts admin usam `SUPABASE_SERVICE_ROLE_KEY` apenas no terminal local/admin. Nunca use service role no frontend.
@@ -118,6 +125,22 @@ Dry-run do reset seguro:
 ```powershell
 npm run admin:reset-org -- --slug=terras-reunidas
 ```
+
+Dry-run da importacao privada de exemplos/intents do Assistente IA:
+
+```powershell
+$env:NEXT_PUBLIC_SUPABASE_URL="https://seu-projeto-de-teste.supabase.co"
+$env:SUPABASE_SERVICE_ROLE_KEY="sua-service-role-de-teste"
+npm run assistant:import-intents -- --file="data/private/assistant/geogestao_assistente_frases_30000.txt" --dry-run
+```
+
+Importe de verdade somente depois de conferir o dry-run:
+
+```powershell
+npm run assistant:import-intents -- --file="data/private/assistant/geogestao_assistente_frases_30000.txt" --confirm
+```
+
+Nao commite o arquivo real de frases/intents. Veja `docs/ASSISTANT_INTENTS.md`.
 
 ## Testes
 
@@ -185,6 +208,7 @@ O workflow manual `.github/workflows/e2e-mutation.yml` roda os E2E destrutivos a
 - Contratos vinculados a cliente, proposta, servico e receita prevista.
 - Servicos tecnicos com quadros, colunas, cards, historico de movimentacao e checklists.
 - Anexos privados via Supabase Storage e tabela `attachments`.
+- Documentos, Legislacao e Anexos usam Storage por organizacao em `organizations/{organization_id}/...`, com globais/oficiais em `shared/...` somente leitura para empresas.
 - Financeiro basico com receitas, despesas, contas a receber/pagar, resumo mensal e resumo por projeto.
 - Biblioteca de documentos com busca.
 - Biblioteca de legislacao com busca por palavra-chave.
@@ -261,6 +285,55 @@ Depois:
 6. Abra o Chat IA no canto inferior direito.
 
 Sem `OPENAI_API_KEY`, o chat mostra erro claro de configuracao. Com a chave configurada no servidor, o route handler `/api/ai/chat` usa o SDK oficial da OpenAI e a Responses API com texto, usando apenas contexto basico da organizacao logada. Nesta fase a IA nao altera banco.
+
+## Assistente IA / Chat Inteligente
+
+O modulo `/assistente-ia` usa uma arquitetura hibrida:
+
+- sem chave externa, interpreta mensagens por regras locais;
+- com `AI_PROVIDER=gemini`, `openrouter` ou `groq`, usa a API externa apenas para classificar intencao e extrair parametros;
+- a execucao real sempre passa por `src/lib/assistant/actions.ts`;
+- o usuario nunca envia SQL livre;
+- a API externa nunca executa acao nem acessa secrets no frontend.
+
+Antes de testar, aplique no Supabase de teste:
+
+```text
+supabase/migrations/021_assistant_module.sql
+supabase/migrations/022_assistant_intent_examples_dataset.sql
+```
+
+O assistente cria:
+
+- `assistant_conversations`;
+- `assistant_messages`;
+- `assistant_intents`;
+- `assistant_action_logs`;
+- `assistant_tasks`.
+
+Perguntas iniciais suportadas:
+
+- "Quais os servicos para hoje?"
+- "Quais servicos tenho esse mes?"
+- "Quais servicos estao atrasados?"
+- "Quais tarefas pendentes?"
+- "Mostre os servicos do cliente Ramon"
+- "Resumo do cliente Ramon"
+- "Criar uma tarefa: convidar o cliente para reuniao para o cliente Ramon"
+- "Criar uma interacao no cliente Ramon dizendo que ele pediu retorno amanha"
+- "Quais clientes estao sem movimentacao?"
+- "Quais propostas/contratos existem para esse cliente?"
+
+A migration 022 e o script `assistant:import-intents` permitem alimentar uma base privada de exemplos reais. O Assistente usa essa base apenas no servidor e envia no maximo poucos exemplos similares ao Gemini quando a confianca do detector local for baixa.
+
+Para habilitar classificacao externa opcional em desenvolvimento:
+
+```env
+AI_PROVIDER=groq
+GROQ_API_KEY=sua-chave-server-side
+```
+
+Tambem sao aceitos `AI_PROVIDER=gemini` com `GEMINI_API_KEY` e `AI_PROVIDER=openrouter` com `OPENROUTER_API_KEY`. Nao use prefixo `NEXT_PUBLIC_` nessas variaveis.
 
 Ao clicar em "Voltar" na proposta ou "Voltar servico" no card tecnico, o sistema:
 
@@ -359,9 +432,13 @@ O mapa usa Leaflet com OpenStreetMap como camada inicial. A arquitetura fica pre
 - Todas as tabelas principais tem Row Level Security ativado.
 - As policies iniciais liberam CRUD para usuarios autenticados, adequadas para MVP interno de ate 10 usuarios.
 - O bucket `attachments` e privado.
-- Uploads usam Supabase Storage com policies para usuarios autenticados.
+- Uploads usam Supabase Storage com policies por organizacao. Arquivos de uma empresa ficam em `organizations/{organization_id}/...`; arquivos globais oficiais ficam em `shared/...`.
 - Inputs sao validados com Zod no cliente e no servidor.
 - Actions importantes registram eventos em `audit_logs`.
+
+## Deploy
+
+O fluxo recomendado de producao esta em `docs/DEPLOYMENT.md`: aplicar migrations primeiro no Supabase de teste, rodar `typecheck`, `build` e `test`, fazer commit/push, aguardar GitHub Actions, aplicar migration no Supabase oficial e validar a Vercel.
 
 ## Proximas melhorias recomendadas
 

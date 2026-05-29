@@ -45,20 +45,39 @@ export function ServiceKanban({
   cards: ServiceCardWithClient[];
 }) {
   const [items, setItems] = useState(cards);
+  const [zoom, setZoom] = useState<"compacto" | "normal" | "ampliado">("compacto");
+  const [columnSearch, setColumnSearch] = useState<Record<string, string>>({});
   const [, startTransition] = useTransition();
 
   useEffect(() => {
     setItems(cards);
   }, [cards]);
 
+  useEffect(() => {
+    const saved = window.localStorage.getItem("geogestao:service-kanban-zoom");
+    if (saved === "compacto" || saved === "normal" || saved === "ampliado") setZoom(saved);
+  }, []);
+
+  function updateZoom(next: "compacto" | "normal" | "ampliado") {
+    setZoom(next);
+    window.localStorage.setItem("geogestao:service-kanban-zoom", next);
+  }
+
   const grouped = useMemo(() => {
     return columns.reduce<Record<string, ServiceCardWithClient[]>>((acc, column) => {
+      const search = (columnSearch[column.id] ?? "").trim().toLowerCase();
       acc[column.id] = items
         .filter((card) => card.column_id === column.id)
+        .filter((card) => {
+          if (!search) return true;
+          return [card.client?.name, card.title, card.description, card.municipality]
+            .filter(Boolean)
+            .some((value) => value!.toLowerCase().includes(search));
+        })
         .sort((a, b) => a.position - b.position);
       return acc;
     }, {});
-  }, [columns, items]);
+  }, [columns, items, columnSearch]);
 
   function onDragEnd(event: DragEndEvent) {
     const { active, over } = event;
@@ -81,17 +100,38 @@ export function ServiceKanban({
 
   return (
     <DndContext onDragEnd={onDragEnd}>
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        <span className="text-xs font-medium text-muted-foreground">Zoom</span>
+        {(["compacto", "normal", "ampliado"] as const).map((option) => (
+          <Button
+            key={option}
+            type="button"
+            size="sm"
+            variant={zoom === option ? "default" : "outline"}
+            onClick={() => updateZoom(option)}
+          >
+            {option}
+          </Button>
+        ))}
+      </div>
       <div
         className="flex gap-4 overflow-x-auto pb-4"
         data-testid="service-kanban"
       >
         {columns.map((column) => (
-          <ServiceColumnView key={column.id} column={column}>
+          <ServiceColumnView
+            key={column.id}
+            column={column}
+            search={columnSearch[column.id] ?? ""}
+            onSearch={(value) => setColumnSearch((current) => ({ ...current, [column.id]: value }))}
+            zoom={zoom}
+          >
             {grouped[column.id]?.map((card) => (
               <ServiceCardView
                 key={card.id}
                 card={card}
                 column={column}
+                zoom={zoom}
               />
             ))}
           </ServiceColumnView>
@@ -104,9 +144,15 @@ export function ServiceKanban({
 function ServiceColumnView({
   column,
   children,
+  search,
+  onSearch,
+  zoom,
 }: {
   column: ServiceColumn;
   children: React.ReactNode;
+  search: string;
+  onSearch: (value: string) => void;
+  zoom: "compacto" | "normal" | "ampliado";
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: column.id });
   return (
@@ -114,9 +160,9 @@ function ServiceColumnView({
       ref={setNodeRef}
       data-testid="service-column"
       data-service-column-name={column.name}
-      className={`min-h-[32rem] w-[320px] shrink-0 rounded-md border bg-secondary/55 p-3 transition-colors ${
+      className={`min-h-[32rem] shrink-0 rounded-md border bg-secondary/55 p-3 transition-colors ${
         isOver ? "border-primary bg-primary/5" : ""
-      }`}
+      } ${zoom === "compacto" ? "w-[260px]" : zoom === "ampliado" ? "w-[360px]" : "w-[320px]"}`}
     >
       <div className="mb-3 flex items-center justify-between gap-2">
         <h2 className="text-sm font-semibold">{column.name}</h2>
@@ -124,6 +170,12 @@ function ServiceColumnView({
           {Array.isArray(children) ? children.length : ""}
         </span>
       </div>
+      <input
+        className="mb-3 h-9 w-full rounded-md border border-input bg-background px-3 text-xs"
+        placeholder="Buscar nesta coluna"
+        value={search}
+        onChange={(event) => onSearch(event.target.value)}
+      />
       <div className="space-y-3">{children}</div>
     </section>
   );
@@ -132,9 +184,11 @@ function ServiceColumnView({
 function ServiceCardView({
   card,
   column,
+  zoom,
 }: {
   card: ServiceCardWithClient;
   column: ServiceColumn;
+  zoom: "compacto" | "normal" | "ampliado";
 }) {
   const router = useRouter();
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
@@ -216,9 +270,9 @@ function ServiceCardView({
       style={style}
       data-testid="service-card"
       data-service-card-title={card.title}
-      className={`group cursor-pointer rounded-md border bg-background p-3 shadow-sm transition hover:border-primary/50 ${
+      className={`group cursor-pointer rounded-md border bg-background shadow-sm transition hover:border-primary/50 ${
         isDragging ? "opacity-70 shadow-soft" : ""
-      }`}
+      } ${zoom === "compacto" ? "p-2 text-[13px]" : "p-3"}`}
       onClick={() => router.push(`/servicos/${card.id}`)}
       role="button"
       tabIndex={0}

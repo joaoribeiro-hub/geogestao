@@ -7,8 +7,14 @@ import { useForm } from "react-hook-form";
 import {
   createExpenseAction,
   createRevenueAction,
+  createTransferAction,
 } from "@/app/(app)/financeiro/actions";
-import { financeSchema, type FinanceFormValues } from "@/lib/schemas";
+import {
+  financeSchema,
+  financeTransferSchema,
+  type FinanceFormValues,
+  type FinanceTransferFormValues,
+} from "@/lib/schemas";
 import type { Client, Proposal, ServiceCard } from "@/types/database";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -37,8 +43,12 @@ export function FinanceForm({
       description: "",
       category: "",
       amount: 0,
+      expected_amount: 0,
+      realized_amount: null,
       due_date: new Date().toISOString().slice(0, 10),
       paid_at: "",
+      bank_account: "",
+      notes: "",
       status: "pending",
     },
   });
@@ -85,13 +95,13 @@ export function FinanceForm({
           </select>
         </div>
         <div className="space-y-2">
-          <Label>Status</Label>
+          <Label>Realizado?</Label>
           <select
             className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
             {...form.register("status")}
           >
-            <option value="pending">Pendente</option>
-            <option value="paid">Pago</option>
+            <option value="pending">Nao</option>
+            <option value="paid">Sim</option>
             <option value="overdue">Vencido</option>
           </select>
         </div>
@@ -139,11 +149,18 @@ export function FinanceForm({
         </div>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2">
-          <Label>Valor</Label>
+          <Label>Valor previsto</Label>
           <Input type="number" step="0.01" {...form.register("amount")} />
         </div>
+        <div className="space-y-2">
+          <Label>Valor realizado</Label>
+          <Input type="number" step="0.01" {...form.register("realized_amount")} />
+        </div>
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-3">
         <div className="space-y-2">
           <Label>Vencimento</Label>
           <Input type="date" {...form.register("due_date")} />
@@ -152,11 +169,93 @@ export function FinanceForm({
           <Label>Pagamento</Label>
           <Input type="date" {...form.register("paid_at")} />
         </div>
+        <div className="space-y-2">
+          <Label>Banco/Conta</Label>
+          <Input {...form.register("bank_account")} />
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <Label>Observacoes</Label>
+        <Input {...form.register("notes")} />
       </div>
 
       <Button disabled={pending || (type === "revenue" && !clients.length)}>
         {pending ? <Loader2 className="animate-spin" aria-hidden="true" /> : <Plus aria-hidden="true" />}
-        {type === "revenue" ? "Criar receita" : "Criar despesa"}
+        {type === "revenue" ? "Criar entrada" : "Criar saida"}
+      </Button>
+    </form>
+  );
+}
+
+export function TransferForm({ onSaved }: { onSaved?: () => void }) {
+  const [pending, startTransition] = useTransition();
+  const form = useForm<FinanceTransferFormValues>({
+    resolver: zodResolver(financeTransferSchema),
+    defaultValues: {
+      from_bank_account: "",
+      to_bank_account: "",
+      amount: 0,
+      transfer_date: new Date().toISOString().slice(0, 10),
+      description: "",
+      notes: "",
+    },
+  });
+
+  function submit(values: FinanceTransferFormValues) {
+    const formData = new FormData();
+    Object.entries(values).forEach(([key, value]) =>
+      formData.set(key, value?.toString() ?? ""),
+    );
+    startTransition(() => {
+      void (async () => {
+        await createTransferAction(formData);
+        onSaved?.();
+      })();
+      form.reset({
+        from_bank_account: "",
+        to_bank_account: "",
+        amount: 0,
+        transfer_date: new Date().toISOString().slice(0, 10),
+        description: "",
+        notes: "",
+      });
+    });
+  }
+
+  return (
+    <form className="grid gap-4" onSubmit={form.handleSubmit(submit)}>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div className="space-y-2">
+          <Label>Banco/conta de saida</Label>
+          <Input {...form.register("from_bank_account")} />
+        </div>
+        <div className="space-y-2">
+          <Label>Banco/conta de entrada</Label>
+          <Input {...form.register("to_bank_account")} />
+        </div>
+      </div>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div className="space-y-2">
+          <Label>Valor</Label>
+          <Input type="number" step="0.01" {...form.register("amount")} />
+        </div>
+        <div className="space-y-2">
+          <Label>Data</Label>
+          <Input type="date" {...form.register("transfer_date")} />
+        </div>
+      </div>
+      <div className="space-y-2">
+        <Label>Descricao</Label>
+        <Input {...form.register("description")} />
+      </div>
+      <div className="space-y-2">
+        <Label>Observacoes</Label>
+        <Input {...form.register("notes")} />
+      </div>
+      <Button disabled={pending}>
+        {pending ? <Loader2 className="animate-spin" aria-hidden="true" /> : <Plus aria-hidden="true" />}
+        Criar transferencia
       </Button>
     </form>
   );

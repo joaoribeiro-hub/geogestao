@@ -41,6 +41,7 @@ export function InteractionForm({
     startTransition(() => {
       void (async () => {
         await createInteractionAction(formData);
+        window.dispatchEvent(new Event("geogestao:notifications-refresh"));
         form.reset({ ...values, description: "" });
         onSaved?.();
       })();

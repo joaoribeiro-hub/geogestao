@@ -34,26 +34,34 @@ export async function GET() {
     : { data: [], error: null };
   if (checklistError) return NextResponse.json({ error: checklistError.message }, { status: 500 });
 
-  const { data: read, error: readError } = await supabase
+  const { data: reads, error: readError } = await supabase
     .from("team_chat_reads")
-    .select("last_read_at")
+    .select("conversation_key,last_read_at")
     .eq("organization_id", organization.id)
-    .eq("user_id", user.id)
-    .maybeSingle();
+    .eq("user_id", user.id);
   if (readError && !/team_chat_reads/i.test(readError.message)) {
     return NextResponse.json({ error: readError.message }, { status: 500 });
   }
 
-  const since = read?.last_read_at ?? membership.created_at;
-  const { data: unreadMessages, error: messagesError } = await supabase
+  const readsByConversation = new Map(
+    (reads ?? []).map((read) => [read.conversation_key, read.last_read_at ?? membership.created_at]),
+  );
+  const { data: candidateMessages, error: messagesError } = await supabase
     .from("team_chat_messages")
-    .select("sender_user_id,created_at")
+    .select("sender_user_id,created_at,chat_scope,recipient_user_id,conversation_key")
     .eq("organization_id", organization.id)
     .is("deleted_at", null)
-    .gt("created_at", since);
+    .neq("sender_user_id", user.id)
+    .or(`chat_scope.eq.general,recipient_user_id.eq.${user.id}`);
   if (messagesError && !/team_chat_messages/i.test(messagesError.message)) {
     return NextResponse.json({ error: messagesError.message }, { status: 500 });
   }
+
+  const unreadMessages = (candidateMessages ?? []).filter((message) => {
+    const conversationKey = message.conversation_key ?? "general";
+    const since = readsByConversation.get(conversationKey) ?? membership.created_at;
+    return message.created_at > since;
+  });
 
   const checklistCounts = calculateChecklistBadgeCounts({
     items: checklistItems ?? [],
@@ -62,7 +70,7 @@ export async function GET() {
     date: today,
   });
   const chatCounts = calculateTeamChatBadgeCounts({
-    messages: unreadMessages ?? [],
+    messages: unreadMessages,
     ownerUserIds,
     currentUserId: user.id,
   });

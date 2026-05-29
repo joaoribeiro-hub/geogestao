@@ -15,6 +15,19 @@ export type OrganizationJoinCodeStatus = "active" | "revoked";
 export type SubscriptionStatus = "active" | "trialing" | "past_due" | "canceled" | "expired";
 export type BillingInterval = "monthly" | "quarterly" | "yearly";
 export type BillingOrderStatus = "draft" | "pending" | "paid" | "canceled" | "expired";
+export type WorkScheduleType = "5x2" | "6x1" | "custom";
+export type WorkTimeDayStatus = "active" | "paused_interval" | "field_mode" | "safety_frozen" | "closed";
+export type WorkTimeSessionMode = "work" | "interval" | "field" | "frozen";
+export type WorkTimeSessionEndReason =
+  | "user_interval"
+  | "user_returned"
+  | "page_closed"
+  | "safety_timeout"
+  | "midnight"
+  | "manual"
+  | "field_started"
+  | "field_ended";
+export type CompanyHolidayType = "national" | "optional_point" | "company" | "state" | "municipal";
 export type ClientKind = "pf" | "pj";
 export type InteractionType = "ligacao" | "email" | "reuniao" | "whatsapp" | "nota";
 export type ProposalStage =
@@ -198,7 +211,9 @@ export type Database = {
           owner_user_id: string | null;
           plan_id: string | null;
           storage_quota_mb: number;
+          storage_quota_bytes: number;
           storage_used_bytes: number;
+          storage_reserved_bytes: number;
           status: OrganizationStatus;
         };
         Insert: {
@@ -210,7 +225,9 @@ export type Database = {
           owner_user_id?: string | null;
           plan_id?: string | null;
           storage_quota_mb?: number;
+          storage_quota_bytes?: number;
           storage_used_bytes?: number;
+          storage_reserved_bytes?: number;
           status?: OrganizationStatus;
           created_at?: string;
           updated_at?: string;
@@ -223,7 +240,9 @@ export type Database = {
           owner_user_id?: string | null;
           plan_id?: string | null;
           storage_quota_mb?: number;
+          storage_quota_bytes?: number;
           storage_used_bytes?: number;
+          storage_reserved_bytes?: number;
           status?: OrganizationStatus;
           updated_at?: string;
         };
@@ -457,6 +476,9 @@ export type Database = {
           bank_holder_document: string | null;
           bank_notes: string | null;
           payment_instructions: string | null;
+          mission: string | null;
+          vision: string | null;
+          values_statement: string | null;
         };
         Insert: {
           id?: string;
@@ -482,6 +504,9 @@ export type Database = {
           bank_holder_document?: string | null;
           bank_notes?: string | null;
           payment_instructions?: string | null;
+          mission?: string | null;
+          vision?: string | null;
+          values_statement?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -508,6 +533,9 @@ export type Database = {
           bank_holder_document?: string | null;
           bank_notes?: string | null;
           payment_instructions?: string | null;
+          mission?: string | null;
+          vision?: string | null;
+          values_statement?: string | null;
           updated_at?: string;
         };
         Relationships: [];
@@ -1171,6 +1199,10 @@ export type Database = {
           payment_status: PaymentStatus;
           title: string;
           description: string | null;
+          municipality: string | null;
+          responsible_user_id: string | null;
+          payment_condition: string | null;
+          custom_service_name: string | null;
           priority: Priority;
           service_date: string | null;
           due_date: string | null;
@@ -1192,6 +1224,10 @@ export type Database = {
           payment_status?: PaymentStatus;
           title: string;
           description?: string | null;
+          municipality?: string | null;
+          responsible_user_id?: string | null;
+          payment_condition?: string | null;
+          custom_service_name?: string | null;
           priority?: Priority;
           service_date?: string | null;
           due_date?: string | null;
@@ -1214,6 +1250,10 @@ export type Database = {
           payment_status?: PaymentStatus;
           title?: string;
           description?: string | null;
+          municipality?: string | null;
+          responsible_user_id?: string | null;
+          payment_condition?: string | null;
+          custom_service_name?: string | null;
           priority?: Priority;
           service_date?: string | null;
           due_date?: string | null;
@@ -1285,6 +1325,40 @@ export type Database = {
         };
         Relationships: [];
       };
+      service_property_infos: {
+        Row: {
+          id: string;
+          organization_id: string;
+          service_card_id: string;
+          title: string;
+          value: string | null;
+          position: number;
+          created_by: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          organization_id: string;
+          service_card_id: string;
+          title: string;
+          value?: string | null;
+          position?: number;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          organization_id?: string;
+          service_card_id?: string;
+          title?: string;
+          value?: string | null;
+          position?: number;
+          created_by?: string | null;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
       team_members: {
         Row: BaseRow & {
           organization_id: string;
@@ -1296,6 +1370,11 @@ export type Database = {
           bank_details: Json;
           monthly_amount: number | null;
           role_title: string | null;
+          birth_date: string | null;
+          work_schedule_type: WorkScheduleType;
+          expected_minutes_by_weekday: Json;
+          default_work_start: string | null;
+          default_work_end: string | null;
           notes: string | null;
           status: "active" | "inactive";
           created_by: string | null;
@@ -1311,6 +1390,11 @@ export type Database = {
           bank_details?: Json;
           monthly_amount?: number | null;
           role_title?: string | null;
+          birth_date?: string | null;
+          work_schedule_type?: WorkScheduleType;
+          expected_minutes_by_weekday?: Json;
+          default_work_start?: string | null;
+          default_work_end?: string | null;
           notes?: string | null;
           status?: "active" | "inactive";
           created_by?: string | null;
@@ -1327,9 +1411,160 @@ export type Database = {
           bank_details?: Json;
           monthly_amount?: number | null;
           role_title?: string | null;
+          birth_date?: string | null;
+          work_schedule_type?: WorkScheduleType;
+          expected_minutes_by_weekday?: Json;
+          default_work_start?: string | null;
+          default_work_end?: string | null;
           notes?: string | null;
           status?: "active" | "inactive";
           created_by?: string | null;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      work_time_days: {
+        Row: BaseRow & {
+          organization_id: string;
+          user_id: string;
+          work_date: string;
+          status: WorkTimeDayStatus;
+          first_started_at: string;
+          last_seen_at: string;
+          last_safety_confirmed_at: string;
+          next_safety_due_at: string;
+          safety_grace_until: string;
+          total_work_seconds: number;
+          total_interval_seconds: number;
+          total_field_seconds: number;
+        };
+        Insert: {
+          id?: string;
+          organization_id: string;
+          user_id: string;
+          work_date: string;
+          status?: WorkTimeDayStatus;
+          first_started_at?: string;
+          last_seen_at?: string;
+          last_safety_confirmed_at?: string;
+          next_safety_due_at?: string;
+          safety_grace_until?: string;
+          total_work_seconds?: number;
+          total_interval_seconds?: number;
+          total_field_seconds?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          organization_id?: string;
+          user_id?: string;
+          work_date?: string;
+          status?: WorkTimeDayStatus;
+          first_started_at?: string;
+          last_seen_at?: string;
+          last_safety_confirmed_at?: string;
+          next_safety_due_at?: string;
+          safety_grace_until?: string;
+          total_work_seconds?: number;
+          total_interval_seconds?: number;
+          total_field_seconds?: number;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      work_time_sessions: {
+        Row: BaseRow & {
+          organization_id: string;
+          user_id: string;
+          work_day_id: string;
+          started_at: string;
+          ended_at: string | null;
+          last_seen_at: string;
+          mode: WorkTimeSessionMode;
+          end_reason: WorkTimeSessionEndReason | null;
+        };
+        Insert: {
+          id?: string;
+          organization_id: string;
+          user_id: string;
+          work_day_id: string;
+          started_at?: string;
+          ended_at?: string | null;
+          last_seen_at?: string;
+          mode?: WorkTimeSessionMode;
+          end_reason?: WorkTimeSessionEndReason | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          organization_id?: string;
+          user_id?: string;
+          work_day_id?: string;
+          started_at?: string;
+          ended_at?: string | null;
+          last_seen_at?: string;
+          mode?: WorkTimeSessionMode;
+          end_reason?: WorkTimeSessionEndReason | null;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      work_time_events: {
+        Row: {
+          id: string;
+          organization_id: string;
+          user_id: string;
+          work_day_id: string;
+          event_type: string;
+          occurred_at: string;
+          metadata: Json;
+        };
+        Insert: {
+          id?: string;
+          organization_id: string;
+          user_id: string;
+          work_day_id: string;
+          event_type: string;
+          occurred_at?: string;
+          metadata?: Json;
+        };
+        Update: {
+          organization_id?: string;
+          user_id?: string;
+          work_day_id?: string;
+          event_type?: string;
+          occurred_at?: string;
+          metadata?: Json;
+        };
+        Relationships: [];
+      };
+      company_holidays: {
+        Row: BaseRow & {
+          organization_id: string | null;
+          date: string;
+          name: string;
+          type: CompanyHolidayType;
+          affects_expected_hours: boolean;
+          is_recurring: boolean;
+        };
+        Insert: {
+          id?: string;
+          organization_id?: string | null;
+          date: string;
+          name: string;
+          type?: CompanyHolidayType;
+          affects_expected_hours?: boolean;
+          is_recurring?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          organization_id?: string | null;
+          date?: string;
+          name?: string;
+          type?: CompanyHolidayType;
+          affects_expected_hours?: boolean;
+          is_recurring?: boolean;
           updated_at?: string;
         };
         Relationships: [];
@@ -1341,6 +1576,9 @@ export type Database = {
           sender_user_id: string;
           message: string;
           message_type: "text";
+          chat_scope: "general" | "direct";
+          recipient_user_id: string | null;
+          conversation_key: string;
           created_at: string;
           updated_at: string;
           deleted_at: string | null;
@@ -1351,6 +1589,9 @@ export type Database = {
           sender_user_id: string;
           message: string;
           message_type?: "text";
+          chat_scope?: "general" | "direct";
+          recipient_user_id?: string | null;
+          conversation_key?: string;
           created_at?: string;
           updated_at?: string;
           deleted_at?: string | null;
@@ -1360,6 +1601,9 @@ export type Database = {
           sender_user_id?: string;
           message?: string;
           message_type?: "text";
+          chat_scope?: "general" | "direct";
+          recipient_user_id?: string | null;
+          conversation_key?: string;
           updated_at?: string;
           deleted_at?: string | null;
         };
@@ -1370,6 +1614,7 @@ export type Database = {
           id: string;
           organization_id: string;
           user_id: string;
+          conversation_key: string;
           last_read_at: string | null;
           created_at: string;
           updated_at: string;
@@ -1378,6 +1623,7 @@ export type Database = {
           id?: string;
           organization_id: string;
           user_id: string;
+          conversation_key?: string;
           last_read_at?: string | null;
           created_at?: string;
           updated_at?: string;
@@ -1385,8 +1631,144 @@ export type Database = {
         Update: {
           organization_id?: string;
           user_id?: string;
+          conversation_key?: string;
           last_read_at?: string | null;
           updated_at?: string;
+        };
+        Relationships: [];
+      };
+      notifications: {
+        Row: {
+          id: string;
+          organization_id: string;
+          recipient_user_id: string;
+          actor_user_id: string | null;
+          type: string;
+          title: string;
+          message: string;
+          entity_type: string | null;
+          entity_id: string | null;
+          dedupe_key: string | null;
+          action_url: string | null;
+          metadata: Json;
+          scheduled_for: string | null;
+          read_at: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          organization_id: string;
+          recipient_user_id: string;
+          actor_user_id?: string | null;
+          type: string;
+          title: string;
+          message: string;
+          entity_type?: string | null;
+          entity_id?: string | null;
+          dedupe_key?: string | null;
+          action_url?: string | null;
+          metadata?: Json;
+          scheduled_for?: string | null;
+          read_at?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          organization_id?: string;
+          recipient_user_id?: string;
+          actor_user_id?: string | null;
+          type?: string;
+          title?: string;
+          message?: string;
+          entity_type?: string | null;
+          entity_id?: string | null;
+          dedupe_key?: string | null;
+          action_url?: string | null;
+          metadata?: Json;
+          scheduled_for?: string | null;
+          read_at?: string | null;
+        };
+        Relationships: [];
+      };
+      agenda_reminders: {
+        Row: {
+          id: string;
+          organization_id: string;
+          title: string;
+          description: string | null;
+          reminder_date: string;
+          reminder_time: string | null;
+          entity_type: string | null;
+          entity_id: string | null;
+          service_card_id: string | null;
+          client_id: string | null;
+          category: string;
+          custom_category: string | null;
+          recurrence: "none" | "weekly";
+          recurrence_until: string | null;
+          canceled_at: string | null;
+          created_by: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          organization_id: string;
+          title: string;
+          description?: string | null;
+          reminder_date: string;
+          reminder_time?: string | null;
+          entity_type?: string | null;
+          entity_id?: string | null;
+          service_card_id?: string | null;
+          client_id?: string | null;
+          category?: string;
+          custom_category?: string | null;
+          recurrence?: "none" | "weekly";
+          recurrence_until?: string | null;
+          canceled_at?: string | null;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          organization_id?: string;
+          title?: string;
+          description?: string | null;
+          reminder_date?: string;
+          reminder_time?: string | null;
+          entity_type?: string | null;
+          entity_id?: string | null;
+          service_card_id?: string | null;
+          client_id?: string | null;
+          category?: string;
+          custom_category?: string | null;
+          recurrence?: "none" | "weekly";
+          recurrence_until?: string | null;
+          canceled_at?: string | null;
+          created_by?: string | null;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      agenda_reminder_recipients: {
+        Row: {
+          id: string;
+          organization_id: string;
+          reminder_id: string;
+          recipient_user_id: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          organization_id: string;
+          reminder_id: string;
+          recipient_user_id: string;
+          created_at?: string;
+        };
+        Update: {
+          organization_id?: string;
+          reminder_id?: string;
+          recipient_user_id?: string;
         };
         Relationships: [];
       };
@@ -1534,21 +1916,27 @@ export type Database = {
       checklists: {
         Row: {
           id: string;
+          organization_id: string | null;
           service_card_id: string;
           title: string;
+          checklist_type: "documents" | "steps";
           position: number;
           created_at: string;
         };
         Insert: {
           id?: string;
+          organization_id?: string | null;
           service_card_id: string;
           title: string;
+          checklist_type?: "documents" | "steps";
           position?: number;
           created_at?: string;
         };
         Update: {
+          organization_id?: string | null;
           service_card_id?: string;
           title?: string;
+          checklist_type?: "documents" | "steps";
           position?: number;
         };
         Relationships: [];
@@ -1559,6 +1947,13 @@ export type Database = {
           checklist_id: string;
           title: string;
           is_done: boolean;
+          completed_at: string | null;
+          completed_by: string | null;
+          due_date: string | null;
+          due_time: string | null;
+          scheduled_at: string | null;
+          deleted_at: string | null;
+          archived_at: string | null;
           position: number;
           created_at: string;
         };
@@ -1567,6 +1962,13 @@ export type Database = {
           checklist_id: string;
           title: string;
           is_done?: boolean;
+          completed_at?: string | null;
+          completed_by?: string | null;
+          due_date?: string | null;
+          due_time?: string | null;
+          scheduled_at?: string | null;
+          deleted_at?: string | null;
+          archived_at?: string | null;
           position?: number;
           created_at?: string;
         };
@@ -1574,6 +1976,13 @@ export type Database = {
           checklist_id?: string;
           title?: string;
           is_done?: boolean;
+          completed_at?: string | null;
+          completed_by?: string | null;
+          due_date?: string | null;
+          due_time?: string | null;
+          scheduled_at?: string | null;
+          deleted_at?: string | null;
+          archived_at?: string | null;
           position?: number;
         };
         Relationships: [];
@@ -1757,8 +2166,12 @@ export type Database = {
           description: string;
           category: string;
           amount: number;
+          expected_amount: number | null;
+          realized_amount: number | null;
           due_date: string;
           paid_at: string | null;
+          bank_account: string | null;
+          notes: string | null;
           status: FinanceStatus;
         };
         Insert: {
@@ -1772,8 +2185,12 @@ export type Database = {
           description: string;
           category: string;
           amount: number;
+          expected_amount?: number | null;
+          realized_amount?: number | null;
           due_date: string;
           paid_at?: string | null;
+          bank_account?: string | null;
+          notes?: string | null;
           status?: FinanceStatus;
           created_at?: string;
           updated_at?: string;
@@ -1788,8 +2205,12 @@ export type Database = {
           description?: string;
           category?: string;
           amount?: number;
+          expected_amount?: number | null;
+          realized_amount?: number | null;
           due_date?: string;
           paid_at?: string | null;
+          bank_account?: string | null;
+          notes?: string | null;
           status?: FinanceStatus;
           updated_at?: string;
         };
@@ -1806,8 +2227,12 @@ export type Database = {
           description: string;
           category: string;
           amount: number;
+          expected_amount: number | null;
+          realized_amount: number | null;
           due_date: string;
           paid_at: string | null;
+          bank_account: string | null;
+          notes: string | null;
           status: FinanceStatus;
         };
         Insert: {
@@ -1821,8 +2246,12 @@ export type Database = {
           description: string;
           category: string;
           amount: number;
+          expected_amount?: number | null;
+          realized_amount?: number | null;
           due_date: string;
           paid_at?: string | null;
+          bank_account?: string | null;
+          notes?: string | null;
           status?: FinanceStatus;
           created_at?: string;
           updated_at?: string;
@@ -1837,10 +2266,365 @@ export type Database = {
           description?: string;
           category?: string;
           amount?: number;
+          expected_amount?: number | null;
+          realized_amount?: number | null;
           due_date?: string;
           paid_at?: string | null;
+          bank_account?: string | null;
+          notes?: string | null;
           status?: FinanceStatus;
           updated_at?: string;
+        };
+        Relationships: [];
+      };
+      finance_transfers: {
+        Row: BaseRow & {
+          organization_id: string;
+          from_bank_account: string;
+          to_bank_account: string;
+          amount: number;
+          transfer_date: string;
+          description: string;
+          notes: string | null;
+          created_by: string | null;
+        };
+        Insert: {
+          id?: string;
+          organization_id: string;
+          from_bank_account: string;
+          to_bank_account: string;
+          amount: number;
+          transfer_date: string;
+          description: string;
+          notes?: string | null;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          organization_id?: string;
+          from_bank_account?: string;
+          to_bank_account?: string;
+          amount?: number;
+          transfer_date?: string;
+          description?: string;
+          notes?: string | null;
+          created_by?: string | null;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      company_knowledge_categories: {
+        Row: {
+          id: string;
+          organization_id: string;
+          name: string;
+          slug: string;
+          position: number;
+          sort_order: number | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          organization_id: string;
+          name: string;
+          slug: string;
+          position?: number;
+          sort_order?: number | null;
+          created_at?: string;
+        };
+        Update: {
+          organization_id?: string;
+          name?: string;
+          slug?: string;
+          position?: number;
+          sort_order?: number | null;
+        };
+        Relationships: [];
+      };
+      company_knowledge_items: {
+        Row: BaseRow & {
+          organization_id: string;
+          category_id: string | null;
+          title: string;
+          slug: string | null;
+          status: string;
+          description: string | null;
+          content: Json | null;
+          content_markdown: string | null;
+          created_by: string | null;
+          updated_by: string | null;
+        };
+        Insert: {
+          id?: string;
+          organization_id: string;
+          category_id?: string | null;
+          title: string;
+          slug?: string | null;
+          status?: string;
+          description?: string | null;
+          content?: Json | null;
+          content_markdown?: string | null;
+          created_by?: string | null;
+          updated_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          organization_id?: string;
+          category_id?: string | null;
+          title?: string;
+          slug?: string | null;
+          status?: string;
+          description?: string | null;
+          content?: Json | null;
+          content_markdown?: string | null;
+          created_by?: string | null;
+          updated_by?: string | null;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      company_knowledge_blocks: {
+        Row: BaseRow & {
+          organization_id: string;
+          item_id: string;
+          title: string;
+          content: string | null;
+          position: number;
+        };
+        Insert: {
+          id?: string;
+          organization_id: string;
+          item_id: string;
+          title: string;
+          content?: string | null;
+          position?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          organization_id?: string;
+          item_id?: string;
+          title?: string;
+          content?: string | null;
+          position?: number;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      hr_documents: {
+        Row: BaseRow & {
+          organization_id: string;
+          team_member_id: string | null;
+          document_type: string;
+          title: string;
+          document_date: string | null;
+          due_date: string | null;
+          status: string;
+          storage_path: string | null;
+          file_name: string | null;
+          mime_type: string | null;
+          size_bytes: number | null;
+          created_by: string | null;
+        };
+        Insert: {
+          id?: string;
+          organization_id: string;
+          team_member_id?: string | null;
+          document_type: string;
+          title: string;
+          document_date?: string | null;
+          due_date?: string | null;
+          status?: string;
+          storage_path?: string | null;
+          file_name?: string | null;
+          mime_type?: string | null;
+          size_bytes?: number | null;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          organization_id?: string;
+          team_member_id?: string | null;
+          document_type?: string;
+          title?: string;
+          document_date?: string | null;
+          due_date?: string | null;
+          status?: string;
+          storage_path?: string | null;
+          file_name?: string | null;
+          mime_type?: string | null;
+          size_bytes?: number | null;
+          created_by?: string | null;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      hr_absences: {
+        Row: BaseRow & {
+          organization_id: string;
+          team_member_id: string;
+          absence_type: "ferias" | "falta" | "afastamento" | "outro";
+          start_date: string;
+          end_date: string | null;
+          notes: string | null;
+          created_by: string | null;
+        };
+        Insert: {
+          id?: string;
+          organization_id: string;
+          team_member_id: string;
+          absence_type: "ferias" | "falta" | "afastamento" | "outro";
+          start_date: string;
+          end_date?: string | null;
+          notes?: string | null;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          organization_id?: string;
+          team_member_id?: string;
+          absence_type?: "ferias" | "falta" | "afastamento" | "outro";
+          start_date?: string;
+          end_date?: string | null;
+          notes?: string | null;
+          created_by?: string | null;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      hr_birthdays: {
+        Row: BaseRow & {
+          organization_id: string;
+          team_member_id: string | null;
+          name: string;
+          birthday: string;
+          notes: string | null;
+          created_by: string | null;
+        };
+        Insert: {
+          id?: string;
+          organization_id: string;
+          team_member_id?: string | null;
+          name: string;
+          birthday: string;
+          notes?: string | null;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          organization_id?: string;
+          team_member_id?: string | null;
+          name?: string;
+          birthday?: string;
+          notes?: string | null;
+          created_by?: string | null;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      routine_items: {
+        Row: BaseRow & {
+          organization_id: string;
+          user_id: string;
+          title: string;
+          description: string | null;
+          routine_scope: "daily" | "weekly" | "monthly" | "annual";
+          routine_date: string | null;
+          due_time: string | null;
+          status: "open" | "done" | "canceled";
+          is_emergency: boolean;
+          source: string;
+          daily_checklist_item_id: string | null;
+          completed_at: string | null;
+          created_by: string | null;
+          deleted_at: string | null;
+          archived_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          organization_id: string;
+          user_id: string;
+          title: string;
+          description?: string | null;
+          routine_scope?: "daily" | "weekly" | "monthly" | "annual";
+          routine_date?: string | null;
+          due_time?: string | null;
+          status?: "open" | "done" | "canceled";
+          is_emergency?: boolean;
+          source?: string;
+          daily_checklist_item_id?: string | null;
+          completed_at?: string | null;
+          created_by?: string | null;
+          deleted_at?: string | null;
+          archived_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          organization_id?: string;
+          user_id?: string;
+          title?: string;
+          description?: string | null;
+          routine_scope?: "daily" | "weekly" | "monthly" | "annual";
+          routine_date?: string | null;
+          due_time?: string | null;
+          status?: "open" | "done" | "canceled";
+          is_emergency?: boolean;
+          source?: string;
+          daily_checklist_item_id?: string | null;
+          completed_at?: string | null;
+          created_by?: string | null;
+          deleted_at?: string | null;
+          archived_at?: string | null;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      company_knowledge_checklist_items: {
+        Row: BaseRow & {
+          organization_id: string;
+          knowledge_item_id: string;
+          title: string;
+          is_done: boolean;
+          due_date: string | null;
+          due_time: string | null;
+          completed_at: string | null;
+          created_by: string | null;
+          deleted_at: string | null;
+          archived_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          organization_id: string;
+          knowledge_item_id: string;
+          title: string;
+          is_done?: boolean;
+          due_date?: string | null;
+          due_time?: string | null;
+          completed_at?: string | null;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+          deleted_at?: string | null;
+          archived_at?: string | null;
+        };
+        Update: {
+          organization_id?: string;
+          knowledge_item_id?: string;
+          title?: string;
+          is_done?: boolean;
+          due_date?: string | null;
+          due_time?: string | null;
+          completed_at?: string | null;
+          created_by?: string | null;
+          updated_at?: string;
+          deleted_at?: string | null;
+          archived_at?: string | null;
         };
         Relationships: [];
       };
@@ -1892,6 +2676,181 @@ export type Database = {
           file_name?: string | null;
           mime_type?: string | null;
           size_bytes?: number | null;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      documents: {
+        Row: {
+          id: string;
+          organization_id: string | null;
+          client_id: string | null;
+          property_id: string | null;
+          service_id: string | null;
+          employee_id: string | null;
+          related_type: string | null;
+          related_id: string | null;
+          uploaded_by: string | null;
+          original_name: string;
+          stored_name: string | null;
+          document_type: string | null;
+          category: string | null;
+          title: string | null;
+          description: string | null;
+          notes: string | null;
+          storage_provider: string;
+          storage_bucket: string;
+          storage_path: string;
+          size_bytes: number;
+          mime_type: string | null;
+          upload_status: "aguardando_upload" | "enviado" | "erro_upload" | "cancelado" | "removido";
+          processing_status: "nao_processado" | "pendente" | "processando" | "concluido" | "erro" | "precisa_ocr";
+          processing_error: string | null;
+          extracted_text: string | null;
+          pages: number | null;
+          file_hash: string | null;
+          is_global: boolean;
+          is_official: boolean;
+          deleted_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          organization_id?: string | null;
+          client_id?: string | null;
+          property_id?: string | null;
+          service_id?: string | null;
+          employee_id?: string | null;
+          related_type?: string | null;
+          related_id?: string | null;
+          uploaded_by?: string | null;
+          original_name: string;
+          stored_name?: string | null;
+          document_type?: string | null;
+          category?: string | null;
+          title?: string | null;
+          description?: string | null;
+          notes?: string | null;
+          storage_provider?: string;
+          storage_bucket?: string;
+          storage_path: string;
+          size_bytes?: number;
+          mime_type?: string | null;
+          upload_status?: "aguardando_upload" | "enviado" | "erro_upload" | "cancelado" | "removido";
+          processing_status?: "nao_processado" | "pendente" | "processando" | "concluido" | "erro" | "precisa_ocr";
+          processing_error?: string | null;
+          extracted_text?: string | null;
+          pages?: number | null;
+          file_hash?: string | null;
+          is_global?: boolean;
+          is_official?: boolean;
+          deleted_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          organization_id?: string | null;
+          client_id?: string | null;
+          property_id?: string | null;
+          service_id?: string | null;
+          employee_id?: string | null;
+          related_type?: string | null;
+          related_id?: string | null;
+          uploaded_by?: string | null;
+          original_name?: string;
+          stored_name?: string | null;
+          document_type?: string | null;
+          category?: string | null;
+          title?: string | null;
+          description?: string | null;
+          notes?: string | null;
+          storage_provider?: string;
+          storage_bucket?: string;
+          storage_path?: string;
+          size_bytes?: number;
+          mime_type?: string | null;
+          upload_status?: "aguardando_upload" | "enviado" | "erro_upload" | "cancelado" | "removido";
+          processing_status?: "nao_processado" | "pendente" | "processando" | "concluido" | "erro" | "precisa_ocr";
+          processing_error?: string | null;
+          extracted_text?: string | null;
+          pages?: number | null;
+          file_hash?: string | null;
+          is_global?: boolean;
+          is_official?: boolean;
+          deleted_at?: string | null;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      document_chunks: {
+        Row: {
+          id: string;
+          document_id: string;
+          organization_id: string;
+          page: number | null;
+          chunk_index: number;
+          text: string;
+          source: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          document_id: string;
+          organization_id: string;
+          page?: number | null;
+          chunk_index?: number;
+          text: string;
+          source?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          document_id?: string;
+          organization_id?: string;
+          page?: number | null;
+          chunk_index?: number;
+          text?: string;
+          source?: string | null;
+        };
+        Relationships: [];
+      };
+      document_processing_jobs: {
+        Row: {
+          id: string;
+          document_id: string;
+          organization_id: string;
+          status: "pending" | "processing" | "done" | "error" | "canceled";
+          attempts: number;
+          payload: Json;
+          available_at: string;
+          locked_at: string | null;
+          processed_at: string | null;
+          last_error: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          document_id: string;
+          organization_id: string;
+          status?: "pending" | "processing" | "done" | "error" | "canceled";
+          attempts?: number;
+          payload?: Json;
+          available_at?: string;
+          locked_at?: string | null;
+          processed_at?: string | null;
+          last_error?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          status?: "pending" | "processing" | "done" | "error" | "canceled";
+          attempts?: number;
+          payload?: Json;
+          available_at?: string;
+          locked_at?: string | null;
+          processed_at?: string | null;
+          last_error?: string | null;
           updated_at?: string;
         };
         Relationships: [];
@@ -2347,6 +3306,8 @@ export type Database = {
           related_service_id: string | null;
           due_date: string | null;
           completed_at: string | null;
+          deleted_at: string | null;
+          archived_at: string | null;
         };
         Insert: {
           id?: string;
@@ -2362,6 +3323,8 @@ export type Database = {
           related_service_id?: string | null;
           due_date?: string | null;
           completed_at?: string | null;
+          deleted_at?: string | null;
+          archived_at?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -2378,6 +3341,8 @@ export type Database = {
           related_service_id?: string | null;
           due_date?: string | null;
           completed_at?: string | null;
+          deleted_at?: string | null;
+          archived_at?: string | null;
           updated_at?: string;
         };
         Relationships: [];
@@ -2475,6 +3440,34 @@ export type Database = {
           services_count: number;
           documents_count: number;
         }>;
+      };
+      reserve_document_storage: {
+        Args: {
+          p_organization_id: string;
+          p_size_bytes: number;
+        };
+        Returns: boolean;
+      };
+      confirm_document_storage: {
+        Args: {
+          p_organization_id: string;
+          p_size_bytes: number;
+        };
+        Returns: undefined;
+      };
+      release_document_storage: {
+        Args: {
+          p_organization_id: string;
+          p_size_bytes: number;
+        };
+        Returns: undefined;
+      };
+      remove_document_storage: {
+        Args: {
+          p_organization_id: string;
+          p_size_bytes: number;
+        };
+        Returns: undefined;
       };
       find_alerts_by_car_app: {
         Args: {
@@ -2635,9 +3628,17 @@ export type ServiceColumn = Database["public"]["Tables"]["service_columns"]["Row
 export type ServiceCard = Database["public"]["Tables"]["service_cards"]["Row"];
 export type ServiceMember = Database["public"]["Tables"]["service_members"]["Row"];
 export type ServiceEvent = Database["public"]["Tables"]["service_events"]["Row"];
+export type ServicePropertyInfo = Database["public"]["Tables"]["service_property_infos"]["Row"];
 export type TeamMember = Database["public"]["Tables"]["team_members"]["Row"];
+export type WorkTimeDay = Database["public"]["Tables"]["work_time_days"]["Row"];
+export type WorkTimeSession = Database["public"]["Tables"]["work_time_sessions"]["Row"];
+export type WorkTimeEvent = Database["public"]["Tables"]["work_time_events"]["Row"];
+export type CompanyHoliday = Database["public"]["Tables"]["company_holidays"]["Row"];
 export type TeamChatMessage = Database["public"]["Tables"]["team_chat_messages"]["Row"];
 export type TeamChatRead = Database["public"]["Tables"]["team_chat_reads"]["Row"];
+export type Notification = Database["public"]["Tables"]["notifications"]["Row"];
+export type AgendaReminder = Database["public"]["Tables"]["agenda_reminders"]["Row"];
+export type AgendaReminderRecipient = Database["public"]["Tables"]["agenda_reminder_recipients"]["Row"];
 export type RecurringExpense = Database["public"]["Tables"]["recurring_expenses"]["Row"];
 export type Contract = Database["public"]["Tables"]["contracts"]["Row"];
 export type ProposalService = Database["public"]["Tables"]["proposal_services"]["Row"];
@@ -2645,6 +3646,22 @@ export type ContractService = Database["public"]["Tables"]["contract_services"][
 export type PaymentInstallment = Database["public"]["Tables"]["payment_installments"]["Row"];
 export type Revenue = Database["public"]["Tables"]["revenues"]["Row"];
 export type Expense = Database["public"]["Tables"]["expenses"]["Row"];
+export type FinanceTransfer = Database["public"]["Tables"]["finance_transfers"]["Row"];
+export type CompanyKnowledgeCategory =
+  Database["public"]["Tables"]["company_knowledge_categories"]["Row"];
+export type CompanyKnowledgeItem =
+  Database["public"]["Tables"]["company_knowledge_items"]["Row"];
+export type CompanyKnowledgeBlock =
+  Database["public"]["Tables"]["company_knowledge_blocks"]["Row"];
+export type CompanyKnowledgeChecklistItem =
+  Database["public"]["Tables"]["company_knowledge_checklist_items"]["Row"];
+export type HrDocument = Database["public"]["Tables"]["hr_documents"]["Row"];
+export type ProfessionalDocument = Database["public"]["Tables"]["documents"]["Row"];
+export type DocumentChunk = Database["public"]["Tables"]["document_chunks"]["Row"];
+export type DocumentProcessingJob = Database["public"]["Tables"]["document_processing_jobs"]["Row"];
+export type HrAbsence = Database["public"]["Tables"]["hr_absences"]["Row"];
+export type HrBirthday = Database["public"]["Tables"]["hr_birthdays"]["Row"];
+export type RoutineItem = Database["public"]["Tables"]["routine_items"]["Row"];
 export type AssistantConversation = Database["public"]["Tables"]["assistant_conversations"]["Row"];
 export type AssistantMessage = Database["public"]["Tables"]["assistant_messages"]["Row"];
 export type AssistantIntent = Database["public"]["Tables"]["assistant_intents"]["Row"];

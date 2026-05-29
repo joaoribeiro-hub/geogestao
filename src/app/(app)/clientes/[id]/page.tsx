@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { ClientInteractionModal } from "@/components/clients/client-interaction-modal";
 import { DeleteButton } from "@/components/delete-button";
+import { ProfessionalDocumentsPanel } from "@/components/documents/professional-documents-panel";
 import { AttachmentActions } from "@/components/files/attachment-actions";
 import { AttachmentUploadModal } from "@/components/files/attachment-upload-modal";
 import { ClientForm } from "@/components/forms/client-form";
@@ -11,6 +12,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { deleteClientAction } from "@/app/(app)/clientes/actions";
 import { requireUser } from "@/lib/auth";
 import { getCurrentOrganizationForUser } from "@/lib/organization";
+import { formatBrlCurrency, getServiceEstimatedValue } from "@/lib/services/service-finance";
 import { createServerSupabase } from "@/lib/supabase/server";
 import { formatDate } from "@/lib/utils";
 
@@ -47,6 +49,25 @@ export default async function ClientDetailPage({
     .eq("entity_id", client.id)
     .order("created_at", { ascending: false });
   const attachments = attachmentsData ?? [];
+  const { data: servicesData } = await supabase
+    .from("service_cards")
+    .select("*")
+    .eq("organization_id", organization.id)
+    .eq("client_id", client.id)
+    .order("created_at", { ascending: false });
+  const services = servicesData ?? [];
+  const { data: revenuesData } = services.length
+    ? await supabase
+        .from("revenues")
+        .select("*")
+        .eq("organization_id", organization.id)
+        .in("service_card_id", services.map((service) => service.id))
+    : { data: [] };
+  const revenues = revenuesData ?? [];
+  const combinedTotal = services.reduce((sum, service) => sum + getServiceEstimatedValue(service), 0);
+  const receivedTotal = revenues
+    .filter((revenue) => revenue.status === "paid")
+    .reduce((sum, revenue) => sum + Number(revenue.amount ?? 0), 0);
 
   return (
     <div>
@@ -71,6 +92,46 @@ export default async function ClientDetailPage({
         </Card>
 
         <div className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Financeiro do cliente</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid gap-3 md:grid-cols-4">
+                <FinanceInfo label="Valor combinado total" value={formatBrlCurrency(combinedTotal)} />
+                <FinanceInfo label="Valores recebidos" value={formatBrlCurrency(receivedTotal)} />
+                <FinanceInfo label="Valores a receber" value={formatBrlCurrency(Math.max(combinedTotal - receivedTotal, 0))} />
+                <FinanceInfo label="Servicos vinculados" value={String(services.length)} />
+              </div>
+              {services.length ? (
+                <div className="space-y-2">
+                  {services.map((service) => {
+                    const serviceReceived = revenues
+                      .filter((revenue) => revenue.service_card_id === service.id && revenue.status === "paid")
+                      .reduce((sum, revenue) => sum + Number(revenue.amount ?? 0), 0);
+                    const serviceValue = getServiceEstimatedValue(service);
+                    return (
+                      <div key={service.id} className="rounded-md border bg-background p-3 text-sm">
+                        <p className="font-medium">{service.title}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {formatBrlCurrency(serviceValue)} combinado · {formatBrlCurrency(serviceReceived)} recebido · {formatBrlCurrency(Math.max(serviceValue - serviceReceived, 0))} a receber
+                        </p>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <EmptyState title="Nenhum servico vinculado ao cliente." />
+              )}
+            </CardContent>
+          </Card>
+
+          <ProfessionalDocumentsPanel
+            title="Documentos profissionais do cliente"
+            relatedType="client"
+            clientId={client.id}
+          />
+
           <Card>
             <CardHeader className="flex-row items-center justify-between gap-3">
               <CardTitle>Historico</CardTitle>
@@ -139,6 +200,15 @@ export default async function ClientDetailPage({
           </Card>
         </div>
       </div>
+    </div>
+  );
+}
+
+function FinanceInfo({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-md border bg-background p-3">
+      <p className="text-xs text-muted-foreground">{label}</p>
+      <p className="mt-1 text-sm font-medium">{value}</p>
     </div>
   );
 }

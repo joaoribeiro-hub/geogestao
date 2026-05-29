@@ -11,6 +11,7 @@ import {
 } from "@/app/(app)/minha-empresa/actions";
 import { teamMemberSchema, type TeamMemberFormValues } from "@/lib/schemas";
 import { formatBrlCurrency, parseBrlCurrencyInput } from "@/lib/services/service-finance";
+import { normalizeExpectedMinutesByWeekday } from "@/lib/services/work-time";
 import type { Json, TeamMember } from "@/types/database";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -31,6 +32,7 @@ export function TeamMemberModal({
   const [pending, startTransition] = useTransition();
   const [feedback, setFeedback] = useState<string | null>(null);
   const bankDetails = asRecord(member?.bank_details);
+  const expectedMinutes = normalizeExpectedMinutesByWeekday(member?.expected_minutes_by_weekday);
   const form = useForm<TeamMemberFormValues>({
     resolver: zodResolver(teamMemberSchema),
     defaultValues: {
@@ -43,6 +45,17 @@ export function TeamMemberModal({
       bank_account: textValue(bankDetails.bank_account),
       monthly_amount: member?.monthly_amount ? formatBrlCurrency(member.monthly_amount) : "",
       role_title: member?.role_title ?? "",
+      birth_date: member?.birth_date ?? "",
+      work_schedule_type: member?.work_schedule_type ?? "5x2",
+      expected_minutes_0: expectedMinutes[0],
+      expected_minutes_1: expectedMinutes[1],
+      expected_minutes_2: expectedMinutes[2],
+      expected_minutes_3: expectedMinutes[3],
+      expected_minutes_4: expectedMinutes[4],
+      expected_minutes_5: expectedMinutes[5],
+      expected_minutes_6: expectedMinutes[6],
+      default_work_start: member?.default_work_start?.slice(0, 5) ?? "",
+      default_work_end: member?.default_work_end?.slice(0, 5) ?? "",
       notes: member?.notes ?? "",
       status: member?.status ?? "active",
     },
@@ -132,6 +145,69 @@ export function TeamMemberModal({
                 </Field>
               </div>
 
+              <div className="grid gap-4 md:grid-cols-3">
+                <Field label="Data de nascimento">
+                  <Input type="date" {...form.register("birth_date")} />
+                </Field>
+                <Field label="Tipo de escala">
+                  <select
+                    className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                    {...form.register("work_schedule_type")}
+                    onChange={(event) => {
+                      form.register("work_schedule_type").onChange(event);
+                      if (event.target.value === "5x2") setScheduleValues(form, [0, 480, 480, 480, 480, 480, 0]);
+                      if (event.target.value === "6x1") setScheduleValues(form, [0, 480, 480, 480, 480, 480, 240]);
+                    }}
+                  >
+                    <option value="5x2">5x2</option>
+                    <option value="6x1">6x1</option>
+                    <option value="custom">Personalizada</option>
+                  </select>
+                </Field>
+                <Field label="Inicio/fim padrao">
+                  <div className="grid grid-cols-2 gap-2">
+                    <Input type="time" {...form.register("default_work_start")} />
+                    <Input type="time" {...form.register("default_work_end")} />
+                  </div>
+                </Field>
+              </div>
+
+              <div className="space-y-2 rounded-md border bg-background p-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-sm font-medium">Horas esperadas por dia</p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setScheduleValues(form, [0, 480, 480, 480, 480, 480, 0])}
+                  >
+                    Preencher 8h 5x2
+                  </Button>
+                </div>
+                <div className="grid gap-3 md:grid-cols-7">
+                  {[
+                    ["Dom", "expected_minutes_0"],
+                    ["Seg", "expected_minutes_1"],
+                    ["Ter", "expected_minutes_2"],
+                    ["Qua", "expected_minutes_3"],
+                    ["Qui", "expected_minutes_4"],
+                    ["Sex", "expected_minutes_5"],
+                    ["Sab", "expected_minutes_6"],
+                  ].map(([label, name]) => (
+                    <Field key={name} label={label}>
+                      <Input
+                        type="number"
+                        min={0}
+                        max={1440}
+                        step={15}
+                        {...form.register(name as keyof TeamMemberFormValues)}
+                      />
+                      <p className="text-[11px] text-muted-foreground">min/dia</p>
+                    </Field>
+                  ))}
+                </div>
+              </div>
+
               <div className="grid gap-4 md:grid-cols-4">
                 <Field label="Banco">
                   <Input {...form.register("bank_name")} />
@@ -195,6 +271,19 @@ function asRecord(value: Json | undefined): Record<string, Json> {
 
 function textValue(value: Json | undefined) {
   return typeof value === "string" ? value : "";
+}
+
+function setScheduleValues(
+  form: ReturnType<typeof useForm<TeamMemberFormValues>>,
+  values: [number, number, number, number, number, number, number],
+) {
+  form.setValue("expected_minutes_0", values[0]);
+  form.setValue("expected_minutes_1", values[1]);
+  form.setValue("expected_minutes_2", values[2]);
+  form.setValue("expected_minutes_3", values[3]);
+  form.setValue("expected_minutes_4", values[4]);
+  form.setValue("expected_minutes_5", values[5]);
+  form.setValue("expected_minutes_6", values[6]);
 }
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {

@@ -1,30 +1,33 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
-  ChecklistForm,
   ChecklistItemForm,
   ChecklistToggle,
 } from "@/components/forms/checklist-forms";
+import { ProfessionalDocumentsPanel } from "@/components/documents/professional-documents-panel";
 import { AttachmentUploader } from "@/components/forms/attachment-uploader";
 import {
   ServiceClientCreatePanel,
+  ServiceEditModal,
+  ServiceFinancePanel,
   ServiceFieldSelect,
   ServiceInteractionForm,
   ServiceMemberForm,
+  ServicePropertyInfoPanel,
   ServiceQuickActionButton,
 } from "@/components/services/service-detail-controls";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { requireUser } from "@/lib/auth";
-import { getCurrentOrganizationForUser } from "@/lib/organization";
+import { canManageOrganization, getCurrentOrganizationContext } from "@/lib/organization";
 import {
   buildServiceSummary,
   paymentStatusLabels,
   priorityLabels,
   serviceTypeLabels,
 } from "@/lib/services/service-flow";
-import { formatBrlCurrency, getServiceEstimatedValue } from "@/lib/services/service-finance";
+import { getServiceEstimatedValue } from "@/lib/services/service-finance";
 import { createServerSupabase } from "@/lib/supabase/server";
 import { formatDate } from "@/lib/utils";
 import type { Json } from "@/types/database";
@@ -37,7 +40,9 @@ export default async function ServiceDetailPage({
   const { id } = await params;
   const supabase = await createServerSupabase();
   const user = await requireUser(supabase);
-  const organization = await getCurrentOrganizationForUser(supabase, user.id);
+  const context = await getCurrentOrganizationContext(supabase, user.id);
+  const organization = context.organization;
+  if (!organization || !context.membership) notFound();
   const { data: card } = await supabase
     .from("service_cards")
     .select("*")
@@ -57,6 +62,9 @@ export default async function ServiceDetailPage({
     membersResult,
     orgMembersResult,
     eventsResult,
+    propertyInfosResult,
+    revenuesResult,
+    clientsResult,
   ] = await Promise.all([
     card.client_id
       ? supabase
@@ -123,6 +131,23 @@ export default async function ServiceDetailPage({
       .eq("service_card_id", card.id)
       .order("created_at", { ascending: false })
       .limit(20),
+    supabase
+      .from("service_property_infos")
+      .select("*")
+      .eq("organization_id", organization.id)
+      .eq("service_card_id", card.id)
+      .order("created_at", { ascending: true }),
+    supabase
+      .from("revenues")
+      .select("*")
+      .eq("organization_id", organization.id)
+      .eq("service_card_id", card.id)
+      .order("due_date", { ascending: false }),
+    supabase
+      .from("clients")
+      .select("*")
+      .eq("organization_id", organization.id)
+      .order("name"),
   ]);
 
   const checklists = checklistsResult.data ?? [];
@@ -133,6 +158,9 @@ export default async function ServiceDetailPage({
   const currentMembers = membersResult.data ?? [];
   const orgMembers = orgMembersResult.data ?? [];
   const events = eventsResult.data ?? [];
+  const propertyInfos = propertyInfosResult.data ?? [];
+  const revenues = revenuesResult.data ?? [];
+  const clients = clientsResult.data ?? [];
   const boardColumns = column
     ? (
         await supabase
@@ -166,6 +194,17 @@ export default async function ServiceDetailPage({
     attachmentCount: attachments.length,
   });
   const metadata = asRecord(card.custom_fields_json);
+  const isOwner = canManageOrganization({ profile: null, membership: context.membership });
+  const canEditService = isOwner || card.responsible_user_id === user.id;
+  const canSeeFinance = canEditService;
+  const responsibleName = card.responsible_user_id
+    ? profileMap.get(card.responsible_user_id)?.full_name ?? "Responsavel"
+    : textValue(metadata.responsavel_principal);
+  const receivedTotal = revenues
+    .filter((revenue) => !revenue.auto_generated && revenue.status === "paid")
+    .reduce((sum, revenue) => sum + Number(revenue.amount ?? 0), 0);
+  const combinedValue = getServiceEstimatedValue(card);
+  const serviceIsActive = !/conclu/i.test(column?.name ?? "") && !/conclu/i.test(column?.slug ?? "");
 
   return (
     <div className="space-y-6">
@@ -187,14 +226,36 @@ export default async function ServiceDetailPage({
             </p>
           </div>
           <Badge variant="secondary">
-            {serviceTypeLabels[card.service_type ?? "outros_servicos"]}
+            {card.service_type === "outros_servicos" && card.custom_service_name
+              ? card.custom_service_name
+              : serviceTypeLabels[card.service_type ?? "outros_servicos"]}
           </Badge>
+          <Badge variant={serviceIsActive ? "default" : "destructive"}>
+            {serviceIsActive ? "Ativo" : "Inativo"}
+          </Badge>
+          {canEditService ? (
+            <ServiceEditModal
+              card={card}
+              clients={client ? [client] : []}
+              columns={boardColumns}
+              members={orgMembers.map((member) => ({
+                id: member.user_id,
+                label: profileMap.get(member.user_id)?.full_name ?? member.role,
+              }))}
+            />
+          ) : null}
         </div>
       </header>
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
         <div className="space-y-6">
-          {!client ? <ServiceClientCreatePanel serviceCardId={card.id} /> : null}
+          {!client ? (
+            <ServiceClientCreatePanel
+              serviceCardId={card.id}
+              clients={clients}
+              canEdit={canEditService}
+            />
+          ) : null}
 
           <Card>
             <CardHeader>
@@ -243,11 +304,23 @@ export default async function ServiceDetailPage({
               </div>
               <div className="grid gap-3 text-sm md:grid-cols-3">
                 <Info label="Data prevista" value={formatDate(card.due_date)} />
-                <Info label="Valor previsto" value={formatBrlCurrency(getServiceEstimatedValue(card))} />
-                <Info label="Responsavel principal" value={textValue(metadata.responsavel_principal)} />
+                <Info label="Municipio" value={card.municipality || "-"} />
+                <Info label="Responsavel principal" value={responsibleName} />
               </div>
             </CardContent>
           </Card>
+
+          {canSeeFinance ? (
+            <ServiceFinancePanel
+              serviceCardId={card.id}
+              combinedValue={combinedValue}
+              paymentCondition={card.payment_condition || textValue(metadata.condicao_pagamento)}
+              receivedTotal={receivedTotal}
+              revenues={revenues.filter((revenue) => !revenue.auto_generated)}
+            />
+          ) : null}
+
+          <ServicePropertyInfoPanel serviceCardId={card.id} items={propertyInfos} />
 
           <Card>
             <CardHeader>
@@ -271,12 +344,13 @@ export default async function ServiceDetailPage({
 
           <Card>
             <CardHeader>
-              <CardTitle>Checklists</CardTitle>
+              <CardTitle>Checklist - Documentos</CardTitle>
             </CardHeader>
             <CardContent className="space-y-5">
-              <ChecklistForm serviceCardId={card.id} />
-              {checklists.length ? (
-                checklists.map((checklist) => {
+              {checklists.filter((checklist) => checklist.checklist_type === "documents").length ? (
+                checklists
+                  .filter((checklist) => checklist.checklist_type === "documents")
+                  .map((checklist) => {
                   const checklistItems = items.filter(
                     (item) => item.checklist_id === checklist.id,
                   );
@@ -291,6 +365,11 @@ export default async function ServiceDetailPage({
                             checklistId={checklist.id}
                             checked={item.is_done}
                             label={item.title}
+                            createdAt={item.created_at}
+                            completedAt={item.completed_at}
+                            dueDate={item.due_date}
+                            dueTime={item.due_time}
+                            canDelete
                           />
                         ))}
                       </div>
@@ -299,10 +378,56 @@ export default async function ServiceDetailPage({
                   );
                 })
               ) : (
-                <EmptyState title="Nenhum checklist cadastrado." />
+                <EmptyState title="Nenhum checklist de documentos cadastrado." />
               )}
             </CardContent>
           </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Checklist - Etapas</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-5">
+              {checklists.filter((checklist) => checklist.checklist_type === "steps").length ? (
+                checklists
+                  .filter((checklist) => checklist.checklist_type === "steps")
+                  .map((checklist) => {
+                    const checklistItems = items.filter((item) => item.checklist_id === checklist.id);
+                    return (
+                      <div key={checklist.id} className="rounded-lg border p-4">
+                        <h2 className="mb-3 text-sm font-semibold">{checklist.title}</h2>
+                        <div className="mb-3 space-y-2">
+                          {checklistItems.map((item) => (
+                            <ChecklistToggle
+                              key={item.id}
+                              itemId={item.id}
+                              checklistId={checklist.id}
+                              checked={item.is_done}
+                              label={item.title}
+                              createdAt={item.created_at}
+                              completedAt={item.completed_at}
+                              dueDate={item.due_date}
+                              dueTime={item.due_time}
+                              canDelete
+                            />
+                          ))}
+                        </div>
+                        <ChecklistItemForm checklistId={checklist.id} allowSchedule />
+                      </div>
+                    );
+                  })
+              ) : (
+                <EmptyState title="Nenhuma etapa cadastrada." />
+              )}
+            </CardContent>
+          </Card>
+
+          <ProfessionalDocumentsPanel
+            title="Documentos profissionais do servico"
+            relatedType="service"
+            serviceId={card.id}
+            clientId={card.client_id ?? undefined}
+          />
 
           <Card id="anexos">
             <CardHeader>
@@ -362,7 +487,7 @@ export default async function ServiceDetailPage({
 
           <Card>
             <CardHeader>
-              <CardTitle>Historico</CardTitle>
+              <CardTitle>Movimentacoes</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <ServiceInteractionForm serviceCardId={card.id} />

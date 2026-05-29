@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { requireUser } from "@/lib/auth";
 import { getCurrentOrganizationForUser } from "@/lib/organization";
 import { createServerSupabase } from "@/lib/supabase/server";
+import type { Client } from "@/types/database";
 
 export default async function ClientsPage({
   searchParams,
@@ -26,6 +27,23 @@ export default async function ClientsPage({
     .eq("organization_id", organization.id)
     .order("created_at", { ascending: false });
   const clients = data ?? [];
+  const [{ data: serviceCards }, { data: serviceColumns }] = await Promise.all([
+    supabase
+      .from("service_cards")
+      .select("client_id,column_id")
+      .eq("organization_id", organization.id),
+    supabase.from("service_columns").select("id,slug,name"),
+  ]);
+  const columnMap = new Map((serviceColumns ?? []).map((column) => [column.id, column]));
+  const activeClientIds = new Set(
+    (serviceCards ?? [])
+      .filter((card) => {
+        if (!card.client_id) return false;
+        const column = columnMap.get(card.column_id);
+        return !/conclu/i.test(`${column?.slug ?? ""} ${column?.name ?? ""}`);
+      })
+      .map((card) => card.client_id as string),
+  );
 
   const normalized = q.trim().toLowerCase();
   const filtered = normalized
@@ -35,6 +53,8 @@ export default async function ClientsPage({
           .some((value) => value!.toLowerCase().includes(normalized)),
       )
     : clients;
+  const activeClients = filtered.filter((client) => activeClientIds.has(client.id));
+  const inactiveClients = filtered.filter((client) => !activeClientIds.has(client.id));
 
   return (
     <div>
@@ -60,39 +80,9 @@ export default async function ClientsPage({
             </form>
 
             {filtered.length ? (
-              <div className="overflow-hidden rounded-lg border">
-                <table className="w-full text-sm">
-                  <thead className="bg-secondary text-left">
-                    <tr>
-                      <th className="px-4 py-3 font-medium">Cliente</th>
-                      <th className="px-4 py-3 font-medium">Contato</th>
-                      <th className="px-4 py-3 font-medium">Tipo</th>
-                      <th className="px-4 py-3 text-right font-medium">Acoes</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filtered.map((client) => (
-                      <tr key={client.id} className="border-t bg-card">
-                        <td className="px-4 py-3">
-                          <Link className="font-medium hover:underline" href={`/clientes/${client.id}`}>
-                            {client.name}
-                          </Link>
-                          <p className="text-xs text-muted-foreground">{client.document}</p>
-                        </td>
-                        <td className="px-4 py-3 text-muted-foreground">
-                          <p>{client.email ?? "-"}</p>
-                          <p>{client.phone ?? "-"}</p>
-                        </td>
-                        <td className="px-4 py-3">
-                          <Badge variant="secondary">{client.kind === "pf" ? "PF" : "PJ"}</Badge>
-                        </td>
-                        <td className="px-4 py-3">
-                          <ClientActions client={client} />
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+              <div className="space-y-6">
+                <ClientTable title={`Clientes Ativos (${activeClients.length})`} clients={activeClients} active />
+                <ClientTable title={`Clientes Inativos (${inactiveClients.length})`} clients={inactiveClients} />
               </div>
             ) : (
               <EmptyState title="Nenhum cliente encontrado." />
@@ -101,6 +91,64 @@ export default async function ClientsPage({
         </Card>
 
       </div>
+    </div>
+  );
+}
+
+function ClientTable({
+  title,
+  clients,
+  active = false,
+}: {
+  title: string;
+  clients: Client[];
+  active?: boolean;
+}) {
+  return (
+    <div>
+      <h2 className="mb-2 text-sm font-semibold">{title}</h2>
+      {clients.length ? (
+        <div className="overflow-hidden rounded-lg border">
+          <table className="w-full text-sm">
+            <thead className="bg-secondary text-left">
+              <tr>
+                <th className="px-4 py-3 font-medium">Cliente</th>
+                <th className="px-4 py-3 font-medium">Contato</th>
+                <th className="px-4 py-3 font-medium">Tipo</th>
+                <th className="px-4 py-3 font-medium">Status</th>
+                <th className="px-4 py-3 text-right font-medium">Acoes</th>
+              </tr>
+            </thead>
+            <tbody>
+              {clients.map((client) => (
+                <tr key={client.id} className="border-t bg-card">
+                  <td className="px-4 py-3">
+                    <Link className="font-medium hover:underline" href={`/clientes/${client.id}`}>
+                      {client.name}
+                    </Link>
+                    <p className="text-xs text-muted-foreground">{client.document}</p>
+                  </td>
+                  <td className="px-4 py-3 text-muted-foreground">
+                    <p>{client.email ?? "-"}</p>
+                    <p>{client.phone ?? "-"}</p>
+                  </td>
+                  <td className="px-4 py-3">
+                    <Badge variant="secondary">{client.kind === "pf" ? "PF" : "PJ"}</Badge>
+                  </td>
+                  <td className="px-4 py-3">
+                    <Badge variant={active ? "default" : "destructive"}>{active ? "Ativo" : "Inativo"}</Badge>
+                  </td>
+                  <td className="px-4 py-3">
+                    <ClientActions client={client} />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <EmptyState title="Nenhum cliente nesta categoria." />
+      )}
     </div>
   );
 }

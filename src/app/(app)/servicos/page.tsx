@@ -4,6 +4,8 @@ import { ServiceKanban } from "@/components/kanban/service-kanban";
 import { PageHeader } from "@/components/layout/page-header";
 import { EmptyState } from "@/components/ui/empty-state";
 import { NewServiceModal } from "@/components/services/new-service-modal";
+import { ServiceSchedule } from "@/components/services/service-schedule";
+import { monthBounds, parseMonthParam } from "@/lib/agenda/calendar";
 import { requireUser } from "@/lib/auth";
 import { resolvePeriodRange } from "@/lib/period";
 import { getInitialServiceColumn } from "@/lib/services/service-flow";
@@ -13,6 +15,7 @@ import {
   isOverdueServiceColumn,
   isServiceOverdue,
 } from "@/lib/services/service-period";
+import { isServiceLostColumn } from "@/lib/services/service-finance";
 import { getCurrentOrganizationForUser } from "@/lib/organization";
 import { createServerSupabase } from "@/lib/supabase/server";
 import { cn } from "@/lib/utils";
@@ -25,16 +28,35 @@ export default async function ServicesPage({
 }) {
   const params = await searchParams;
   const board = Array.isArray(params.board) ? params.board[0] : params.board;
+  const scheduleMonth = Array.isArray(params.scheduleMonth)
+    ? params.scheduleMonth[0]
+    : params.scheduleMonth;
   const periodRange = resolvePeriodRange(params);
+  const scheduleMonthData = parseMonthParam(scheduleMonth);
+  const scheduleBounds = monthBounds(scheduleMonthData.year, scheduleMonthData.monthIndex);
   const supabase = await createServerSupabase();
   const user = await requireUser(supabase);
   const organization = await getCurrentOrganizationForUser(supabase, user.id);
-  const [boardsResult, clientsResult] = await Promise.all([
+  const [boardsResult, clientsResult, orgMembersResult] = await Promise.all([
     supabase.from("service_boards").select("*").order("position"),
     supabase.from("clients").select("*").eq("organization_id", organization.id).order("name"),
+    supabase
+      .from("organization_members")
+      .select("user_id,role")
+      .eq("organization_id", organization.id)
+      .eq("status", "active"),
   ]);
   const boards = boardsResult.data ?? [];
   const clients = clientsResult.data ?? [];
+  const orgMembers = orgMembersResult.data ?? [];
+  const { data: profiles } = orgMembers.length
+    ? await supabase.from("profiles").select("id,full_name").in("id", orgMembers.map((member) => member.user_id))
+    : { data: [] };
+  const profileMap = new Map((profiles ?? []).map((profile) => [profile.id, profile.full_name]));
+  const memberOptions = orgMembers.map((member) => ({
+    id: member.user_id,
+    label: profileMap.get(member.user_id) ?? member.role ?? "Membro",
+  }));
 
   const selectedBoard = boards.find((item) => item.slug === board) ?? boards[0];
   const boardIds = boards.map((item) => item.id);
@@ -48,6 +70,7 @@ export default async function ServicesPage({
   const allColumns = allColumnsResult.data ?? [];
   const columns = selectedBoard
     ? allColumns.filter((column) => column.board_id === selectedBoard.id)
+        .filter((column) => !isServiceLostColumn(column))
     : [];
   const columnByServiceType = buildInitialColumnByServiceType(boards, allColumns);
 
@@ -85,6 +108,62 @@ export default async function ServicesPage({
     ...displayCardInOverdueColumn(card, columnsById, overdueColumn),
     client: card.client_id ? clientMap.get(card.client_id) ?? null : null,
   }));
+  const { data: scheduleCards } = await supabase
+    .from("service_cards")
+    .select("id,title,service_date,due_date")
+    .eq("organization_id", organization.id)
+    .or(`and(service_date.gte.${scheduleBounds.from},service_date.lte.${scheduleBounds.to}),and(due_date.gte.${scheduleBounds.from},due_date.lte.${scheduleBounds.to})`);
+  const { data: scheduleChecklists } = await supabase
+    .from("checklists")
+    .select("id,service_card_id")
+    .eq("organization_id", organization.id)
+    .eq("checklist_type", "steps");
+  const scheduleChecklistIds = (scheduleChecklists ?? []).map((checklist) => checklist.id);
+  const { data: scheduleItems } = scheduleChecklistIds.length
+    ? await supabase
+        .from("checklist_items")
+        .select("id,checklist_id,title,due_date")
+        .in("checklist_id", scheduleChecklistIds)
+        .gte("due_date", scheduleBounds.from)
+        .lte("due_date", scheduleBounds.to)
+    : { data: [] };
+  const scheduleChecklistMap = new Map((scheduleChecklists ?? []).map((item) => [item.id, item.service_card_id]));
+  const scheduleEvents = [
+    ...((scheduleCards ?? []).flatMap((card) => {
+      const events = [];
+      if (card.service_date) {
+        events.push({
+          id: `service-start-${card.id}`,
+          date: card.service_date,
+          title: card.title,
+          type: "Inicio" as const,
+          href: `/servicos/${card.id}`,
+        });
+      }
+      if (card.due_date) {
+        events.push({
+          id: `service-due-${card.id}`,
+          date: card.due_date,
+          title: card.title,
+          type: "Prazo" as const,
+          href: `/servicos/${card.id}`,
+        });
+      }
+      return events;
+    }) ?? []),
+    ...((scheduleItems ?? [])
+      .filter((item) => item.due_date)
+      .map((item) => {
+        const serviceId = scheduleChecklistMap.get(item.checklist_id) ?? "";
+        return {
+          id: `step-${item.id}`,
+          date: item.due_date!,
+          title: item.title,
+          type: "Etapa" as const,
+          href: serviceId ? `/servicos/${serviceId}` : "/servicos",
+        };
+      }) ?? []),
+  ];
 
   return (
     <div>
@@ -97,6 +176,7 @@ export default async function ServicesPage({
           clients={clients}
           columns={allColumns}
           columnByServiceType={columnByServiceType}
+          members={memberOptions}
         />
       </div>
 
@@ -126,6 +206,7 @@ export default async function ServicesPage({
       ) : (
         <div className="grid gap-6">
           <ServiceKanban columns={columns} cards={cardsWithClients} />
+          <ServiceSchedule month={scheduleMonth} events={scheduleEvents} />
         </div>
       )}
     </div>

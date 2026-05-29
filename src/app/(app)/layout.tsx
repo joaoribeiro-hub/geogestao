@@ -29,7 +29,11 @@ export default async function AuthenticatedLayout({
   }
 
   return (
-    <AppShell userEmail={user.email} limitedMode={needsOrganization}>
+    <AppShell
+      userEmail={user.email}
+      limitedMode={needsOrganization}
+      membershipRole={context.membership?.role ?? null}
+    >
       {children}
     </AppShell>
   );

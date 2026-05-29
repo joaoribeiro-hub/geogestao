@@ -1,5 +1,6 @@
 import { LibraryFileActions } from "@/components/files/library-file-actions";
 import { LibraryUploadModal } from "@/components/files/library-upload-modal";
+import { ProfessionalDocumentsPanel } from "@/components/documents/professional-documents-panel";
 import { PageHeader } from "@/components/layout/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -40,6 +41,11 @@ export default async function DocumentsPage({
         <LibraryUploadModal kind="document" />
       </PageHeader>
       <div className="grid gap-6">
+        <ProfessionalDocumentsPanel
+          title="Documentos profissionais da empresa"
+          relatedType="company"
+        />
+
         <Card>
           <CardHeader>
             <CardTitle>Documentos</CardTitle>

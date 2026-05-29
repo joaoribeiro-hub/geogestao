@@ -74,6 +74,21 @@ Escopo:
 
 Status: parcial/implementado no codigo. Pendente aplicar `supabase/migrations/008_account1_organizations_profiles_ai.sql` no Supabase de teste, validar manualmente conta, organizacao, uploads e Chat IA, e depois avaliar aplicacao no Supabase oficial.
 
+### Fase NOTIFICATIONS-CHAT-AGENDA-REFINE-1: Notificacoes, Agenda compacta e Chat direto
+
+Objetivo: refinar a experiencia de comunicacao operacional sem alterar autenticao ou dados geograficos.
+
+Escopo implementado:
+
+- notificacoes com `action_url` interno para abrir cliente, servico, Agenda ou checklist;
+- botao `X` no sininho para marcar notificacao como lida;
+- mensagens de lembrete com contexto de cliente/servico sem repetir titulo;
+- Agenda mensal com layout mais compacto;
+- Chat da equipe com conversa geral, conversa direta e filtro Hoje/Ontem/Data;
+- leitura de mensagens por `conversation_key`, preservando badges de conversas nao abertas.
+
+Status: implementado no codigo. Pendente aplicar `supabase/migrations/031_notifications_chat_direct_refine.sql` no Supabase de teste e validar manualmente com owner/admin operacional.
+
 ### Fase AUTH-ORG-PLANS-1: Cadastro publico, onboarding e planos
 
 Objetivo: permitir cadastro publico com confirmacao de e-mail, recuperacao de senha, onboarding de empresa e base inicial de planos, sem pagamento real.
@@ -413,3 +428,106 @@ Escopo:
 - badges de mensagens nao lidas, separando mensagens do owner;
 - Supabase Realtime com polling leve como fallback;
 - activity log para mensagens enviadas.
+
+## Fase SERVICE-CLIENT-FINANCE-NOTIFICATIONS-AGENDA-1
+
+Status: implementado no codigo com migration `030_service_client_finance_notifications_agenda.sql`, pendente aplicar no Supabase de teste e validar manualmente.
+
+Escopo:
+
+- Assistente IA reconhece atribuicao direta de tarefa para membro.
+- Servico ganhou municipio, responsavel principal, condicao de pagamento e nome personalizado para `Outros`.
+- Novos servicos nascem com `Checklist - Documentos` e `Checklist - Etapas` vazios.
+- Porcentagem do servico usa apenas `Checklist - Etapas`.
+- Detalhe do servico possui financeiro operacional, recebimentos e informacoes adicionais do imovel.
+- Cliente mostra resumo financeiro por servico e separacao ativo/inativo.
+- Sininho centraliza notificacoes.
+- Agenda lista prazos e lembretes.
+- Agenda evoluiu para calendario mensal visual com navegacao por mes.
+- Detalhe de servico sem cliente permite buscar e vincular cliente existente da organizacao.
+- Notificacoes de lembretes foram centralizadas para cliente, servico e Agenda, com sincronizacao sem cron ao abrir o sininho.
+- Dashboard/Financeiro ficam owner-only no menu; Propostas/Contratos ficam como subitens de Servicos.
+## HOME-ROUTINE-SCHEDULE-FINANCE-COMPANY-1
+
+- Evoluir RH com anexos reais, ferias/faltas e aniversarios editaveis.
+- Criar detalhe completo para itens da base interna da empresa.
+- Implementar migracao idempotente de tarefas nao concluidas apos meia-noite.
+- Adicionar filtros reais nas abas de notificacoes do Inicio.
+- Ampliar busca global com Assistente IA integrado diretamente no input.
+
+## HOME-HR-REPORTS-NOTIFICATIONS-FINISH-1
+
+Status: implementado no codigo com migration `033_home_hr_reports_notifications_finish.sql`, pendente aplicar no Supabase de teste.
+
+Concluido nesta fase:
+
+- filtros reais das abas de notificacoes do Inicio;
+- filtro padrao de nao lidas e fechamento por X;
+- menu Relatorios com base em checklists/rotina;
+- detalhe editavel da Base Interna;
+- RH com nascimento, aniversarios, ferias/faltas e documentos reais.
+
+Proximos incrementos:
+
+- incluir etapas de servico nos Relatorios;
+- editar documentos de RH sem reanexar arquivo;
+- notificacoes automaticas de aniversario sem cron externo;
+- consolidar relatorios por produtividade mensal.
+
+## WORK-TIME-TRACKING-1
+
+Status: implementado no codigo com migration `034_work_time_tracking.sql`, pendente aplicar no Supabase de teste e validar com usuarios owner/admin.
+
+Escopo:
+
+- expediente automatico por usuario;
+- heartbeat sem contagem com pagina fechada;
+- intervalo, campo e seguranca de 2h;
+- jornada por colaborador no RH;
+- feriados e relatorios de horas.
+
+Proximos incrementos:
+
+- tela de edicao de feriados da empresa;
+- notificacao opcional para owner quando membro congelar timer;
+- exportacao CSV/PDF dos relatorios de horas;
+- reconciliacao manual pelo owner em casos excepcionais.
+
+## DOCUMENTS-STORAGE-ARCH-1
+
+Status: implementado no codigo com migration `035_documents_storage_arch.sql`, pendente aplicar no Supabase de teste.
+
+Escopo:
+
+- bucket privado `documentos`;
+- tabela profissional `documents`;
+- controle de quota por organizacao;
+- upload autenticado validado pelo backend;
+- download por signed URL;
+- busca por metadados/texto;
+- chunks e fila de processamento preparados.
+
+Proximos incrementos:
+
+- migrar anexos legados sob demanda;
+- extracao real de PDF/DOCX;
+- OCR para imagens e PDFs escaneados;
+- cron/worker gerenciado via Supabase Queues ou Edge Function.
+
+## UX-CLEAN-COMPANY-KNOWLEDGE-1
+
+Status: implementado no codigo com migration `036_ux_clean_company_knowledge.sql`, pendente aplicar no Supabase de teste.
+
+Concluido nesta fase:
+
+- Base Interna por eixos e paginas com seed idempotente;
+- detalhe de pagina com markdown, blocos, checklist e permissao de edicao para owner;
+- Minha Empresa > Informacoes em visualizacao/edicao;
+- formularios grandes prioritarios movidos para modais;
+- navegacao padrao para `/inicio`.
+
+Proximos incrementos:
+
+- converter formularios secundarios restantes para modais quando fizer sentido;
+- editor markdown com preview;
+- historico de versoes das paginas internas.

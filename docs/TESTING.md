@@ -339,6 +339,10 @@ Coberto agora:
 - AI-ASSISTANT-CONTEXT-LEARNING-2: contexto curto para membro citado, status atual por checklist, sanitizacao de feedback negativo e migration de exemplos globais sanitizados.
 - AUTH-ORG-PLANS-1: validacao de CPF/senha/cadastro, reset de senha, limite de 3 usuarios do plano Iniciante e presenca das funcoes/RLS principais da migration 023.
 - TEAM-COMMS-CHECKLIST-BADGES-1: helpers de badges do Checklist e Chat da equipe, migration de chat com RLS/realtime e presenca dos widgets/badges flutuantes.
+- SERVICE-CLIENT-FINANCE-NOTIFICATIONS-AGENDA-1: detector local para atribuicao direta a membro, migration de municipio/checklists/financeiro/notificacoes/agenda, menus owner-only e estrutura visual de servico/cliente/agenda.
+- AGENDA-CALENDAR-SERVICE-CLIENT-LINK: helpers de calendario mensal, navegacao por mes e servico sem cliente com busca/vinculo por cliente existente.
+- NOTIFICATIONS-REMINDERS-FIX-1: regras puras de notificacao de lembrete para hoje, janelas 2h/1h/horario e parser de `datetime-local`.
+- NOTIFICATIONS-CHAT-AGENDA-REFINE-1: helpers de action_url interno, mensagem de lembrete sem repeticao, conversa direta do Chat da equipe, leitura por `conversation_key` e filtro de data no widget.
 - status comercial de proposta nao aprovada/perdida;
 - receita pendente/a receber para pagamento nao pago;
 - pagina de login em E2E.
@@ -360,3 +364,84 @@ Pendente:
 - teste de intersecao espacial/buffer depois de ativar PostGIS e carregar fixtures geograficas.
 - E2E completo do novo fluxo de Servicos com anexos, criacao de cliente pelo servico, proposta/contrato vinculados e reset seguro em Supabase de teste.
 - E2E real de cadastro publico, confirmacao de e-mail, onboarding por codigo e reset de senha, pois depende de Supabase Auth configurado com redirects do ambiente.
+## HOME-ROUTINE-SCHEDULE-FINANCE-COMPANY-1
+
+Testes manuais recomendados:
+
+- Criar etapa de servico com data/horario e conferir Agenda, Cronograma e sininho.
+- Criar lembrete com categoria e recorrencia semanal.
+- Editar e apagar/cancelar lembrete criado pelo proprio usuario.
+- Criar Entrada, Saida e Transferencia no Financeiro.
+- Conferir que Transferencia nao altera lucro.
+- Editar Missao, Visao e Valores em Minha Empresa.
+- Abrir Minha Empresa > RH > Colaboradores e confirmar que a equipe anterior continua aparecendo.
+- Criar item diario em Rotina e conferir Checklist de Hoje.
+- Usar busca do Inicio para cliente, servico e menu.
+
+## HOME-HR-REPORTS-NOTIFICATIONS-FINISH-1
+
+Testes manuais recomendados:
+
+- Abrir Inicio e conferir que o padrao mostra apenas notificacoes nao lidas.
+- Alternar Tudo/Mencoes/Projetos/Notas e conferir filtros.
+- Clicar no X de uma notificacao e confirmar que ela some das nao lidas.
+- Abrir Relatorios e testar filtros rapidos, status, data e membro.
+- Criar item em Minha Empresa > Informacoes > Base Interna e abrir o detalhe.
+- Adicionar, editar e apagar bloco da Base Interna.
+- Cadastrar colaborador com data de nascimento e conferir RH > Aniversarios.
+- Criar aniversario manual e conferir o calendario.
+- Criar ferias/falta e conferir o calendario.
+- Anexar documento de RH e testar Visualizar/Baixar/Apagar.
+
+## WORK-TIME-TRACKING-1
+
+Testes manuais recomendados:
+
+- Entrar no app autenticado e conferir timer no topo.
+- Aguardar heartbeat e confirmar que `work_time_days.last_seen_at` atualiza.
+- Clicar em Intervalo e conferir que o timer fica pausado e o relatorio mostra intervalo.
+- Voltar do intervalo e conferir retomada.
+- Ativar Saida para campo e conferir que o tempo conta como trabalho/campo.
+- Forcar `next_safety_due_at` no Supabase de teste para agora e conferir botao Confirmar.
+- Forcar `safety_grace_until` no passado e conferir estado congelado.
+- Confirmar presenca depois de congelado e conferir retomada.
+- Configurar jornada 6x1 ou personalizada em RH > Colaboradores.
+- Abrir Relatorios > Horas de expediente em diaria, semanal e mensal.
+- Conferir que owner ve todos e membro ve apenas o proprio relatorio.
+- Abrir Agenda e confirmar feriados de 2026.
+
+## DOCUMENTS-STORAGE-ARCH-1
+
+Testes manuais recomendados:
+
+- Aplicar `supabase/migrations/035_documents_storage_arch.sql` no Supabase de teste.
+- Abrir `/documentos` e enviar PDF/TXT pequeno no painel "Documentos profissionais da empresa".
+- Conferir no Supabase que o registro aparece em `documents` com `upload_status = enviado`.
+- Conferir que `organizations.storage_reserved_bytes` volta a 0 e `storage_used_bytes` aumenta.
+- Baixar pelo botao Baixar e confirmar que a URL assinada abre.
+- Buscar por nome, tipo e descricao.
+- Apagar documento e conferir `deleted_at`, `upload_status = removido` e reducao de `storage_used_bytes`.
+- Repetir em `/clientes/[id]` e `/servicos/[id]`.
+- Testar arquivo maior que 50 MB e MIME nao permitido.
+- Testar duas empresas: usuario da empresa B nao deve listar nem baixar documento da empresa A.
+
+## UX-CLEAN-COMPANY-KNOWLEDGE-1
+
+Testes automatizados adicionados:
+
+- `tests/unit/ux-clean-company-knowledge.test.ts`
+
+Testes manuais recomendados:
+
+- Aplicar `supabase/migrations/036_ux_clean_company_knowledge.sql` no Supabase de teste.
+- Abrir Minha Empresa > Informacoes e confirmar modo visualizacao.
+- Entrar como owner, clicar Editar, salvar dados e confirmar retorno ao modo visualizacao.
+- Conferir eixos/paginas padrao da Base Interna.
+- Criar nova pagina por modal e abrir `/minha-empresa/base-interna/[pageId]`.
+- Editar conteudo markdown/status da pagina.
+- Entrar como admin operacional e confirmar visualizacao sem edicao.
+- Abrir Documentos e confirmar que o formulario so aparece em `+ Anexar documento`.
+- Abrir RH > Contratos e documentos e confirmar modal de anexo.
+- Abrir Rotina e confirmar modal `+ Adicionar item de rotina`.
+- Abrir `/` autenticado e confirmar redirecionamento para `/inicio`.
+- Abrir deep link como `/servicos` e confirmar que nao redireciona para Inicio.

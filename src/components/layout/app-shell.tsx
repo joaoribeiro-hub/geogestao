@@ -2,9 +2,12 @@ import Link from "next/link";
 import { headers } from "next/headers";
 import {
   Archive,
+  BarChart3,
   BookOpen,
   BriefcaseBusiness,
   Building2,
+  CalendarDays,
+  CalendarRange,
   FileText,
   Home,
   Landmark,
@@ -15,18 +18,25 @@ import {
 import { ptBR } from "@/lib/i18n/pt-br";
 import { cn } from "@/lib/utils";
 import { FloatingWidgets } from "@/components/floating/floating-widgets";
+import { NotificationBell } from "@/components/notifications/notification-bell";
 import { SignOutButton } from "@/components/layout/sign-out-button";
+import { WorkTimerTopbar } from "@/components/work-time/work-timer-topbar";
 
 const mainNav = [
-  { href: "/", label: ptBR.nav.dashboard, icon: Home },
+  { href: "/rotina", label: "Rotina", icon: CalendarRange },
+  { href: "/inicio", label: "Inicio", icon: Home },
   { href: "/servicos", label: ptBR.nav.services, icon: BriefcaseBusiness },
-  { href: "/financeiro", label: ptBR.nav.finance, icon: Landmark },
+  { href: "/propostas", label: "Propostas", icon: FileText, nested: true },
+  { href: "/contratos", label: "Contratos", icon: FileText, nested: true },
+  { href: "/clientes", label: ptBR.nav.clients, icon: Users },
+  { href: "/agenda", label: "Agenda", icon: CalendarDays },
+  { href: "/financeiro", label: ptBR.nav.finance, icon: Landmark, ownerOnly: true },
+  { href: "/relatorios", label: "Relatorios", icon: BarChart3 },
 ] as const;
 
 const settingsNav = [
   { href: "/minha-empresa", label: ptBR.nav.company, icon: Building2 },
   { href: "/minha-conta", label: "Minha Conta", icon: UserCircle },
-  { href: "/clientes", label: ptBR.nav.clients, icon: Users },
   { href: "/documentos", label: ptBR.nav.documents, icon: FileText },
   { href: "/legislacao", label: ptBR.nav.legislation, icon: BookOpen },
   { href: "/anexos", label: ptBR.nav.attachments, icon: Paperclip },
@@ -36,13 +46,18 @@ export async function AppShell({
   children,
   userEmail,
   limitedMode = false,
+  membershipRole = null,
 }: {
   children: React.ReactNode;
   userEmail?: string | null;
   limitedMode?: boolean;
+  membershipRole?: string | null;
 }) {
   const pathname = (await headers()).get("x-pathname") ?? "/";
-  const visibleMainNav = limitedMode ? [] : mainNav;
+  const isOwner = membershipRole === "owner";
+  const visibleMainNav = limitedMode
+    ? []
+    : mainNav.filter((item) => !("ownerOnly" in item) || !item.ownerOnly || isOwner);
   const visibleSettingsNav = limitedMode
     ? settingsNav.filter((item) => item.href === "/minha-conta")
     : settingsNav;
@@ -78,6 +93,8 @@ export async function AppShell({
             <p className="text-sm font-semibold">{ptBR.appName}</p>
           </div>
           <div className="ml-auto flex items-center gap-3">
+            {!limitedMode ? <WorkTimerTopbar /> : null}
+            {!limitedMode ? <NotificationBell /> : null}
             <span
               className="hidden max-w-56 truncate text-sm text-muted-foreground sm:inline"
               data-testid="user-email"
@@ -95,8 +112,7 @@ export async function AppShell({
       <nav className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-4 border-t bg-card p-2 lg:hidden">
         {visibleMobileNav.map((item) => {
           const Icon = item.icon;
-          const active =
-            item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
+          const active = pathname.startsWith(item.href);
           return (
             <Link
               key={item.href}
@@ -135,14 +151,14 @@ function NavSection({
       <div className="space-y-1">
         {items.map((item) => {
           const Icon = item.icon;
-          const active =
-            item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
+          const active = pathname.startsWith(item.href);
           return (
             <Link
               key={item.href}
               href={item.href}
               className={cn(
                 "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground",
+                "nested" in item && item.nested && "ml-7 py-1.5 text-xs",
                 active && "bg-secondary text-foreground",
               )}
             >

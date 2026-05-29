@@ -57,6 +57,9 @@ export const companySettingsSchema = z.object({
   state: optionalText,
   logo_url: optionalText,
   notes: optionalText,
+  mission: optionalText,
+  vision: optionalText,
+  values_statement: optionalText,
 });
 
 export const companyBankSettingsSchema = z.object({
@@ -90,6 +93,17 @@ export const teamMemberSchema = z.object({
     .transform((value) => (value ? parseBrlCurrencyInput(value) : null))
     .pipe(z.number().nonnegative("Informe um valor valido.").nullable()),
   role_title: optionalText,
+  birth_date: dateString,
+  work_schedule_type: z.enum(["5x2", "6x1", "custom"]).default("5x2"),
+  expected_minutes_0: z.coerce.number().min(0).max(1440).default(0),
+  expected_minutes_1: z.coerce.number().min(0).max(1440).default(480),
+  expected_minutes_2: z.coerce.number().min(0).max(1440).default(480),
+  expected_minutes_3: z.coerce.number().min(0).max(1440).default(480),
+  expected_minutes_4: z.coerce.number().min(0).max(1440).default(480),
+  expected_minutes_5: z.coerce.number().min(0).max(1440).default(480),
+  expected_minutes_6: z.coerce.number().min(0).max(1440).default(0),
+  default_work_start: optionalText,
+  default_work_end: optionalText,
   notes: optionalText,
   status: z.enum(["active", "inactive"]).default("active"),
 });
@@ -251,6 +265,13 @@ export const serviceCardSchema = z.object({
     .transform((value) => (value ? value : null)),
   title: z.string().trim().min(3, "Informe o titulo."),
   description: optionalText,
+  municipality: optionalText,
+  responsible_user_id: z
+    .string()
+    .optional()
+    .transform((value) => (value ? value : null)),
+  payment_condition: optionalText,
+  custom_service_name: optionalText,
   service_type: z
     .enum(["georreferenciamento", "car", "itr_ccir", "outros_servicos"])
     .nullable()
@@ -281,12 +302,72 @@ export const serviceCardSchema = z.object({
 export const checklistSchema = z.object({
   service_card_id: z.string().uuid(),
   title: z.string().trim().min(2, "Informe o nome do checklist."),
+  checklist_type: z.enum(["documents", "steps"]).default("documents"),
 });
 
 export const checklistItemSchema = z.object({
   checklist_id: z.string().uuid(),
   title: z.string().trim().min(2, "Informe o item."),
   is_done: z.coerce.boolean().optional().default(false),
+  due_date: dateString,
+  due_time: optionalText,
+});
+
+export const servicePropertyInfoSchema = z.object({
+  service_card_id: z.string().uuid(),
+  title: z.string().trim().min(2, "Informe o titulo."),
+  value: optionalText,
+});
+
+export const serviceReceiptSchema = z.object({
+  service_card_id: z.string().uuid(),
+  amount: z
+    .string()
+    .min(1, "Informe o valor.")
+    .transform((value, ctx) => {
+      const parsed = parseBrlCurrencyInput(value);
+      if (parsed === null || parsed <= 0) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Informe um valor valido." });
+        return z.NEVER;
+      }
+      return parsed;
+    }),
+  paid_at: z.string().min(1, "Informe a data do recebimento."),
+  description: optionalText,
+});
+
+export const serviceEditSchema = z.object({
+  client_id: z
+    .string()
+    .optional()
+    .transform((value) => (value ? value : null)),
+  title: z.string().trim().min(3, "Informe o nome do imovel."),
+  description: optionalText,
+  municipality: optionalText,
+  responsible_user_id: z
+    .string()
+    .optional()
+    .transform((value) => (value ? value : null)),
+  service_type: z.enum(["georreferenciamento", "car", "itr_ccir", "outros_servicos"]),
+  custom_service_name: optionalText,
+  due_date: dateString,
+  payment_condition: optionalText,
+  estimated_value: z
+    .string()
+    .optional()
+    .transform((value) => (value ? parseBrlCurrencyInput(value) : null))
+    .pipe(z.number().nonnegative("Informe um valor valido.").nullable()),
+});
+
+export const agendaReminderSchema = z.object({
+  title: z.string().trim().min(2, "Informe o titulo."),
+  description: optionalText,
+  reminder_date: z.string().min(1, "Informe a data."),
+  reminder_time: optionalText,
+  category: z.string().trim().min(2, "Informe a categoria.").default("Outro"),
+  custom_category: optionalText,
+  recurrence: z.enum(["none", "weekly"]).default("none"),
+  recipient_user_ids: z.array(z.string().uuid()).min(1, "Selecione ao menos um destinatario."),
 });
 
 export const financeSchema = z.object({
@@ -305,9 +386,92 @@ export const financeSchema = z.object({
   description: z.string().trim().min(3, "Informe a descricao."),
   category: z.string().trim().min(2, "Informe a categoria."),
   amount: z.coerce.number().positive("Informe um valor positivo."),
+  expected_amount: z.coerce.number().positive("Informe um valor positivo.").nullable().optional(),
+  realized_amount: z.coerce.number().positive("Informe um valor positivo.").nullable().optional(),
   due_date: z.string().min(1, "Informe o vencimento."),
   paid_at: dateString,
+  bank_account: optionalText,
+  notes: optionalText,
   status: z.enum(["pending", "paid", "overdue"]),
+});
+
+export const financeTransferSchema = z.object({
+  from_bank_account: z.string().trim().min(2, "Informe a conta de saida."),
+  to_bank_account: z.string().trim().min(2, "Informe a conta de entrada."),
+  amount: z.coerce.number().positive("Informe um valor positivo."),
+  transfer_date: z.string().min(1, "Informe a data."),
+  description: z.string().trim().min(3, "Informe a descricao."),
+  notes: optionalText,
+});
+
+export const routineItemSchema = z.object({
+  title: z.string().trim().min(2, "Informe a tarefa."),
+  description: optionalText,
+  routine_scope: z.enum(["daily", "weekly", "monthly", "annual"]).default("daily"),
+  routine_date: dateString,
+  due_time: optionalText,
+  is_emergency: z.coerce.boolean().optional().default(false),
+});
+
+export const companyKnowledgeItemSchema = z.object({
+  category_id: z.string().uuid("Selecione uma categoria."),
+  title: z.string().trim().min(2, "Informe o titulo."),
+  status: z
+    .enum(["em_revisao", "em_desenvolvimento", "atualizado", "nao_iniciada"])
+    .default("nao_iniciada"),
+  description: optionalText,
+  content_markdown: optionalText,
+});
+
+export const companyKnowledgeCategorySchema = z.object({
+  name: z.string().trim().min(2, "Informe o nome do eixo."),
+});
+
+export const companyKnowledgeBlockSchema = z.object({
+  item_id: z.string().uuid(),
+  title: z.string().trim().min(2, "Informe o titulo do bloco."),
+  content: optionalText,
+});
+
+export const companyKnowledgeChecklistItemSchema = z.object({
+  knowledge_item_id: z.string().uuid(),
+  title: z.string().trim().min(2, "Informe o item."),
+  due_date: dateString,
+  due_time: optionalText,
+});
+
+export const hrDocumentSchema = z.object({
+  team_member_id: z
+    .string()
+    .optional()
+    .transform((value) => (value ? value : null)),
+  title: z.string().trim().min(2, "Informe o nome do documento."),
+  document_type: z.string().trim().min(2, "Informe o tipo do documento."),
+  document_date: dateString,
+  due_date: dateString,
+  status: z.string().trim().min(2).default("active"),
+  storage_path: z.string().min(1, "Envie o arquivo."),
+  file_name: z.string().min(1),
+  mime_type: optionalText,
+  size_bytes: z.coerce.number().nullable().optional(),
+});
+
+export const hrAbsenceSchema = z.object({
+  team_member_id: z.string().uuid("Selecione o colaborador."),
+  absence_type: z.enum(["ferias", "falta", "afastamento", "outro"]),
+  start_date: z.string().min(1, "Informe a data inicial."),
+  end_date: dateString,
+  notes: optionalText,
+});
+
+export const hrBirthdaySchema = z.object({
+  team_member_id: z
+    .string()
+    .optional()
+    .transform((value) => (value ? value : null)),
+  name: z.string().trim().min(2, "Informe o nome."),
+  birthday: z.string().min(1, "Informe a data."),
+  notes: optionalText,
 });
 
 export const documentTemplateSchema = z.object({
@@ -368,4 +532,17 @@ export type ProposalFormValues = z.input<typeof proposalSchema>;
 export type ProposalPdfFormValues = z.input<typeof proposalPdfSchema>;
 export type ProposalModelDraftFormValues = z.input<typeof proposalModelDraftSchema>;
 export type ServiceCardFormValues = z.input<typeof serviceCardSchema>;
+export type ServiceEditFormValues = z.input<typeof serviceEditSchema>;
+export type ServiceReceiptFormValues = z.input<typeof serviceReceiptSchema>;
+export type ServicePropertyInfoFormValues = z.input<typeof servicePropertyInfoSchema>;
+export type AgendaReminderFormValues = z.input<typeof agendaReminderSchema>;
 export type FinanceFormValues = z.input<typeof financeSchema>;
+export type FinanceTransferFormValues = z.input<typeof financeTransferSchema>;
+export type RoutineItemFormValues = z.input<typeof routineItemSchema>;
+export type CompanyKnowledgeCategoryFormValues = z.input<typeof companyKnowledgeCategorySchema>;
+export type CompanyKnowledgeItemFormValues = z.input<typeof companyKnowledgeItemSchema>;
+export type CompanyKnowledgeBlockFormValues = z.input<typeof companyKnowledgeBlockSchema>;
+export type CompanyKnowledgeChecklistItemFormValues = z.input<typeof companyKnowledgeChecklistItemSchema>;
+export type HrDocumentFormValues = z.input<typeof hrDocumentSchema>;
+export type HrAbsenceFormValues = z.input<typeof hrAbsenceSchema>;
+export type HrBirthdayFormValues = z.input<typeof hrBirthdaySchema>;

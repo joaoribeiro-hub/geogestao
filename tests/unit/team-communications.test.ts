@@ -6,6 +6,11 @@ import {
   calculateTeamChatBadgeCounts,
   previewMessage,
 } from "@/lib/team-communications/badges";
+import {
+  getDateRangeForSaoPauloDay,
+  getDirectConversationKey,
+  GENERAL_CONVERSATION_KEY,
+} from "@/lib/team-communications/conversations";
 
 describe("TEAM-COMMS-CHECKLIST-BADGES-1", () => {
   it("conta apenas itens abertos de hoje no badge do checklist", () => {
@@ -102,5 +107,45 @@ describe("TEAM-COMMS-CHECKLIST-BADGES-1", () => {
 
   it("limita preview de activity log do chat", () => {
     expect(previewMessage("a".repeat(120))).toHaveLength(80);
+  });
+
+  it("gera chave estavel para conversa direta", () => {
+    expect(getDirectConversationKey("user-b", "user-a")).toBe("direct:user-a:user-b");
+    expect(getDirectConversationKey("user-a", "user-b")).toBe("direct:user-a:user-b");
+    expect(GENERAL_CONVERSATION_KEY).toBe("general");
+  });
+
+  it("filtra mensagens por dia no timezone do Brasil", () => {
+    expect(getDateRangeForSaoPauloDay("2026-05-21")).toEqual({
+      startIso: "2026-05-21T03:00:00.000Z",
+      endIso: "2026-05-22T03:00:00.000Z",
+    });
+  });
+
+  it("cria migration de refinamento com chat direto e leitura por conversa", () => {
+    const migration = readFileSync(
+      join(process.cwd(), "supabase/migrations/031_notifications_chat_direct_refine.sql"),
+      "utf8",
+    );
+
+    expect(migration).toContain("action_url text");
+    expect(migration).toContain("chat_scope text");
+    expect(migration).toContain("recipient_user_id uuid");
+    expect(migration).toContain("conversation_key text");
+    expect(migration).toContain("unique (organization_id, user_id, conversation_key)");
+    expect(migration).toContain("chat_scope = 'general'");
+    expect(migration).toContain("recipient_user_id = auth.uid()");
+  });
+
+  it("exibe controles de conversa direta e filtro de data no widget", () => {
+    const widget = readFileSync(
+      join(process.cwd(), "src/components/team-chat/team-chat-widget.tsx"),
+      "utf8",
+    );
+
+    expect(widget).toContain("Geral da empresa");
+    expect(widget).toContain("Direto:");
+    expect(widget).toContain('data-testid={`team-chat-date-${filter}`}');
+    expect(widget).toContain('"today", "yesterday", "custom"');
   });
 });

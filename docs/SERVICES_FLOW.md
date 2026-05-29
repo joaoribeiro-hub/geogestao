@@ -15,15 +15,18 @@ Completo como um sistema profissional. Simples como um quadro de tarefas.
 
 Menu principal:
 
-- Dashboard
+- Dashboard (somente owner)
 - Servicos
-- Financeiro
+- Propostas (subitem de Servicos)
+- Contratos (subitem de Servicos)
+- Clientes
+- Agenda
+- Financeiro (somente owner)
 
 Configuracoes:
 
 - Minha Empresa
 - Minha Conta
-- Clientes / Base de clientes
 - Documentos
 - Legislacao
 - Anexos
@@ -43,7 +46,7 @@ Georreferenciamento:
 7. Geo Protocolado no INCRA
 8. Geo - Pendencia de Confrontante
 9. Geo Concluido
-10. Servico perdido
+10. Servico perdido (oculto na experiencia principal desta fase; dados antigos nao sao apagados)
 
 CAR:
 
@@ -54,7 +57,7 @@ CAR:
 5. Em atraso
 6. CAR Protocolado/Em Analise
 7. CAR Concluido
-8. Servico perdido
+8. Servico perdido (oculto)
 
 ITR/CCIR:
 
@@ -65,7 +68,7 @@ ITR/CCIR:
 5. Em atraso
 6. Protocolado/Enviado
 7. Concluido
-8. Servico perdido
+8. Servico perdido (oculto)
 
 Outros Servicos:
 
@@ -75,7 +78,7 @@ Outros Servicos:
 4. Prioridade
 5. Em atraso
 6. Concluido
-7. Servico perdido
+7. Servico perdido (oculto)
 
 Todo servico novo deve entrar primeiro em `Aguardando documentos`.
 
@@ -92,7 +95,10 @@ A tela `/servicos` possui o botao `Novo Servico`, abrindo um modal grande com:
 - data prevista;
 - status de pagamento;
 - valor previsto;
-- responsavel principal.
+- responsavel principal;
+- municipio;
+- condicao de pagamento;
+- nome personalizado quando o tipo for `Outros`.
 
 O valor previsto usa formato monetario brasileiro. Exemplos aceitos:
 
@@ -106,9 +112,10 @@ Ao criar o servico:
 
 - o card e criado na primeira coluna do quadro do tipo escolhido;
 - se existir a coluna `Aguardando documentos`, ela e usada;
-- um checklist padrao e criado conforme o tipo de servico.
+- sao criados dois checklists vazios: `Checklist - Documentos` e `Checklist - Etapas`.
 - o servidor recalcula a coluna inicial a partir do `service_type`, evitando depender apenas de um campo escondido do formulario.
 - apos sucesso, o modal fecha, a tela atualiza e o usuario e levado para a aba do tipo de servico criado.
+- o seletor de cliente usa busca reaproveitavel por nome, documento, telefone ou e-mail.
 
 O filtro de periodo da tela de Servicos usa o intervalo operacional do servico:
 
@@ -140,7 +147,7 @@ Ao clicar em `Em execucao`:
 
 Nas colunas de execucao, o botao `Proximo` move o card para a proxima coluna a direita dentro do fluxo daquele tipo.
 
-A coluna `Servico perdido` existe em todos os fluxos. Quando um servico entra nessa coluna:
+A coluna `Servico perdido` pode existir por compatibilidade em dados antigos, mas nao aparece no Kanban principal desta fase. Quando um servico antigo estiver nessa coluna:
 
 - o valor sai do lucro estimado;
 - o valor sai do lucro efetuado, mesmo se estava pago;
@@ -178,6 +185,25 @@ O card inteiro e clicavel e abre `/servicos/[id]`. O botao antigo `Abrir detalhe
 A pagina `/servicos/[id]` mostra:
 
 - cliente em destaque;
+- municipio;
+- tag Ativo/Inativo;
+- botao Editar para owner ou responsavel principal;
+- bloco Financeiro para owner ou responsavel principal;
+- Informacoes adicionais do imovel;
+- Checklist - Documentos;
+- Checklist - Etapas;
+- Movimentacoes.
+
+Interacoes de servico com data/horario geram lembretes e notificacoes para os destinatarios padrao: criador e responsavel principal, quando existir.
+
+Quando um servico nao possui cliente vinculado, o detalhe mostra:
+
+- busca de cliente existente da mesma organizacao;
+- ate 10 resultados visiveis;
+- botao `Vincular`;
+- botao `Cadastrar cliente`.
+
+Owner e responsavel principal podem vincular ou cadastrar cliente no servico. Outros membros visualizam aviso sem acao.
 - nome do imovel/empreendimento;
 - tipo de servico como badge pequeno;
 - resumo automatico deterministico;
@@ -259,3 +285,23 @@ Outros Servicos:
 - Historico estruturado em `service_events` depende da mesma migration.
 - Regras financeiras existentes foram preservadas.
 - A migration corretiva `016_services_workflow_company_team_permissions.sql` adiciona os fluxos iniciais para CAR, ITR/CCIR e Outros Servicos, equipe operacional, dados bancarios e permissao owner/admin para edicao de Minha Empresa.
+## HOME-ROUTINE-SCHEDULE-FINANCE-COMPANY-1
+
+- O menu Servicos agora possui o bloco "Cronograma dos servicos" abaixo do Kanban.
+- O cronograma usa o mes atual por padrao e permite navegar por mes anterior, atual e proximo.
+- Servicos aparecem por data de inicio operacional e data prevista/final.
+- Itens do Checklist - Etapas com data aparecem no cronograma e na Agenda.
+- Itens do Checklist - Etapas com data e horario geram notificacoes de lembrete.
+- Checklist - Documentos continua sem impacto na porcentagem do servico e nao alimenta cronograma.
+
+## DOCUMENTS-STORAGE-ARCH-1
+
+O detalhe do servico ganhou painel de documentos profissionais usando a tabela `documents` e o bucket privado `documentos`.
+
+Paths de servico:
+
+```text
+organizations/{organization_id}/services/{service_id}/documents/{document_id}/{safe_filename}
+```
+
+Os anexos legados do servico continuam em `attachments` para compatibilidade e nao sao migrados automaticamente.

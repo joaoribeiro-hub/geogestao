@@ -74,6 +74,8 @@ Observacoes:
 - Se `OPENAI_API_KEY` nao estiver configurada, o Chat IA retorna erro claro de configuracao e nao chama a OpenAI.
 - O Chat IA usa o SDK oficial `openai` e a Responses API apenas com texto nesta fase.
 - O Assistente IA em `/assistente-ia` funciona sem API externa por interpretador local. `AI_PROVIDER`, `GEMINI_API_KEY`, `OPENROUTER_API_KEY` e `GROQ_API_KEY` sao opcionais, server-side e usados apenas para classificar intencoes.
+- O Chat da equipe e flutuante, com conversa geral da empresa, conversa direta entre dois membros, badges por nao lidas e isolamento por `organization_id`.
+- O sininho de notificacoes usa `action_url` interno para abrir cliente, servico, Agenda ou checklist de origem, e o botao `X` marca a notificacao como lida.
 - Variaveis Google/Drive sao opcionais e servem apenas para a origem bruta das bases geograficas. A consulta do app deve usar tabelas ja importadas no Supabase/Postgres.
 - `SUPABASE_SERVICE_ROLE_KEY` e permitido apenas em scripts locais/admin de importacao geografica. Nunca usar no frontend.
 - Variaveis MapBiomas Alerta sao server-side. Nunca criar `NEXT_PUBLIC_MAPBIOMAS_*`.
@@ -139,6 +141,8 @@ No ultimo ciclo de implementacao da Fase 1, essas validacoes passaram.
 - `/propostas/[id]` - visualizacao/preview A4 e edicao resumida da proposta.
 - `/servicos` - quadros e cards de servicos tecnicos.
 - `/servicos/[id]` - detalhe de card/servico tecnico.
+- `/agenda` - calendario mensal com prazos de servicos e lembretes.
+- Sininho de notificacoes sincroniza lembretes de cliente, servico e Agenda por usuario/organizacao.
 - `/financeiro` - receitas, despesas e resumos basicos.
 - `/documentos` - biblioteca de modelos/documentos.
 - `/legislacao` - biblioteca de legislacao/normas.
@@ -834,3 +838,83 @@ O arquivo `src/types/database.ts` concentra os tipos TypeScript principais, incl
 8. Preparar documentos de cliente/imovel.
 9. Evoluir dashboard gerencial.
 10. Adicionar camada de satelite ao mapa via provedor com API adequada.
+## HOME-ROUTINE-SCHEDULE-FINANCE-COMPANY-1
+
+Implementado:
+
+- menu Rotina;
+- menu Dashboard renomeado para Inicio;
+- cronograma mensal dentro de Servicos;
+- Checklist - Etapas com data/horario opcional;
+- Agenda com categorias, recorrencia semanal, edicao e cancelamento;
+- Financeiro com Entrada, Saida, Transferencia e painel lateral;
+- Minha Empresa com Missao, Visao, Valores, base interna e RH visual.
+
+Preparado para futuro:
+
+- documentos de RH;
+- ferias/faltas;
+- aniversarios;
+- blocos detalhados da base interna;
+- migracao automatica de tarefas vencidas sem cron real.
+
+## HOME-HR-REPORTS-NOTIFICATIONS-FINISH-1
+
+Implementado:
+
+- notificacoes do Inicio com abas funcionais, filtro de nao lidas e botao X;
+- menu Relatorios abaixo de Financeiro;
+- relatorios iniciais de tarefas/checklists por status, data, membro e dia da semana;
+- Base Interna da empresa com itens clicaveis, detalhe editavel, blocos e checklist;
+- RH com data de nascimento em colaboradores;
+- RH > Aniversarios em calendario mensal;
+- RH > Ferias e faltas em calendario mensal;
+- RH > Contratos e documentos com upload real.
+
+Migration: `033_home_hr_reports_notifications_finish.sql`.
+
+## WORK-TIME-TRACKING-1
+
+Implementado:
+
+- timer de expediente no topo do app autenticado;
+- heartbeat em `/api/work-time` com persistencia em banco;
+- pausa por intervalo;
+- modo saida para campo;
+- confirmacao de seguranca a cada 2 horas com janela de 15 minutos;
+- congelamento por falta de confirmacao;
+- fechamento idempotente de dias antigos ao carregar o app;
+- jornada esperada por colaborador em RH;
+- feriados nacionais 2026 em `company_holidays`;
+- feriados visiveis na Agenda;
+- relatorios de horas diario, semanal e mensal em Relatorios.
+
+Migration: `034_work_time_tracking.sql`.
+
+## DOCUMENTS-STORAGE-ARCH-1
+
+Implementado:
+
+- bucket privado `documentos` preparado no Supabase Storage;
+- tabela `documents` para metadados profissionais;
+- tabela `document_chunks` para busca textual;
+- tabela `document_processing_jobs` como fila inicial de processamento;
+- quota em bytes por organizacao com reserva, confirmacao, cancelamento e remocao;
+- APIs seguras para preparar upload, confirmar upload, cancelar reserva, buscar, baixar por signed URL e remover;
+- painel reutilizavel de documentos profissionais em Documentos, Cliente e Servico;
+- worker inicial para processar TXT e preparar PDF/DOCX/OCR.
+
+Migration: `035_documents_storage_arch.sql`.
+
+## UX-CLEAN-COMPANY-KNOWLEDGE-1
+
+Implementado:
+
+- Minha Empresa > Informacoes abre em modo visualizacao e owner usa Editar/Salvar.
+- Base Interna da empresa foi reorganizada por eixos e paginas.
+- Eixos e paginas padrao sao criados por organizacao de forma idempotente.
+- Paginas da Base Interna possuem rota propria em `/minha-empresa/base-interna/[pageId]`.
+- Documentos profissionais, documentos de RH e item de Rotina usam botao + modal em vez de formulario grande aberto.
+- Login, onboarding concluido e raiz autenticada levam para `/inicio`.
+
+Migration: `036_ux_clean_company_knowledge.sql`.

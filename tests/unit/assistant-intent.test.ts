@@ -49,6 +49,15 @@ describe("assistant intent detector", () => {
     expect(detection.intent).toBe("create_member_task");
   });
 
+  it("detecta atribuicao direta quando usuario diz quero que membro faca algo", () => {
+    const detection = detectAssistantIntent("Quero que a Natalia faca o TRI do cliente Almeida");
+
+    expect(detection.intent).toBe("create_member_task");
+    expect(detection.needsConfirmation).toBe(true);
+    expect(detection.params.memberName).toBe("Natalia");
+    expect(detection.params.description).toBe("Fazer o TRI do cliente Almeida");
+  });
+
   it("detecta criacao de interacao", () => {
     const detection = detectAssistantIntent("Criar uma interação no cliente Ramon dizendo que ele pediu retorno amanhã");
     expect(detection.intent).toBe("create_client_interaction");

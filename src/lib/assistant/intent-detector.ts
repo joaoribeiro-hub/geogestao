@@ -211,7 +211,11 @@ function extractInteractionDescription(message: string) {
 function hasMemberTaskLanguage(normalized: string) {
   const taskTerms = hasAny(normalized, synonyms.createTask) || hasAny(normalized, ["lembrar", "lembra", "responsavel"]);
   const memberTerms = hasAny(normalized, ["para o membro", "para a membro", "para membro", "pro membro", "pra membro", "atribui para", "atribuir para", "responsavel"]);
-  return taskTerms && memberTerms;
+  const directAssignment =
+    /\b(?:quero que|peca para|coloque para|manda|mande)\s+(?:o\s+|a\s+)?[\w\s'-]{2,80}?\s+(?:faca|fazer|realize|revise|ligue|mande|envie|prepare|busque|leve|pegue)\b/.test(
+      normalized,
+    );
+  return (taskTerms && memberTerms) || directAssignment;
 }
 
 function hasClearServiceCreationLanguage(normalized: string) {
@@ -252,6 +256,7 @@ export function hasTaskConflictTerms(normalized: string) {
 
 function extractTaskMemberName(message: string) {
   const patterns = [
+    /(?:quero que|pe[cç]a para|coloque para|manda|mande)\s+(?:o\s+|a\s+)?(.+?)\s+(?:fa[cç]a|fazer|realize|revise|ligue|mande|envie|prepare|busque|leve|pegue)\b/i,
     /(?:para|pra|pro)\s+(?:o\s+|a\s+)?membro\s+(.+?)(?:\s*[:'"]|$)/i,
     /(?:atribui(?:r)?|atribuir|responsavel)\s+(?:para|pra|pro)?\s*(?:o\s+|a\s+)?(.+?)(?:\s*[:'"]|$)/i,
   ];
@@ -267,6 +272,16 @@ function extractMemberTaskDescription(message: string) {
   if (quoted) return quoted;
   const afterColon = message.split(":").slice(1).join(":").trim();
   if (afterColon) return afterColon;
+  const directAssignment =
+    /(?:quero que|pe[cç]a para|coloque para|manda|mande)\s+(?:o\s+|a\s+)?(.+?)\s+(fa[cç]a|fazer|realize|revise|ligue|mande|envie|prepare|busque|leve|pegue)\s+(.+)$/i.exec(
+      message,
+    );
+  if (directAssignment?.[3]) {
+    const verb = directAssignment[2].toLowerCase();
+    const text = directAssignment[3].trim();
+    if (/fa[cç]a|fazer/i.test(verb)) return `Fazer ${text}`;
+    return `${capitalizeFirst(verb)} ${text}`;
+  }
   return message
     .replace(/^.*?(?:crie|criar|cria|nova|cadastrar)\s+(?:uma\s+)?tarefa/i, "")
     .replace(/^.*?me lembra\s+de\s+/i, "")
@@ -275,6 +290,10 @@ function extractMemberTaskDescription(message: string) {
     .replace(/\s+e\s+(?:atribui|atribuir)\s+(?:para|pra|pro)\s+.+$/i, "")
     .replace(/\b(hoje|amanha|amanhÃ£|ontem)\b/gi, "")
     .trim() || "Tarefa criada pelo Assistente IA";
+}
+
+function capitalizeFirst(value: string) {
+  return value ? value.charAt(0).toUpperCase() + value.slice(1) : value;
 }
 
 function extractRelativeDate(message: string) {

@@ -6,6 +6,7 @@ import { requireUser } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
 import { formDataToObject } from "@/lib/form-data";
 import { getCurrentOrganizationForUser } from "@/lib/organization";
+import { generateReminderNotifications, splitLocalDateTime } from "@/lib/notifications/reminders";
 import { clientSchema, interactionSchema } from "@/lib/schemas";
 import { createServerSupabase } from "@/lib/supabase/server";
 
@@ -30,6 +31,30 @@ export async function createClientAction(formData: FormData) {
 
   revalidatePath("/clientes");
   redirect(`/clientes/${data.id}`);
+}
+
+export async function createClientInlineAction(formData: FormData) {
+  const supabase = await createServerSupabase();
+  const user = await requireUser(supabase);
+  const organization = await getCurrentOrganizationForUser(supabase, user.id);
+  const parsed = clientSchema.parse(formDataToObject(formData));
+
+  const { data, error } = await supabase
+    .from("clients")
+    .insert({ ...parsed, organization_id: organization.id, created_by: user.id })
+    .select("id,name")
+    .single();
+
+  if (error) throw new Error(error.message);
+  await logAudit(supabase, {
+    action: "client.created",
+    entityType: "client",
+    entityId: data.id,
+  });
+
+  revalidatePath("/clientes");
+  revalidatePath("/servicos");
+  return data;
 }
 
 export async function updateClientAction(clientId: string, formData: FormData) {
@@ -108,12 +133,35 @@ export async function createInteractionAction(formData: FormData) {
   const organization = await getCurrentOrganizationForUser(supabase, user.id);
   const parsed = interactionSchema.parse(formDataToObject(formData));
 
-  const { error } = await supabase.from("client_interactions").insert({
+  const { data: interaction, error } = await supabase.from("client_interactions").insert({
     ...parsed,
     organization_id: organization.id,
     responsible_id: user.id,
-  });
+  }).select("id").single();
   if (error) throw new Error(error.message);
+
+  const { date, time } = splitLocalDateTime(parsed.occurred_at);
+  const { data: client } = await supabase
+    .from("clients")
+    .select("name")
+    .eq("id", parsed.client_id)
+    .eq("organization_id", organization.id)
+    .maybeSingle();
+  const clientName = client?.name ?? "Cliente";
+  await generateReminderNotifications(supabase, {
+    organizationId: organization.id,
+    reminderId: interaction.id,
+    entityType: "client_interaction",
+    entityId: interaction.id,
+    title: `${clientName}: ${parsed.description}`,
+    description: `Cliente ${clientName}: ${parsed.description}`,
+    reminderDate: date,
+    reminderTime: time,
+    recipientUserIds: [user.id],
+    actorUserId: user.id,
+    actionUrl: `/clientes/${parsed.client_id}`,
+    metadata: { client_id: parsed.client_id, client_name: clientName },
+  });
 
   await logAudit(supabase, {
     action: "client_interaction.created",

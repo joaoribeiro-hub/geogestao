@@ -62,7 +62,8 @@ export function LoginForm() {
       return;
     }
 
-    router.replace(params.get("redirectedFrom") ?? "/");
+    const redirectedFrom = params.get("redirectedFrom");
+    router.replace(redirectedFrom && redirectedFrom !== "/" ? redirectedFrom : "/inicio");
     router.refresh();
   }
 

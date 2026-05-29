@@ -73,3 +73,8 @@ Para responder "o que ele esta fazendo agora", o assistente usa o checklist do m
 6. se nao houver aberto, informa que nao ha item em andamento.
 
 O contexto da conversa guarda o ultimo membro citado, entao perguntas seguintes com "ele", "ela" ou "esse membro" continuam apontando para o mesmo usuario da organizacao.
+## HOME-ROUTINE-SCHEDULE-FINANCE-COMPANY-1
+
+- Rotina diaria criada no menu Rotina cria item correspondente no Checklist de Hoje da data selecionada.
+- Marcar/desmarcar item de rotina sincroniza o item diario vinculado quando houver vinculo.
+- A migracao automatica de itens nao concluidos para o dia seguinte fica preparada para evolucao idempotente sem cron real.

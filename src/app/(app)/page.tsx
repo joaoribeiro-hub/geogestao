@@ -1,8 +1,9 @@
 import Link from "next/link";
-import { AlertTriangle, CalendarClock, CircleDollarSign, FolderKanban, Users } from "lucide-react";
+import { AlertTriangle, Bell, CalendarClock, CircleDollarSign, FolderKanban, Search, Users } from "lucide-react";
 import { PeriodFilter } from "@/components/filters/period-filter";
-import { PageHeader } from "@/components/layout/page-header";
+import { HomeNotifications } from "@/components/home/home-notifications";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { requireUser } from "@/lib/auth";
@@ -12,13 +13,16 @@ import { filterOrganizationRows } from "@/lib/services/dashboard-metrics";
 import { calculateServiceFinanceSummary } from "@/lib/services/service-finance";
 import { createServerSupabase } from "@/lib/supabase/server";
 import { formatCurrency, formatDate } from "@/lib/utils";
+import type { DailyChecklistItem } from "@/types/database";
 
 export default async function DashboardPage({
   searchParams,
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const periodRange = resolvePeriodRange(await searchParams);
+  const params = await searchParams;
+  const periodRange = resolvePeriodRange(params);
+  const q = Array.isArray(params.q) ? params.q[0] ?? "" : params.q ?? "";
   const supabase = await createServerSupabase();
   const user = await requireUser(supabase);
   const organization = await getCurrentOrganizationForUser(supabase, user.id);
@@ -30,14 +34,24 @@ export default async function DashboardPage({
     columnsResult,
     revenuesResult,
     expensesResult,
+    profileResult,
+    checklistResult,
   ] = await Promise.all([
-    supabase.from("clients").select("id,organization_id").eq("organization_id", organization.id),
+    supabase.from("clients").select("id,organization_id,name").eq("organization_id", organization.id),
     supabase.from("proposals").select("*").eq("organization_id", organization.id),
     supabase.from("contracts").select("*").eq("organization_id", organization.id),
     supabase.from("service_cards").select("*").eq("organization_id", organization.id).order("due_date"),
     supabase.from("service_columns").select("*"),
     supabase.from("revenues").select("*").eq("organization_id", organization.id).order("due_date"),
     supabase.from("expenses").select("*").eq("organization_id", organization.id).order("due_date"),
+    supabase.from("profiles").select("full_name").eq("id", user.id).maybeSingle(),
+    supabase
+      .from("daily_checklists")
+      .select("id,daily_checklist_items(*)")
+      .eq("organization_id", organization.id)
+      .eq("user_id", user.id)
+      .eq("checklist_date", new Date().toISOString().slice(0, 10))
+      .maybeSingle(),
   ]);
   const clients = filterOrganizationRows(clientsResult.data ?? [], organization.id);
   const proposals = filterByPeriod(
@@ -99,6 +113,32 @@ export default async function DashboardPage({
   );
   const expenseAmount = expenses.reduce((sum, item) => sum + Number(item.amount), 0);
   const serviceFinance = calculateServiceFinanceSummary(cards, columnMap);
+  const currentHour = new Date().getHours();
+  const greeting = currentHour < 12 ? "Bom dia" : currentHour < 18 ? "Boa tarde" : "Boa noite";
+  const displayName = profileResult.data?.full_name ?? user.email ?? "usuario";
+  const todayTasks = (Array.isArray(checklistResult.data?.daily_checklist_items)
+    ? checklistResult.data.daily_checklist_items
+    : []) as DailyChecklistItem[];
+  const normalizedQuery = q.trim().toLowerCase();
+  const searchResults = normalizedQuery
+    ? [
+        ...clients
+          .filter((client) => client.name?.toLowerCase().includes(normalizedQuery))
+          .slice(0, 5)
+          .map((client) => ({ href: `/clientes/${client.id}`, label: client.name ?? "Cliente", type: "Cliente" })),
+        ...cards
+          .filter((card) => card.title.toLowerCase().includes(normalizedQuery))
+          .slice(0, 5)
+          .map((card) => ({ href: `/servicos/${card.id}`, label: card.title, type: "Servico" })),
+        ...[
+          { href: "/servicos", label: "Servicos", type: "Menu" },
+          { href: "/clientes", label: "Clientes", type: "Menu" },
+          { href: "/agenda", label: "Agenda", type: "Menu" },
+          { href: "/rotina", label: "Rotina", type: "Menu" },
+          { href: "/financeiro", label: "Financeiro", type: "Menu" },
+        ].filter((item) => item.label.toLowerCase().includes(normalizedQuery)),
+      ]
+    : [];
 
   if (process.env.NODE_ENV !== "production") {
     console.info("[dashboard:organization-scope]", {
@@ -131,13 +171,86 @@ export default async function DashboardPage({
 
   return (
     <div data-testid="dashboard-page">
-      <PageHeader
-        title="Dashboard"
-        titleTestId="dashboard-title"
-        description="Visao rapida de clientes, propostas, servicos em andamento e financeiro."
-      />
+      <section className="mb-6 text-center">
+        <p className="text-sm font-medium text-muted-foreground">
+          {formatDate(new Date().toISOString().slice(0, 10))}
+        </p>
+        <h1 className="mt-2 text-3xl font-semibold tracking-normal" data-testid="dashboard-title">
+          {greeting}, {displayName}
+        </h1>
+        <p className="mt-2 text-sm text-muted-foreground">Central operacional do GeoGestao.</p>
+      </section>
+
+      <Card className="mx-auto mb-6 max-w-4xl">
+        <CardContent className="p-5">
+          <form action="/" className="flex gap-2">
+            <div className="relative flex-1">
+              <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+              <input
+                name="q"
+                defaultValue={q}
+                placeholder="Pesquisar tarefas, servicos, clientes, menus ou perguntar ao assistente..."
+                className="h-11 w-full rounded-md border border-input bg-background pl-9 pr-3 text-sm"
+              />
+            </div>
+            <Button>Buscar</Button>
+          </form>
+          {normalizedQuery ? (
+            <div className="mt-3 grid gap-2 md:grid-cols-2">
+              {searchResults.length ? (
+                searchResults.map((item) => (
+                  <Link key={`${item.type}-${item.href}`} href={item.href} className="rounded-md bg-secondary px-3 py-2 text-sm hover:bg-secondary/80">
+                    <Badge variant="outline" className="mr-2">{item.type}</Badge>
+                    {item.label}
+                  </Link>
+                ))
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  Nao encontrei registro direto. Use o Assistente IA flutuante para interpretar como pergunta ou comando.
+                </p>
+              )}
+            </div>
+          ) : null}
+        </CardContent>
+      </Card>
 
       <PeriodFilter range={periodRange} action="/" />
+
+      <div className="mb-6 grid gap-6 xl:grid-cols-[minmax(0,1fr)_420px]">
+        <Card>
+          <CardHeader>
+            <CardTitle>Tarefas de hoje</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {todayTasks.length ? (
+              <div className="space-y-2">
+                {todayTasks.slice(0, 8).map((item) => (
+                  <div key={item.id} className="rounded-md border bg-background px-3 py-2 text-sm">
+                    <p className={item.status === "done" ? "text-muted-foreground line-through" : "font-medium"}>{item.title}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {item.is_emergency ? "Emergencia · " : ""}{item.status === "done" ? "Concluida" : "Aberta"}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <EmptyState title="Nenhuma tarefa programada para hoje." />
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Bell className="size-5" aria-hidden="true" />
+              Notificacoes
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <HomeNotifications />
+          </CardContent>
+        </Card>
+      </div>
 
       <div className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Metric title="Total de clientes" value={clients.length.toString()} icon={<Users />} />

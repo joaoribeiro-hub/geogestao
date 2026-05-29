@@ -12,10 +12,12 @@ export function NewServiceModal({
   clients,
   columns,
   columnByServiceType,
+  members,
 }: {
   clients: Client[];
   columns: ServiceColumn[];
   columnByServiceType: Partial<Record<ProposalServiceType, string>>;
+  members?: Array<{ id: string; label: string }>;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -47,8 +49,8 @@ export function NewServiceModal({
               <div>
                 <h2 className="text-lg font-semibold">Novo Servico</h2>
                 <p className="text-sm text-muted-foreground">
-                  O servico sera criado em Aguardando documentos e recebera um
-                  checklist padrao conforme o tipo escolhido.
+                  O servico sera criado em Aguardando documentos. Os checklists
+                  de documentos e etapas comecam vazios para voce preencher.
                 </p>
               </div>
               <Button
@@ -66,6 +68,7 @@ export function NewServiceModal({
                 clients={clients}
                 columns={columns}
                 columnByServiceType={columnByServiceType}
+                members={members ?? []}
                 onCreated={(result) => {
                   setOpen(false);
                   setFeedback("Servico criado em Aguardando documentos.");

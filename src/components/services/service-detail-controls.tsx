@@ -1,18 +1,26 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Loader2, Plus, UserPlus } from "lucide-react";
+import { Loader2, Plus, UserPlus, X } from "lucide-react";
 import {
   addServiceMemberAction,
+  addServicePropertyInfoAction,
+  addServiceReceiptAction,
   createClientForServiceAction,
   createContractForServiceAction,
   createProposalForServiceAction,
   createServiceInteractionAction,
+  deleteServicePropertyInfoAction,
+  deleteServiceReceiptAction,
+  linkExistingClientToServiceAction,
+  updateServiceDetailsAction,
   updateServicePaymentStatusAction,
   updateServicePriorityAction,
   updateServiceStageAction,
 } from "@/app/(app)/servicos/actions";
-import type { PaymentStatus, Priority } from "@/types/database";
+import { formatBrlCurrency, parseBrlCurrencyInput } from "@/lib/services/service-finance";
+import { formatDate } from "@/lib/utils";
+import type { Client, Revenue, ServiceCard, ServiceColumn, ServicePropertyInfo, PaymentStatus, Priority } from "@/types/database";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -64,10 +72,28 @@ export function ServiceFieldSelect({
   );
 }
 
-export function ServiceClientCreatePanel({ serviceCardId }: { serviceCardId: string }) {
+export function ServiceClientCreatePanel({
+  serviceCardId,
+  clients,
+  canEdit,
+}: {
+  serviceCardId: string;
+  clients: Client[];
+  canEdit: boolean;
+}) {
   const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  const filteredClients = clients
+    .filter((client) => {
+      const value = search.trim().toLowerCase();
+      if (!value) return false;
+      return [client.name, client.document, client.phone, client.email]
+        .filter(Boolean)
+        .some((field) => field!.toLowerCase().includes(value));
+    })
+    .slice(0, 10);
 
   return (
     <div className="rounded-md border bg-secondary/40 p-4" id="cliente">
@@ -78,11 +104,69 @@ export function ServiceClientCreatePanel({ serviceCardId }: { serviceCardId: str
             Este servico ainda nao possui cliente vinculado.
           </p>
         </div>
-        <Button type="button" variant="outline" onClick={() => setOpen((value) => !value)}>
-          <UserPlus aria-hidden="true" />
-          Cadastrar cliente
-        </Button>
+        {canEdit ? (
+          <Button type="button" variant="outline" onClick={() => setOpen((value) => !value)}>
+            <UserPlus aria-hidden="true" />
+            Cadastrar cliente
+          </Button>
+        ) : null}
       </div>
+
+      {canEdit ? (
+        <div className="mt-4 space-y-3">
+          <div className="space-y-2">
+            <Label>Vincular cliente existente</Label>
+            <Input
+              placeholder="Buscar cliente pelo nome, CPF/CNPJ ou telefone..."
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+            />
+          </div>
+          {search.trim() ? (
+            <div className="max-h-72 space-y-2 overflow-y-auto rounded-md border bg-background p-2">
+              {filteredClients.length ? (
+                filteredClients.map((client) => (
+                  <div key={client.id} className="flex flex-wrap items-center justify-between gap-3 rounded-md border p-3 text-sm">
+                    <div>
+                      <p className="font-medium">{client.name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {client.document ?? "Sem documento"} · {client.phone ?? client.email ?? "Sem contato"}
+                      </p>
+                    </div>
+                    <Button
+                      type="button"
+                      size="sm"
+                      disabled={pending}
+                      onClick={() =>
+                        startTransition(() => {
+                          void (async () => {
+                            setMessage(null);
+                            try {
+                              await linkExistingClientToServiceAction(serviceCardId, client.id);
+                              setMessage(`Cliente ${client.name} vinculado ao servico.`);
+                            } catch (error) {
+                              setMessage(error instanceof Error ? error.message : "Nao foi possivel vincular cliente.");
+                            }
+                          })();
+                        })
+                      }
+                    >
+                      {pending ? <Loader2 className="animate-spin" aria-hidden="true" /> : null}
+                      Vincular
+                    </Button>
+                  </div>
+                ))
+              ) : (
+                <p className="p-3 text-sm text-muted-foreground">Nenhum cliente encontrado nesta empresa.</p>
+              )}
+            </div>
+          ) : null}
+        </div>
+      ) : (
+        <p className="mt-3 rounded-md bg-background p-3 text-sm text-muted-foreground">
+          Apenas o proprietario da empresa ou o responsavel principal pode vincular cliente ao servico.
+        </p>
+      )}
 
       {open ? (
         <form
@@ -270,6 +354,7 @@ export function ServiceInteractionForm({ serviceCardId }: { serviceCardId: strin
                 setMessage(null);
                 try {
                   await createServiceInteractionAction(formData);
+                  window.dispatchEvent(new Event("geogestao:notifications-refresh"));
                   setMessage("Interacao registrada no historico do servico.");
                   form.reset();
                   setOpen(false);
@@ -288,6 +373,16 @@ export function ServiceInteractionForm({ serviceCardId }: { serviceCardId: strin
             <Label>Descricao</Label>
             <Textarea name="description" required placeholder="Ex.: Cliente pediu retorno sobre documentos." />
           </div>
+          <div className="grid gap-3 md:grid-cols-2">
+            <div className="space-y-2">
+              <Label>Data do lembrete</Label>
+              <Input name="reminder_date" type="date" />
+            </div>
+            <div className="space-y-2">
+              <Label>Horario</Label>
+              <Input name="reminder_time" type="time" />
+            </div>
+          </div>
           {message ? <p className="text-xs text-muted-foreground">{message}</p> : null}
           <Button disabled={pending}>
             {pending ? <Loader2 className="animate-spin" aria-hidden="true" /> : <Plus aria-hidden="true" />}
@@ -297,6 +392,218 @@ export function ServiceInteractionForm({ serviceCardId }: { serviceCardId: strin
       ) : message ? (
         <p className="text-xs text-muted-foreground">{message}</p>
       ) : null}
+    </div>
+  );
+}
+
+export function ServiceEditModal({
+  card,
+  members,
+}: {
+  card: ServiceCard;
+  clients: Client[];
+  columns: ServiceColumn[];
+  members: Array<{ id: string; label: string }>;
+}) {
+  const [open, setOpen] = useState(false);
+  const [pending, startTransition] = useTransition();
+  const [value, setValue] = useState(formatBrlCurrency(Number((card.custom_fields_json as Record<string, unknown>)?.valor_previsto ?? 0)));
+
+  return (
+    <>
+      <Button type="button" variant="outline" onClick={() => setOpen(true)}>
+        Editar
+      </Button>
+      {open ? (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-foreground/35 p-4" role="dialog" aria-modal="true">
+          <form
+            className="max-h-[92vh] w-full max-w-3xl overflow-y-auto rounded-lg border bg-card p-5 shadow-xl"
+            onSubmit={(event) => {
+              event.preventDefault();
+              const formData = new FormData(event.currentTarget);
+              const parsedValue = parseBrlCurrencyInput(value);
+              formData.set("estimated_value", parsedValue === null ? "" : String(parsedValue));
+              startTransition(() => {
+                void (async () => {
+                  await updateServiceDetailsAction(card.id, formData);
+                  setOpen(false);
+                })();
+              });
+            }}
+          >
+            <div className="mb-4 flex items-start justify-between gap-3">
+              <div>
+                <h2 className="text-lg font-semibold">Editar servico</h2>
+                <p className="text-sm text-muted-foreground">Altere os dados principais e financeiros do servico.</p>
+              </div>
+              <Button type="button" variant="ghost" size="icon" onClick={() => setOpen(false)} aria-label="Fechar">
+                <X aria-hidden="true" />
+              </Button>
+            </div>
+            <div className="grid gap-4 md:grid-cols-2">
+              <Field label="Nome do proprietario" name="description" defaultValue={card.description ?? ""} textarea />
+              <Field label="Nome do imovel" name="title" defaultValue={card.title} />
+              <Field label="Municipio" name="municipality" defaultValue={card.municipality ?? ""} />
+              <Field label="Data prevista" name="due_date" type="date" defaultValue={card.due_date ?? ""} />
+              <div className="space-y-2">
+                <Label>Responsavel principal</Label>
+                <select name="responsible_user_id" defaultValue={card.responsible_user_id ?? ""} className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm">
+                  <option value="">Sem responsavel</option>
+                  {members.map((member) => <option key={member.id} value={member.id}>{member.label}</option>)}
+                </select>
+              </div>
+              <div className="space-y-2">
+                <Label>Tipo de servico</Label>
+                <select name="service_type" defaultValue={card.service_type ?? "outros_servicos"} className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm">
+                  <option value="georreferenciamento">Georreferenciamento</option>
+                  <option value="car">CAR</option>
+                  <option value="itr_ccir">ITR/CCIR</option>
+                  <option value="outros_servicos">Outros</option>
+                </select>
+              </div>
+              <Field label="Qual servico? (quando Outros)" name="custom_service_name" defaultValue={card.custom_service_name ?? ""} />
+              <div className="space-y-2">
+                <Label>Valor combinado</Label>
+                <Input value={value} onChange={(event) => setValue(event.target.value)} />
+              </div>
+            </div>
+            <div className="mt-4 space-y-2">
+              <Label>Condicao de pagamento</Label>
+              <Textarea name="payment_condition" defaultValue={card.payment_condition ?? ""} />
+            </div>
+            <div className="mt-5 flex justify-end gap-2">
+              <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
+              <Button disabled={pending}>{pending ? <Loader2 className="animate-spin" aria-hidden="true" /> : null}Salvar</Button>
+            </div>
+          </form>
+        </div>
+      ) : null}
+    </>
+  );
+}
+
+export function ServiceFinancePanel({
+  serviceCardId,
+  combinedValue,
+  paymentCondition,
+  receivedTotal,
+  revenues,
+}: {
+  serviceCardId: string;
+  combinedValue: number;
+  paymentCondition: string;
+  receivedTotal: number;
+  revenues: Revenue[];
+}) {
+  const [pending, startTransition] = useTransition();
+  const receivable = Math.max(combinedValue - receivedTotal, 0);
+  return (
+    <div className="rounded-lg border bg-card p-5">
+      <h2 className="text-base font-semibold">Financeiro</h2>
+      <div className="mt-4 grid gap-3 md:grid-cols-4">
+        <FinanceInfo label="Valor combinado" value={formatBrlCurrency(combinedValue)} />
+        <FinanceInfo label="Condicao de pagamento" value={paymentCondition || "-"} />
+        <FinanceInfo label="Valores recebidos" value={formatBrlCurrency(receivedTotal)} />
+        <FinanceInfo label="Valores a receber" value={formatBrlCurrency(receivable)} />
+      </div>
+      <form
+        className="mt-4 grid gap-3 md:grid-cols-[160px_160px_1fr_auto]"
+        onSubmit={(event) => {
+          event.preventDefault();
+          const formData = new FormData(event.currentTarget);
+          formData.set("service_card_id", serviceCardId);
+          startTransition(() => {
+            void addServiceReceiptAction(formData);
+            event.currentTarget.reset();
+          });
+        }}
+      >
+        <Input name="amount" placeholder="R$ 1.200,50" required />
+        <Input name="paid_at" type="date" required />
+        <Input name="description" placeholder="Observacao" />
+        <Button disabled={pending}>{pending ? <Loader2 className="animate-spin" aria-hidden="true" /> : <Plus aria-hidden="true" />}Receber</Button>
+      </form>
+      <div className="mt-4 space-y-2">
+        {revenues.map((revenue) => (
+          <div key={revenue.id} className="flex items-center justify-between gap-3 rounded-md border bg-background p-3 text-sm">
+            <span>{formatBrlCurrency(Number(revenue.amount))} · {formatDate(revenue.paid_at ?? revenue.due_date)} · {revenue.description}</span>
+            <Button type="button" size="icon" variant="ghost" className="text-destructive" onClick={() => startTransition(() => void deleteServiceReceiptAction(revenue.id))}>
+              <X className="size-4" aria-hidden="true" />
+            </Button>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+export function ServicePropertyInfoPanel({
+  serviceCardId,
+  items,
+}: {
+  serviceCardId: string;
+  items: ServicePropertyInfo[];
+}) {
+  const [pending, startTransition] = useTransition();
+  return (
+    <div className="rounded-lg border bg-card p-5">
+      <h2 className="text-base font-semibold">Informacoes adicionais do imovel</h2>
+      <form
+        className="mt-4 grid gap-3 md:grid-cols-[180px_1fr_auto]"
+        onSubmit={(event) => {
+          event.preventDefault();
+          const formData = new FormData(event.currentTarget);
+          formData.set("service_card_id", serviceCardId);
+          startTransition(() => {
+            void addServicePropertyInfoAction(formData);
+            event.currentTarget.reset();
+          });
+        }}
+      >
+        <Input name="title" placeholder="Matricula" required />
+        <Input name="value" placeholder="Valor / descricao" required />
+        <Button disabled={pending}>{pending ? <Loader2 className="animate-spin" aria-hidden="true" /> : <Plus aria-hidden="true" />}Adicionar</Button>
+      </form>
+      <div className="mt-4 space-y-2">
+        {items.map((item) => (
+          <div key={item.id} className="flex items-center justify-between gap-3 rounded-md border bg-background p-3 text-sm">
+            <span><strong>{item.title}:</strong> {item.value}</span>
+            <Button type="button" size="icon" variant="ghost" className="text-destructive" onClick={() => startTransition(() => void deleteServicePropertyInfoAction(item.id, serviceCardId))}>
+              <X className="size-4" aria-hidden="true" />
+            </Button>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function FinanceInfo({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-md border bg-background p-3">
+      <p className="text-xs text-muted-foreground">{label}</p>
+      <p className="mt-1 text-sm font-medium">{value}</p>
+    </div>
+  );
+}
+
+function Field({
+  label,
+  name,
+  defaultValue,
+  type = "text",
+  textarea = false,
+}: {
+  label: string;
+  name: string;
+  defaultValue?: string;
+  type?: string;
+  textarea?: boolean;
+}) {
+  return (
+    <div className="space-y-2">
+      <Label>{label}</Label>
+      {textarea ? <Textarea name={name} defaultValue={defaultValue} /> : <Input name={name} type={type} defaultValue={defaultValue} />}
     </div>
   );
 }
