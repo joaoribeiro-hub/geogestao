@@ -60,7 +60,7 @@ export async function POST(request: Request) {
   const parsed = assistantRequestSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json(
-      { error: "Mensagem invalida para o Assistente IA." },
+      { error: "Mensagem invalida para a Sophia." },
       { status: 400 },
     );
   }
@@ -402,6 +402,7 @@ function detectionFromConfirmation(confirmation: AssistantConfirmationPayload): 
     listMemberCurrentStatus: "list_member_current_status",
     createChecklistItem: "create_checklist_item",
     assignChecklistItem: "assign_checklist_item",
+    completeServiceStep: "complete_service_step",
     listMemberActivity: "list_member_activity",
     listClientServices: "list_client_services",
     listClientCommercialRecords: "list_client_commercial_records",

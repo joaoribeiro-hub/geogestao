@@ -73,7 +73,7 @@ export function AssistantFloatingWidget() {
       id: "welcome-assistant",
       role: "assistant",
       content:
-        "Sou o Assistente IA do GeoGestao. Posso ajudar com servicos, clientes, tarefas, financeiro, documentos e checklists da sua empresa.",
+        "Sou a Sophia, assistente do GeoGestao. Posso ajudar com servicos, clientes, tarefas, financeiro, documentos e checklists da sua empresa.",
     },
   ]);
   const [pending, startTransition] = useTransition();
@@ -143,7 +143,7 @@ export function AssistantFloatingWidget() {
             {
               id: crypto.randomUUID(),
               role: "assistant",
-              content: "Nao foi possivel conectar ao Assistente IA agora.",
+              content: "Nao foi possivel conectar a Sophia agora.",
               originalUserText: message,
             },
           ]);
@@ -204,14 +204,14 @@ export function AssistantFloatingWidget() {
         <section
           className="flex h-[min(620px,calc(100vh-8rem))] w-[calc(100vw-2rem)] max-w-[420px] flex-col overflow-hidden rounded-lg border bg-card shadow-xl"
           data-testid="assistant-floating-panel"
-          aria-label="Assistente IA"
+          aria-label="Sophia"
         >
           <header className="flex items-center justify-between border-b px-4 py-3">
             <div className="flex items-center gap-2">
               <Bot className="size-4 text-primary" aria-hidden="true" />
-              <p className="text-sm font-semibold">Assistente IA</p>
+              <p className="text-sm font-semibold">Sophia</p>
             </div>
-            <Button type="button" variant="ghost" size="icon" aria-label="Fechar Assistente IA" onClick={() => setOpen(false)}>
+            <Button type="button" variant="ghost" size="icon" aria-label="Fechar Sophia" onClick={() => setOpen(false)}>
               <X aria-hidden="true" />
             </Button>
           </header>
@@ -327,7 +327,7 @@ export function AssistantFloatingWidget() {
         type="button"
         size="icon"
         className="size-12 rounded-full shadow-lg"
-        aria-label={open ? "Minimizar Assistente IA" : "Abrir Assistente IA"}
+        aria-label={open ? "Minimizar Sophia" : "Abrir Sophia"}
         onClick={() => setOpen((current) => !current)}
         data-testid="assistant-floating-button"
       >

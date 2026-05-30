@@ -28,7 +28,7 @@ export function sanitizeAssistantFeedbackText(text: string) {
   }
 
   sanitized = sanitized.replace(/\b(\p{Lu}[\p{L}'_-]+(?:\s+\p{Lu}[\p{L}'_-]+){1,4})\b/gu, (match) => {
-    if (["GeoGestao", "Assistente IA"].includes(match)) return match;
+    if (["GeoGestao", "Assistente IA", "Sophia"].includes(match)) return match;
     return "[NOME]";
   });
 

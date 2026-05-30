@@ -28,6 +28,15 @@ export function detectAssistantIntent(message: string, context?: AssistantConver
   const normalized = normalizeAssistantText(message);
   const clientName = extractClientName(message);
 
+  if (isCompleteServiceStepRequest(normalized)) {
+    const step = extractQuotedValue(message, 0) ?? extractStepName(message);
+    const service = extractQuotedValue(message, 1) ?? extractServiceNameForStep(message);
+    return intent("complete_service_step", 0.93, {
+      stepName: step,
+      serviceName: service,
+    });
+  }
+
   if (hasMemberTaskLanguage(normalized)) {
     return intent(
       "create_member_task",
@@ -172,6 +181,25 @@ export function detectAssistantIntent(message: string, context?: AssistantConver
   return intent("unknown", 0.2, {});
 }
 
+function isCompleteServiceStepRequest(normalized: string) {
+  return hasAny(normalized, ["terminei", "conclui", "concluido", "finalizei", "marcar como concluida", "marcar como concluido"]) &&
+    hasAny(normalized, ["etapa", "checklist"]) &&
+    normalized.includes("servico");
+}
+
+function extractQuotedValue(message: string, index: number) {
+  const matches = Array.from(message.matchAll(/["“”']([^"“”']+)["“”']/g)).map((match) => match[1]?.trim()).filter(Boolean);
+  return matches[index] ?? null;
+}
+
+function extractStepName(message: string) {
+  return message.match(/(?:etapa|checklist)\s+(.+?)\s+(?:no|do|da)\s+servi[cç]o/i)?.[1]?.trim() ?? null;
+}
+
+function extractServiceNameForStep(message: string) {
+  return message.match(/servi[cç]o\s+(.+)$/i)?.[1]?.replace(/["“”']/g, "").trim() ?? null;
+}
+
 export function normalizeAssistantText(value: string) {
   return value
     .normalize("NFD")
@@ -198,7 +226,7 @@ function extractTaskDescription(message: string) {
     .replace(/\s+para\s+(?:o\s+)?cliente\s+.+$/i, "")
     .replace(/\s+(?:daqui\s+\w+(?:\s+dias?)?|amanh[ãa]|hoje)\b/gi, "")
     .replace(/\b(?:o|a)\s+([A-ZÁÉÍÓÚÂÊÔÃÕÇ][\p{L}'-]+(?:\s+[A-ZÁÉÍÓÚÂÊÔÃÕÇ][\p{L}'-]+){0,4})\b/gu, "")
-    .trim() || "Tarefa criada pelo Assistente IA";
+    .trim() || "Tarefa criada pela Sophia";
 }
 
 function extractInteractionDescription(message: string) {
@@ -289,7 +317,7 @@ function extractMemberTaskDescription(message: string) {
     .replace(/\s+(?:para|pra|pro)\s+(?:o\s+|a\s+)?membro\s+.+?(?:\s+de\s+|$)/i, " ")
     .replace(/\s+e\s+(?:atribui|atribuir)\s+(?:para|pra|pro)\s+.+$/i, "")
     .replace(/\b(hoje|amanha|amanhÃ£|ontem)\b/gi, "")
-    .trim() || "Tarefa criada pelo Assistente IA";
+    .trim() || "Tarefa criada pela Sophia";
 }
 
 function capitalizeFirst(value: string) {
@@ -349,7 +377,7 @@ function extractPropertyName(message: string) {
 
 function extractServiceTitle(message: string) {
   const propertyName = extractPropertyName(message);
-  return propertyName ? `Imovel ${propertyName}` : "Servico criado pelo Assistente IA";
+  return propertyName ? `Imovel ${propertyName}` : "Servico criado pela Sophia";
 }
 
 function extractServiceDescription(message: string) {
@@ -379,7 +407,7 @@ function extractChecklistTitle(message: string) {
   return message
     .replace(/^(crie|criar|cria|adicionar|adicione|registrar|registre)\s+(um\s+)?(item\s+)?(?:no\s+)?checklist\s*(de hoje)?/i, "")
     .replace(/\b(hoje|amanha|amanhã|ontem)\b/gi, "")
-    .trim() || "Item criado pelo Assistente IA";
+    .trim() || "Item criado pela Sophia";
 }
 
 function extractConversationMemberName(message: string) {

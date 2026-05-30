@@ -28,6 +28,11 @@ export type WorkTimeSessionEndReason =
   | "field_started"
   | "field_ended";
 export type CompanyHolidayType = "national" | "optional_point" | "company" | "state" | "municipal";
+export type UserIntegrationProvider = "google_drive" | "google_calendar";
+export type UserIntegrationStatus = "active" | "disconnected" | "needs_reauthorization" | "error";
+export type CalendarSyncStatus = "pending" | "synced" | "error" | "skipped" | "deleted";
+export type AiAgentRunStatus = "pending" | "running" | "completed" | "error";
+export type ReminderNotificationPreference = "due" | "10m" | "1h" | "none";
 export type ClientKind = "pf" | "pj";
 export type InteractionType = "ligacao" | "email" | "reuniao" | "whatsapp" | "nota";
 export type ProposalStage =
@@ -1211,6 +1216,12 @@ export type Database = {
           custom_fields_json: Json;
           position: number;
           created_from_proposal_id: string | null;
+          import_source: string | null;
+          import_external_id: string | null;
+          import_external_url: string | null;
+          imported_at: string | null;
+          imported_by: string | null;
+          raw_import_data: Json | null;
         };
         Insert: {
           id?: string;
@@ -1236,6 +1247,12 @@ export type Database = {
           custom_fields_json?: Json;
           position?: number;
           created_from_proposal_id?: string | null;
+          import_source?: string | null;
+          import_external_id?: string | null;
+          import_external_url?: string | null;
+          imported_at?: string | null;
+          imported_by?: string | null;
+          raw_import_data?: Json | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -1262,6 +1279,12 @@ export type Database = {
           custom_fields_json?: Json;
           position?: number;
           created_from_proposal_id?: string | null;
+          import_source?: string | null;
+          import_external_id?: string | null;
+          import_external_url?: string | null;
+          imported_at?: string | null;
+          imported_by?: string | null;
+          raw_import_data?: Json | null;
           updated_at?: string;
         };
         Relationships: [];
@@ -1637,6 +1660,92 @@ export type Database = {
         };
         Relationships: [];
       };
+      user_integrations: {
+        Row: {
+          id: string;
+          user_id: string;
+          organization_id: string | null;
+          provider: UserIntegrationProvider;
+          provider_account_email: string | null;
+          access_token_encrypted: string | null;
+          refresh_token_encrypted: string | null;
+          token_expires_at: string | null;
+          scopes: string[] | null;
+          status: UserIntegrationStatus;
+          metadata: Json;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          organization_id?: string | null;
+          provider: UserIntegrationProvider;
+          provider_account_email?: string | null;
+          access_token_encrypted?: string | null;
+          refresh_token_encrypted?: string | null;
+          token_expires_at?: string | null;
+          scopes?: string[] | null;
+          status?: UserIntegrationStatus;
+          metadata?: Json;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          user_id?: string;
+          organization_id?: string | null;
+          provider?: UserIntegrationProvider;
+          provider_account_email?: string | null;
+          access_token_encrypted?: string | null;
+          refresh_token_encrypted?: string | null;
+          token_expires_at?: string | null;
+          scopes?: string[] | null;
+          status?: UserIntegrationStatus;
+          metadata?: Json;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      calendar_event_syncs: {
+        Row: {
+          id: string;
+          organization_id: string;
+          internal_event_id: string;
+          user_id: string;
+          provider: "google_calendar";
+          external_event_id: string | null;
+          sync_status: CalendarSyncStatus;
+          last_error: string | null;
+          synced_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          organization_id: string;
+          internal_event_id: string;
+          user_id: string;
+          provider?: "google_calendar";
+          external_event_id?: string | null;
+          sync_status?: CalendarSyncStatus;
+          last_error?: string | null;
+          synced_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          organization_id?: string;
+          internal_event_id?: string;
+          user_id?: string;
+          provider?: "google_calendar";
+          external_event_id?: string | null;
+          sync_status?: CalendarSyncStatus;
+          last_error?: string | null;
+          synced_at?: string | null;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
       notifications: {
         Row: {
           id: string;
@@ -1706,6 +1815,8 @@ export type Database = {
           recurrence: "none" | "weekly";
           recurrence_until: string | null;
           canceled_at: string | null;
+          notification_preference: ReminderNotificationPreference;
+          completed_at: string | null;
           created_by: string | null;
           created_at: string;
           updated_at: string;
@@ -1726,6 +1837,8 @@ export type Database = {
           recurrence?: "none" | "weekly";
           recurrence_until?: string | null;
           canceled_at?: string | null;
+          notification_preference?: ReminderNotificationPreference;
+          completed_at?: string | null;
           created_by?: string | null;
           created_at?: string;
           updated_at?: string;
@@ -1745,6 +1858,8 @@ export type Database = {
           recurrence?: "none" | "weekly";
           recurrence_until?: string | null;
           canceled_at?: string | null;
+          notification_preference?: ReminderNotificationPreference;
+          completed_at?: string | null;
           created_by?: string | null;
           updated_at?: string;
         };
@@ -2709,6 +2824,11 @@ export type Database = {
           extracted_text: string | null;
           pages: number | null;
           file_hash: string | null;
+          google_drive_file_id: string | null;
+          google_drive_owner_user_id: string | null;
+          google_drive_owner_email: string | null;
+          external_url: string | null;
+          external_metadata: Json;
           is_global: boolean;
           is_official: boolean;
           deleted_at: string | null;
@@ -2743,6 +2863,11 @@ export type Database = {
           extracted_text?: string | null;
           pages?: number | null;
           file_hash?: string | null;
+          google_drive_file_id?: string | null;
+          google_drive_owner_user_id?: string | null;
+          google_drive_owner_email?: string | null;
+          external_url?: string | null;
+          external_metadata?: Json;
           is_global?: boolean;
           is_official?: boolean;
           deleted_at?: string | null;
@@ -2776,6 +2901,11 @@ export type Database = {
           extracted_text?: string | null;
           pages?: number | null;
           file_hash?: string | null;
+          google_drive_file_id?: string | null;
+          google_drive_owner_user_id?: string | null;
+          google_drive_owner_email?: string | null;
+          external_url?: string | null;
+          external_metadata?: Json;
           is_global?: boolean;
           is_official?: boolean;
           deleted_at?: string | null;
@@ -2907,6 +3037,154 @@ export type Database = {
           mime_type?: string | null;
           size_bytes?: number | null;
           updated_at?: string;
+        };
+        Relationships: [];
+      };
+      ai_agents: {
+        Row: {
+          id: string;
+          slug: string;
+          name: string;
+          description: string | null;
+          system_prompt: string | null;
+          schedule_type: string | null;
+          is_active: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          slug: string;
+          name: string;
+          description?: string | null;
+          system_prompt?: string | null;
+          schedule_type?: string | null;
+          is_active?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          slug?: string;
+          name?: string;
+          description?: string | null;
+          system_prompt?: string | null;
+          schedule_type?: string | null;
+          is_active?: boolean;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      ai_agent_runs: {
+        Row: {
+          id: string;
+          organization_id: string;
+          agent_id: string;
+          triggered_by: string | null;
+          trigger_type: string;
+          status: AiAgentRunStatus;
+          input: Json;
+          output: Json;
+          summary: string | null;
+          error: string | null;
+          started_at: string | null;
+          finished_at: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          organization_id: string;
+          agent_id: string;
+          triggered_by?: string | null;
+          trigger_type?: string;
+          status?: AiAgentRunStatus;
+          input?: Json;
+          output?: Json;
+          summary?: string | null;
+          error?: string | null;
+          started_at?: string | null;
+          finished_at?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          organization_id?: string;
+          agent_id?: string;
+          triggered_by?: string | null;
+          trigger_type?: string;
+          status?: AiAgentRunStatus;
+          input?: Json;
+          output?: Json;
+          summary?: string | null;
+          error?: string | null;
+          started_at?: string | null;
+          finished_at?: string | null;
+        };
+        Relationships: [];
+      };
+      ai_agent_deliveries: {
+        Row: {
+          id: string;
+          organization_id: string;
+          agent_run_id: string;
+          user_id: string;
+          delivery_type: string;
+          read_at: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          organization_id: string;
+          agent_run_id: string;
+          user_id: string;
+          delivery_type?: string;
+          read_at?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          organization_id?: string;
+          agent_run_id?: string;
+          user_id?: string;
+          delivery_type?: string;
+          read_at?: string | null;
+        };
+        Relationships: [];
+      };
+      service_import_batches: {
+        Row: {
+          id: string;
+          organization_id: string;
+          uploaded_by: string | null;
+          source: string;
+          filename: string | null;
+          total_rows: number;
+          imported_count: number;
+          skipped_count: number;
+          error_count: number;
+          dry_run: boolean;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          organization_id: string;
+          uploaded_by?: string | null;
+          source?: string;
+          filename?: string | null;
+          total_rows?: number;
+          imported_count?: number;
+          skipped_count?: number;
+          error_count?: number;
+          dry_run?: boolean;
+          created_at?: string;
+        };
+        Update: {
+          organization_id?: string;
+          uploaded_by?: string | null;
+          source?: string;
+          filename?: string | null;
+          total_rows?: number;
+          imported_count?: number;
+          skipped_count?: number;
+          error_count?: number;
+          dry_run?: boolean;
         };
         Relationships: [];
       };
@@ -3628,6 +3906,7 @@ export type ServiceColumn = Database["public"]["Tables"]["service_columns"]["Row
 export type ServiceCard = Database["public"]["Tables"]["service_cards"]["Row"];
 export type ServiceMember = Database["public"]["Tables"]["service_members"]["Row"];
 export type ServiceEvent = Database["public"]["Tables"]["service_events"]["Row"];
+export type ServiceImportBatch = Database["public"]["Tables"]["service_import_batches"]["Row"];
 export type ServicePropertyInfo = Database["public"]["Tables"]["service_property_infos"]["Row"];
 export type TeamMember = Database["public"]["Tables"]["team_members"]["Row"];
 export type WorkTimeDay = Database["public"]["Tables"]["work_time_days"]["Row"];
@@ -3636,6 +3915,8 @@ export type WorkTimeEvent = Database["public"]["Tables"]["work_time_events"]["Ro
 export type CompanyHoliday = Database["public"]["Tables"]["company_holidays"]["Row"];
 export type TeamChatMessage = Database["public"]["Tables"]["team_chat_messages"]["Row"];
 export type TeamChatRead = Database["public"]["Tables"]["team_chat_reads"]["Row"];
+export type UserIntegration = Database["public"]["Tables"]["user_integrations"]["Row"];
+export type CalendarEventSync = Database["public"]["Tables"]["calendar_event_syncs"]["Row"];
 export type Notification = Database["public"]["Tables"]["notifications"]["Row"];
 export type AgendaReminder = Database["public"]["Tables"]["agenda_reminders"]["Row"];
 export type AgendaReminderRecipient = Database["public"]["Tables"]["agenda_reminder_recipients"]["Row"];
@@ -3659,6 +3940,9 @@ export type HrDocument = Database["public"]["Tables"]["hr_documents"]["Row"];
 export type ProfessionalDocument = Database["public"]["Tables"]["documents"]["Row"];
 export type DocumentChunk = Database["public"]["Tables"]["document_chunks"]["Row"];
 export type DocumentProcessingJob = Database["public"]["Tables"]["document_processing_jobs"]["Row"];
+export type AiAgent = Database["public"]["Tables"]["ai_agents"]["Row"];
+export type AiAgentRun = Database["public"]["Tables"]["ai_agent_runs"]["Row"];
+export type AiAgentDelivery = Database["public"]["Tables"]["ai_agent_deliveries"]["Row"];
 export type HrAbsence = Database["public"]["Tables"]["hr_absences"]["Row"];
 export type HrBirthday = Database["public"]["Tables"]["hr_birthdays"]["Row"];
 export type RoutineItem = Database["public"]["Tables"]["routine_items"]["Row"];

@@ -1,5 +1,17 @@
 # GeoGestao - Roadmap
 
+## AGENTS-TASKS-SYNC-FIX-1
+
+Concluido nesta fase corretiva:
+
+- mensagem de configuracao Google amigavel;
+- Briefing da manha resiliente a zero tarefas e retornos nao unitarios;
+- cards de agentes no Inicio;
+- cron diario as 05:00 America/Sao_Paulo via 08:00 UTC;
+- sincronizacao Tarefa/Rotina com carry-over;
+- editar/apagar no widget Tarefa;
+- filtro do Inicio recolhido.
+
 Data do checkpoint: 2026-05-11
 
 ## Qualidade tecnica
@@ -531,3 +543,13 @@ Proximos incrementos:
 - converter formularios secundarios restantes para modais quando fizer sentido;
 - editor markdown com preview;
 - historico de versoes das paginas internas.
+# INTEGRATIONS-AGENTS-TASKS-IMPORT-1
+
+Status: implementado no código com migration `037_integrations_agents_tasks_import.sql`, pendente aplicar no Supabase de teste e validar manualmente.
+
+- Google Drive opcional por usuário.
+- Google Calendar opcional por usuário.
+- Sophia como identidade visual do assistente.
+- Agentes com execução manual inicial.
+- Widget Tarefa/Lembrete.
+- Importação Trello/planilha para Serviços.

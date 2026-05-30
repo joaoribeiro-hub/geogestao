@@ -19,6 +19,7 @@ export type AssistantIntentName =
   | "list_member_current_status"
   | "create_checklist_item"
   | "assign_checklist_item"
+  | "complete_service_step"
   | "list_member_activity"
   | "list_member_tasks"
   | "list_client_services"

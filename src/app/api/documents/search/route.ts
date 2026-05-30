@@ -25,7 +25,7 @@ export async function GET(request: Request) {
   let query = supabase
     .from("documents")
     .select(
-      "id,organization_id,client_id,property_id,service_id,employee_id,related_type,original_name,stored_name,document_type,category,title,description,notes,storage_bucket,storage_path,size_bytes,mime_type,upload_status,processing_status,is_global,is_official,created_at,uploaded_by",
+      "id,organization_id,client_id,property_id,service_id,employee_id,related_type,original_name,stored_name,document_type,category,title,description,notes,storage_provider,storage_bucket,storage_path,size_bytes,mime_type,upload_status,processing_status,is_global,is_official,created_at,uploaded_by,google_drive_owner_email,external_url",
     )
     .or(`organization_id.eq.${organization.id},is_global.eq.true`)
     .is("deleted_at", null)

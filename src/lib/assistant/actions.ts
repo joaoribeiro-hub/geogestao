@@ -48,6 +48,7 @@ export const assistantActionRegistry: Record<string, ActionHandler> = {
   createClientTask,
   createClientInteraction,
   createService,
+  completeServiceStep,
   listTodayChecklist,
   createChecklistItem,
   assignChecklistItem,
@@ -68,6 +69,7 @@ export const intentToActionName: Record<string, string> = {
   create_member_task: "assignChecklistItem",
   create_client_interaction: "createClientInteraction",
   create_service: "createService",
+  complete_service_step: "completeServiceStep",
   list_today_checklist: "listTodayChecklist",
   list_member_checklist: "listMemberActivity",
   list_member_current_status: "listMemberActivity",
@@ -284,7 +286,7 @@ async function createClientTask(context: AssistantContext, params: Record<string
   if (resolution.status === "needs_confirmation") return resolution.result;
   if (!resolution.client) return clientNotFound("createClientTask", params);
 
-  const description = stringParam(params.description) ?? "Tarefa criada pelo Assistente IA";
+  const description = stringParam(params.description) ?? "Tarefa criada pela Sophia";
   const dueDateInput = stringParam(params.dueDate) ?? stringParam(params.date) ?? stringParam(params.data);
   const dueDate = dueDateInput ? normalizeAssistantDate(dueDateInput) : null;
   if (dueDateInput && !dueDate) {
@@ -326,7 +328,7 @@ async function createClientInteraction(context: AssistantContext, params: Record
   if (resolution.status === "needs_confirmation") return resolution.result;
   if (!resolution.client) return clientNotFound("createClientInteraction", params);
 
-  const description = stringParam(params.description) ?? "Interacao criada pelo Assistente IA";
+  const description = stringParam(params.description) ?? "Interacao criada pela Sophia";
   const dateInput = stringParam(params.date) ?? stringParam(params.dueDate) ?? stringParam(params.data);
   const occurredAt = dateInput ? normalizeAssistantDate(dateInput) : todayDate();
   if (!occurredAt) {
@@ -456,6 +458,126 @@ async function createService(context: AssistantContext, params: Record<string, J
       value,
     },
     output: { service_id: card.id },
+  });
+}
+
+async function completeServiceStep(
+  context: AssistantContext,
+  params: Record<string, Json>,
+  confirmation?: AssistantConfirmationPayload,
+) {
+  const serviceName = stringParam(params.serviceName);
+  const stepName = stringParam(params.stepName);
+  if (!serviceName || !stepName) {
+    return result({
+      actionName: "completeServiceStep",
+      input: params,
+      status: "ok",
+      message: "Informe o nome do servico e da etapa que deseja concluir.",
+      data: { type: "missing_field" },
+    });
+  }
+
+  const service = await findServiceByName(context, serviceName);
+  if (!service) {
+    return result({
+      actionName: "completeServiceStep",
+      input: params,
+      status: "ok",
+      message: `Nao encontrei servico parecido com "${serviceName}" nesta empresa.`,
+      data: { type: "service_not_found", serviceName },
+    });
+  }
+
+  const { data: checklists } = await context.supabase
+    .from("checklists")
+    .select("id")
+    .eq("organization_id", context.organizationId)
+    .eq("service_card_id", service.id)
+    .eq("checklist_type", "steps");
+  const checklistIds = (checklists ?? []).map((checklist) => checklist.id);
+  const { data: items } = checklistIds.length
+    ? await context.supabase
+        .from("checklist_items")
+        .select("id,checklist_id,title,is_done")
+        .in("checklist_id", checklistIds)
+        .is("deleted_at", null)
+        .is("archived_at", null)
+    : { data: [] };
+  const normalizedStep = normalizeAssistantText(stepName);
+  const exact = (items ?? []).find((item) => normalizeAssistantText(item.title) === normalizedStep);
+  const similar = (items ?? []).filter((item) => normalizeAssistantText(item.title).includes(normalizedStep) || normalizedStep.includes(normalizeAssistantText(item.title)));
+  const target = exact ?? (similar.length === 1 ? similar[0] : null);
+
+  if (!target) {
+    const suggestions = (similar.length ? similar : items ?? []).slice(0, 5).map((item) => item.title);
+    return result({
+      actionName: "completeServiceStep",
+      input: params,
+      status: "ok",
+      message: suggestions.length
+        ? `Nao encontrei exatamente essa etapa. Itens parecidos em ${service.title}: ${suggestions.join(", ")}.`
+        : `O servico ${service.title} nao possui etapas cadastradas.`,
+      data: { type: "service_step_not_found", suggestions },
+    });
+  }
+
+  if (!params.confirmed && !confirmation?.params?.confirmed) {
+    return result({
+      actionName: "completeServiceStep",
+      input: params,
+      status: "needs_confirmation",
+      message: `Confirma marcar a etapa "${target.title}" do servico "${service.title}" como concluida?`,
+      requiresConfirmation: true,
+      confirmation: {
+        actionName: "completeServiceStep",
+        params: {
+          ...params,
+          serviceId: service.id,
+          checklistItemId: target.id,
+          checklistId: target.checklist_id,
+          serviceName: service.title,
+          stepName: target.title,
+          confirmed: true,
+        },
+      },
+    });
+  }
+
+  const checklistItemId = stringParam(params.checklistItemId) ?? target.id;
+  const now = new Date().toISOString();
+  const { error } = await context.supabase
+    .from("checklist_items")
+    .update({ is_done: true, completed_at: now, completed_by: context.user.id })
+    .eq("id", checklistItemId)
+    .eq("checklist_id", target.checklist_id);
+  if (error) throw new Error(error.message);
+
+  await refreshServiceChecklistPercent(context.supabase, service.id);
+  await context.supabase
+    .from("agenda_reminders")
+    .update({ completed_at: now, canceled_at: now })
+    .eq("organization_id", context.organizationId)
+    .eq("entity_type", "service_card")
+    .eq("entity_id", service.id)
+    .ilike("title", `%${target.title}%`)
+    .is("completed_at", null);
+  await context.supabase.from("service_events").insert({
+    organization_id: context.organizationId,
+    service_card_id: service.id,
+    event_type: "service.step_completed_by_sophia",
+    title: "Etapa concluida pela Sophia",
+    description: target.title,
+    metadata: { checklist_item_id: checklistItemId },
+    created_by: context.user.id,
+  });
+
+  return result({
+    actionName: "completeServiceStep",
+    input: params,
+    status: "ok",
+    message: `Etapa "${target.title}" do servico "${service.title}" marcada como concluida.`,
+    data: { type: "service_step_completed", serviceId: service.id, checklistItemId },
   });
 }
 
@@ -876,6 +998,43 @@ async function getContractsForClient(context: AssistantContext, clientId: string
     .order("created_at", { ascending: false });
   if (error) throw new Error(error.message);
   return data ?? [];
+}
+
+async function findServiceByName(context: AssistantContext, serviceName: string) {
+  const normalized = normalizeAssistantText(serviceName);
+  const { data, error } = await context.supabase
+    .from("service_cards")
+    .select("id,title")
+    .eq("organization_id", context.organizationId)
+    .ilike("title", `%${serviceName}%`)
+    .limit(5);
+  if (error) throw new Error(error.message);
+  return (data ?? []).find((service) => normalizeAssistantText(service.title) === normalized) ?? data?.[0] ?? null;
+}
+
+async function refreshServiceChecklistPercent(supabase: ServerSupabase, serviceCardId: string) {
+  const { data: checklists } = await supabase
+    .from("checklists")
+    .select("id")
+    .eq("service_card_id", serviceCardId)
+    .eq("checklist_type", "steps");
+  const checklistIds = (checklists ?? []).map((checklist) => checklist.id);
+  if (!checklistIds.length) {
+    await supabase.from("service_cards").update({ checklist_percent: 0 }).eq("id", serviceCardId);
+    return;
+  }
+  const { data: items } = await supabase
+    .from("checklist_items")
+    .select("is_done")
+    .in("checklist_id", checklistIds)
+    .is("deleted_at", null)
+    .is("archived_at", null);
+  const total = items?.length ?? 0;
+  const done = (items ?? []).filter((item) => item.is_done).length;
+  await supabase
+    .from("service_cards")
+    .update({ checklist_percent: total ? Number(((done / total) * 100).toFixed(2)) : 0 })
+    .eq("id", serviceCardId);
 }
 
 function serviceListResult(

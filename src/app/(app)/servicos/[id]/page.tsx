@@ -184,6 +184,8 @@ export default async function ServiceDetailPage({
         .from("checklist_items")
         .select("*")
         .in("checklist_id", checklistIds)
+        .is("deleted_at", null)
+        .is("archived_at", null)
         .order("position")
     : { data: [] };
   const items = itemsResult.data ?? [];
@@ -373,12 +375,17 @@ export default async function ServiceDetailPage({
                           />
                         ))}
                       </div>
-                      <ChecklistItemForm checklistId={checklist.id} />
+                      <ChecklistItemForm checklistId={checklist.id} checklistType="documents" />
                     </div>
                   );
                 })
               ) : (
-                <EmptyState title="Nenhum checklist de documentos cadastrado." />
+                <div className="rounded-lg border p-4">
+                  <EmptyState title="Nenhum item de documento cadastrado." />
+                  <div className="mt-3">
+                    <ChecklistItemForm serviceCardId={card.id} checklistType="documents" />
+                  </div>
+                </div>
               )}
             </CardContent>
           </Card>
@@ -409,15 +416,21 @@ export default async function ServiceDetailPage({
                               dueDate={item.due_date}
                               dueTime={item.due_time}
                               canDelete
+                              allowSchedule
                             />
                           ))}
                         </div>
-                        <ChecklistItemForm checklistId={checklist.id} allowSchedule />
+                        <ChecklistItemForm checklistId={checklist.id} checklistType="steps" allowSchedule />
                       </div>
                     );
                   })
               ) : (
-                <EmptyState title="Nenhuma etapa cadastrada." />
+                <div className="rounded-lg border p-4">
+                  <EmptyState title="Nenhuma etapa cadastrada." />
+                  <div className="mt-3">
+                    <ChecklistItemForm serviceCardId={card.id} checklistType="steps" allowSchedule />
+                  </div>
+                </div>
               )}
             </CardContent>
           </Card>

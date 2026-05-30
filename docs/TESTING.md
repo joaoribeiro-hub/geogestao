@@ -1,5 +1,24 @@
 # GeoGestao - Testes Automatizados
 
+## AGENTS-TASKS-SYNC-FIX-1
+
+Testes automatizados adicionados:
+
+- `tests/unit/agents-tasks-sync-fix.test.ts`
+
+Testes manuais recomendados:
+
+- Remover variaveis Google localmente e clicar em Conectar Google para confirmar mensagem amigavel.
+- Executar Briefing da manha com zero tarefas e confirmar que salva run sem erro.
+- Criar duas tarefas no widget Tarefa e abrir Rotina para conferir que aparecem no dia.
+- Criar item diario na Rotina e abrir widget Tarefa para conferir sincronizacao.
+- Deixar uma tarefa aberta de ontem e confirmar que aparece hoje.
+- Editar e apagar tarefa pelo widget e confirmar reflexo na Rotina.
+- Abrir Inicio e confirmar que o filtro inicia fechado.
+- Clicar em Filtro, aplicar periodo e confirmar fechamento por navegacao.
+- Conferir cards Briefing da manha/Revisao semanal acima de Tarefas de hoje.
+- Testar `/api/cron/agents/daily-briefing` com e sem `Authorization: Bearer <CRON_SECRET>`.
+
 Data do checkpoint: 2026-05-07
 
 ## Objetivo
@@ -445,3 +464,22 @@ Testes manuais recomendados:
 - Abrir Rotina e confirmar modal `+ Adicionar item de rotina`.
 - Abrir `/` autenticado e confirmar redirecionamento para `/inicio`.
 - Abrir deep link como `/servicos` e confirmar que nao redireciona para Inicio.
+## INTEGRATIONS-AGENTS-TASKS-IMPORT-1
+
+Testar:
+
+- Conectar Google Drive em Minha Conta e enviar documento escolhendo `Meu Google Drive`.
+- Baixar documento do Drive com outro membro da mesma organização.
+- Conferir que usuário de outra organização não encontra o documento.
+- Conectar Google Calendar e criar lembrete para usuário conectado.
+- Conferir `calendar_event_syncs`.
+- Abrir Sophia e validar que intents antigas continuam funcionando.
+- Executar `Briefing da manhã` em Minha Conta > Agentes e conferir `ai_agent_runs`.
+- Abrir widget `Tarefa`, criar tarefa e criar lembrete na aba `Lembrete`.
+- Importar planilha Trello em Serviços: primeiro dry-run, depois confirmar.
+
+Comandos:
+
+- `npm run typecheck`
+- `npm run build`
+- `npm run test`

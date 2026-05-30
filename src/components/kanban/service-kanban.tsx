@@ -176,7 +176,9 @@ function ServiceColumnView({
         value={search}
         onChange={(event) => onSearch(event.target.value)}
       />
-      <div className="space-y-3">{children}</div>
+      <div className="max-h-[46rem] space-y-3 overflow-y-auto pr-1" data-testid="service-column-scroll">
+        {children}
+      </div>
     </section>
   );
 }

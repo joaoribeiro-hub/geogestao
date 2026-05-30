@@ -1,5 +1,14 @@
 # GeoGestao - Decisoes do Projeto
 
+## AGENTS-TASKS-SYNC-FIX-1
+
+- Google OAuth sem variaveis de ambiente deve orientar o admin na UI e nao expor JSON cru.
+- Briefing da manha e Revisao semanal salvam resultado em `ai_agent_runs` como objeto JSON padronizado.
+- Execucao automatica dos agentes usa endpoint cron protegido por `CRON_SECRET`; Vercel Cron fica em UTC.
+- Tarefa e Rotina diaria usam vinculo entre `daily_checklist_items` e `routine_items` para manter a mesma fonte operacional.
+- Tarefa aberta com data anterior continua aparecendo ate conclusao, cancelamento, arquivamento ou exclusao.
+- Agente financeiro e seus resultados sao exclusivos de owner.
+
 Data do checkpoint: 2026-05-11
 
 ## Decisoes registradas
@@ -212,3 +221,11 @@ Data do checkpoint: 2026-05-11
 91. Formularios grandes de criacao pontual devem abrir por botao + modal. Minha Empresa > Informacoes e excecao: permanece na pagina em modo visualizacao com botao Editar.
 
 92. A navegacao padrao autenticada abre em `/inicio`; deep links especificos continuam respeitados.
+## INTEGRATIONS-AGENTS-TASKS-IMPORT-1
+
+- Google Drive é armazenamento opcional por usuário e não substitui o Supabase Storage como padrão.
+- Tokens OAuth são armazenados criptografados e nunca enviados ao frontend.
+- Google Calendar sincroniza eventos por destinatário quando o usuário conectou a própria conta.
+- Sophia é o nome de interface do Assistente IA; as intents e a action registry permanecem iguais.
+- Agentes executam server-side, salvam `ai_agent_runs` e não executam ações diretas sem validação backend.
+- Importação Trello usa dry-run antes da confirmação e pula duplicados por `Card ID`.

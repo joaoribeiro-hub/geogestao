@@ -1,5 +1,19 @@
 # GeoGestao - Estado Atual do Projeto
 
+## AGENTS-TASKS-SYNC-FIX-1
+
+Implementado:
+
+- mensagem amigavel quando Google OAuth nao esta configurado no servidor;
+- Briefing da manha corrigido para nao quebrar com retorno vazio/multiplo de Supabase;
+- `ai_agent_runs.output` passa a salvar objeto JSON padronizado para cards e historico;
+- cards de Briefing da manha e Revisao semanal no Inicio;
+- cron protegido em `/api/cron/agents/daily-briefing` agendado para 08:00 UTC;
+- agente financeiro bloqueado para nao-owner na UI e no backend;
+- widget Tarefa com editar/apagar;
+- sincronizacao Tarefa/Rotina com carry-over de itens abertos;
+- filtro do Inicio recolhido em botao `Filtro`.
+
 Data do checkpoint: 2026-05-11
 
 ## Visao geral
@@ -918,3 +932,14 @@ Implementado:
 - Login, onboarding concluido e raiz autenticada levam para `/inicio`.
 
 Migration: `036_ux_clean_company_knowledge.sql`.
+# Fase INTEGRATIONS-AGENTS-TASKS-IMPORT-1
+
+- Supabase Storage continua sendo o armazenamento principal; Google Drive é opção adicional por usuário.
+- Minha Conta ganhou Integrações para Google Drive e Google Calendar com OAuth server-side e tokens criptografados.
+- Documentos podem ser salvos no Supabase Storage ou no Google Drive conectado do usuário.
+- Lembretes da Agenda e lembretes rápidos tentam sincronizar com Google Calendar dos destinatários conectados.
+- O Assistente IA passa a se chamar Sophia na interface, mantendo intents e histórico.
+- Agentes iniciais foram preparados: briefing da manhã, revisão semanal, documentos e financeiro.
+- O widget flutuante de checklist passa a se chamar Tarefa e ganha aba Lembrete.
+- Início mostra indicadores quantitativos apenas para owner.
+- Serviços ganhou importação de planilhas Trello com dry-run e prevenção de duplicados por Card ID.

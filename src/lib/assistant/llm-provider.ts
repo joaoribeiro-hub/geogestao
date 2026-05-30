@@ -1,6 +1,6 @@
 import type { AssistantIntentDetection } from "@/lib/assistant/types";
 
-const systemInstruction = `Voce classifica mensagens para o Assistente IA do GeoGestao.
+const systemInstruction = `Voce classifica mensagens para a Sophia, assistente do GeoGestao.
 Responda somente JSON valido com: intent, params, confidence, responseDraft, requiresConfirmation.
 Nao invente dados, nao gere SQL, nao diga que criou algo e nao execute acoes.
 Intents permitidas: list_today_services, list_month_services, list_overdue_services, list_pending_tasks, list_inactive_clients, find_client_by_name, summarize_client, create_client_task, create_member_task, create_client_interaction, create_service, list_client_services, list_client_commercial_records, unknown.`;

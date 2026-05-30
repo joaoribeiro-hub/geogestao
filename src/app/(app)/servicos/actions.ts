@@ -860,12 +860,20 @@ export async function createChecklistAction(formData: FormData) {
 export async function createChecklistItemAction(formData: FormData) {
   const supabase = await createServerSupabase();
   const user = await requireUser(supabase);
+  const organization = await getCurrentOrganizationForUser(supabase, user.id);
   const parsed = checklistItemSchema.parse(formDataToObject(formData));
+  const checklistId = parsed.checklist_id ?? await ensureServiceChecklistByType(
+    supabase,
+    organization.id,
+    parsed.service_card_id,
+    parsed.checklist_type,
+  );
 
   const { data: checklist, error: checklistError } = await supabase
     .from("checklists")
     .select("service_card_id,checklist_type,organization_id")
-    .eq("id", parsed.checklist_id)
+    .eq("id", checklistId)
+    .eq("organization_id", organization.id)
     .single();
   if (checklistError) throw new Error(checklistError.message);
 
@@ -876,7 +884,12 @@ export async function createChecklistItemAction(formData: FormData) {
   const { data: item, error } = await supabase
     .from("checklist_items")
     .insert({
-      ...parsed,
+      checklist_id: checklistId,
+      title: parsed.title,
+      is_done: parsed.is_done,
+      due_date: parsed.due_date,
+      due_time: parsed.due_time,
+      created_at: parsed.created_at ? `${parsed.created_at}T00:00:00-03:00` : undefined,
       scheduled_at: scheduledAt,
     })
     .select("id,title,due_date,due_time")
@@ -914,6 +927,15 @@ export async function createChecklistItemAction(formData: FormData) {
       recipientUserIds: recipients,
       category: "Servicos",
     });
+    await createDailyTaskForServiceStep(supabase, {
+      organizationId: checklist.organization_id,
+      userId: card?.responsible_user_id ?? user.id,
+      createdBy: user.id,
+      serviceCardId: checklist.service_card_id,
+      serviceTitle: card?.title ?? "servico",
+      itemTitle: item.title,
+      dueDate: item.due_date,
+    });
   }
   if (parsed.is_done && checklist.checklist_type === "steps" && checklist.organization_id) {
     await notifyOwnersAboutServiceStepCompletion(supabase, {
@@ -923,6 +945,43 @@ export async function createChecklistItemAction(formData: FormData) {
       itemTitle: parsed.title,
     });
   }
+  revalidatePath(`/servicos/${checklist.service_card_id}`);
+  revalidatePath("/servicos");
+}
+
+export async function updateChecklistItemAction(formData: FormData) {
+  const supabase = await createServerSupabase();
+  const user = await requireUser(supabase);
+  const organization = await getCurrentOrganizationForUser(supabase, user.id);
+  const parsed = checklistItemSchema.parse(formDataToObject(formData));
+  const itemId = formData.get("item_id")?.toString() ?? "";
+  if (!itemId || !parsed.checklist_id) throw new Error("Item de checklist invalido.");
+
+  const { data: checklist, error: checklistError } = await supabase
+    .from("checklists")
+    .select("service_card_id,checklist_type,organization_id")
+    .eq("id", parsed.checklist_id)
+    .eq("organization_id", organization.id)
+    .single();
+  if (checklistError) throw new Error(checklistError.message);
+
+  const scheduledAt =
+    parsed.due_date && parsed.due_time
+      ? new Date(`${parsed.due_date}T${parsed.due_time}:00-03:00`).toISOString()
+      : null;
+  const { error } = await supabase
+    .from("checklist_items")
+    .update({
+      title: parsed.title,
+      due_date: parsed.due_date,
+      due_time: parsed.due_time,
+      scheduled_at: scheduledAt,
+    })
+    .eq("id", itemId)
+    .eq("checklist_id", parsed.checklist_id);
+  if (error) throw new Error(error.message);
+
+  await refreshChecklistPercent(supabase, checklist.service_card_id);
   revalidatePath(`/servicos/${checklist.service_card_id}`);
   revalidatePath("/servicos");
 }
@@ -959,6 +1018,20 @@ export async function toggleChecklistItemAction(
       .select("title")
       .eq("id", itemId)
       .maybeSingle();
+    await markServiceStepRemindersCompleted(supabase, {
+      organizationId: checklist.organization_id,
+      serviceCardId: checklist.service_card_id,
+      itemTitle: item?.title ?? "Etapa",
+    });
+    await recordServiceEvent(supabase, {
+      organizationId: checklist.organization_id,
+      serviceCardId: checklist.service_card_id,
+      userId: user.id,
+      eventType: "service.step_completed",
+      title: "Etapa concluida",
+      description: item?.title ?? "Etapa",
+      metadata: { checklist_item_id: itemId },
+    });
     await notifyOwnersAboutServiceStepCompletion(supabase, {
       organizationId: checklist.organization_id,
       actorUserId: user.id,
@@ -981,7 +1054,7 @@ export async function deleteChecklistItemAction(itemId: string, checklistId: str
   if (checklistError) throw new Error(checklistError.message);
   const { error } = await supabase
     .from("checklist_items")
-    .delete()
+    .update({ deleted_at: new Date().toISOString() })
     .eq("id", itemId)
     .eq("checklist_id", checklistId);
   if (error) throw new Error(error.message);
@@ -1027,7 +1100,9 @@ async function refreshChecklistPercent(
   const { data: itemsData } = await supabase
     .from("checklist_items")
     .select("is_done")
-    .in("checklist_id", ids);
+    .in("checklist_id", ids)
+    .is("deleted_at", null)
+    .is("archived_at", null);
   const items = itemsData ?? [];
 
   const total = items.length;
@@ -1038,6 +1113,138 @@ async function refreshChecklistPercent(
     .from("service_cards")
     .update({ checklist_percent: percent })
     .eq("id", serviceCardId);
+}
+
+async function ensureServiceChecklistByType(
+  supabase: Awaited<ReturnType<typeof createServerSupabase>>,
+  organizationId: string,
+  serviceCardId: string | null | undefined,
+  checklistType: "documents" | "steps" | undefined,
+) {
+  if (!serviceCardId || !checklistType) throw new Error("Servico ou tipo de checklist invalido.");
+  const { data: existing, error: existingError } = await supabase
+    .from("checklists")
+    .select("id")
+    .eq("organization_id", organizationId)
+    .eq("service_card_id", serviceCardId)
+    .eq("checklist_type", checklistType)
+    .order("position", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+  if (existingError) throw new Error(existingError.message);
+  if (existing) return existing.id;
+
+  const { data: created, error } = await supabase
+    .from("checklists")
+    .insert({
+      organization_id: organizationId,
+      service_card_id: serviceCardId,
+      title: checklistType === "steps" ? "Checklist - Etapas" : "Checklist - Documentos",
+      checklist_type: checklistType,
+      position: checklistType === "steps" ? 2 : 1,
+    })
+    .select("id")
+    .single();
+  if (error) throw new Error(error.message);
+  return created.id;
+}
+
+async function createDailyTaskForServiceStep(
+  supabase: Awaited<ReturnType<typeof createServerSupabase>>,
+  {
+    organizationId,
+    userId,
+    createdBy,
+    serviceCardId,
+    serviceTitle,
+    itemTitle,
+    dueDate,
+  }: {
+    organizationId: string;
+    userId: string;
+    createdBy: string;
+    serviceCardId: string;
+    serviceTitle: string;
+    itemTitle: string;
+    dueDate: string;
+  },
+) {
+  const { data: checklist, error: checklistError } = await supabase
+    .from("daily_checklists")
+    .upsert(
+      {
+        organization_id: organizationId,
+        user_id: userId,
+        checklist_date: dueDate,
+      },
+      { onConflict: "organization_id,user_id,checklist_date" },
+    )
+    .select("id")
+    .single();
+  if (checklistError) throw new Error(checklistError.message);
+
+  const title = `Etapa: ${itemTitle} - ${serviceTitle}`;
+  const { data: existing } = await supabase
+    .from("daily_checklist_items")
+    .select("id")
+    .eq("organization_id", organizationId)
+    .eq("assigned_to", userId)
+    .eq("related_service_id", serviceCardId)
+    .eq("title", title)
+    .is("deleted_at", null)
+    .limit(1)
+    .maybeSingle();
+  if (existing) return;
+
+  const { data: dailyItem, error: dailyError } = await supabase
+    .from("daily_checklist_items")
+    .insert({
+      organization_id: organizationId,
+      checklist_id: checklist.id,
+      assigned_to: userId,
+      created_by: createdBy,
+      title,
+      due_date: dueDate,
+      related_service_id: serviceCardId,
+      source: "self",
+    })
+    .select("id")
+    .single();
+  if (dailyError) throw new Error(dailyError.message);
+
+  await supabase.from("routine_items").insert({
+    organization_id: organizationId,
+    user_id: userId,
+    title,
+    routine_scope: "daily",
+    routine_date: dueDate,
+    source: "service_step",
+    daily_checklist_item_id: dailyItem.id,
+    created_by: createdBy,
+  });
+}
+
+async function markServiceStepRemindersCompleted(
+  supabase: Awaited<ReturnType<typeof createServerSupabase>>,
+  {
+    organizationId,
+    serviceCardId,
+    itemTitle,
+  }: {
+    organizationId: string;
+    serviceCardId: string;
+    itemTitle: string;
+  },
+) {
+  const now = new Date().toISOString();
+  await supabase
+    .from("agenda_reminders")
+    .update({ completed_at: now, canceled_at: now })
+    .eq("organization_id", organizationId)
+    .eq("entity_type", "service_card")
+    .eq("entity_id", serviceCardId)
+    .ilike("title", `%${itemTitle}%`)
+    .is("completed_at", null);
 }
 
 async function ensureEmptyServiceChecklists(

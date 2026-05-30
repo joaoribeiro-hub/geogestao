@@ -1,6 +1,8 @@
 import { Save } from "lucide-react";
 import { updateProfileAction } from "@/app/(app)/minha-conta/actions";
 import { AvatarUploader } from "@/components/account/avatar-uploader";
+import { GoogleIntegrationsPanel } from "@/components/account/google-integrations-panel";
+import { AiAgentsPanel } from "@/components/ai-agents/ai-agents-panel";
 import { PlansModal } from "@/components/account/plans-modal";
 import { PageHeader } from "@/components/layout/page-header";
 import { OrganizationOnboarding } from "@/components/onboarding/organization-onboarding";
@@ -208,6 +210,34 @@ export default async function AccountPage() {
               ) : (
                 <div className="rounded-md bg-secondary px-3 py-2 text-sm text-muted-foreground">
                   Sua conta ainda nao participa de uma empresa. Conclua o onboarding para liberar o sistema.
+                </div>
+              )}
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle>Integracoes</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {organization && membership ? (
+                <GoogleIntegrationsPanel />
+              ) : (
+                <div className="rounded-md bg-secondary px-3 py-2 text-sm text-muted-foreground">
+                  Conclua o onboarding para conectar Google Drive e Google Calendar.
+                </div>
+              )}
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle>Agentes</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {organization && membership ? (
+                <AiAgentsPanel />
+              ) : (
+                <div className="rounded-md bg-secondary px-3 py-2 text-sm text-muted-foreground">
+                  Conclua o onboarding para executar agentes.
                 </div>
               )}
             </CardContent>

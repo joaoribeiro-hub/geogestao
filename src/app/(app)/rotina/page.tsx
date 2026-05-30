@@ -40,7 +40,10 @@ export default async function RoutinePage({
     .select("*")
     .eq("organization_id", organization.id)
     .eq("user_id", user.id)
-    .or(`and(routine_scope.eq.daily,routine_date.gte.${days[0]},routine_date.lte.${days[6]}),routine_scope.in.(weekly,monthly,annual)`)
+    .is("deleted_at", null)
+    .is("archived_at", null)
+    .neq("status", "canceled")
+    .or(`and(routine_scope.eq.daily,routine_date.lte.${days[6]}),routine_scope.in.(weekly,monthly,annual)`)
     .order("created_at", { ascending: true });
 
   const items = routineItems ?? [];
@@ -114,7 +117,10 @@ export default async function RoutinePage({
 
       <div className="grid gap-3 lg:grid-cols-7">
         {days.map((day) => {
-          const dayItems = dailyItems.filter((item) => item.routine_date === day);
+          const dayItems = dailyItems.filter((item) => {
+            if (item.status === "open") return !item.routine_date || item.routine_date <= day;
+            return item.routine_date === day || item.completed_at?.slice(0, 10) === day;
+          });
           const isToday = day === toDateKey(new Date());
           return (
             <Card key={day} className={isToday ? "border-primary" : ""}>

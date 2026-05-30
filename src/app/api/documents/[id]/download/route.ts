@@ -31,6 +31,13 @@ export async function GET(
     assertDocumentStoragePath(organization.id, document.storage_path);
   }
 
+  if (document.storage_provider === "google_drive") {
+    return NextResponse.json({
+      downloadUrl: `/api/integrations/google/drive/download?documentId=${encodeURIComponent(document.id)}`,
+      expiresInSeconds: 300,
+    });
+  }
+
   const { data, error: signedError } = await supabase.storage
     .from(document.storage_bucket ?? "documentos")
     .createSignedUrl(document.storage_path, 60 * 5);
@@ -40,4 +47,3 @@ export async function GET(
 
   return NextResponse.json({ signedUrl: data.signedUrl, expiresInSeconds: 300 });
 }
-

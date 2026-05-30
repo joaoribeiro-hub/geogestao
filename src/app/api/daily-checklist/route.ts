@@ -28,18 +28,27 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: checklistError.message }, { status: 500 });
   }
 
-  const { data: items, error } = checklist
-    ? await supabase
-        .from("daily_checklist_items")
-        .select("*")
-        .eq("organization_id", organization.id)
-        .eq("checklist_id", checklist.id)
-        .order("is_emergency", { ascending: false })
-        .order("created_at", { ascending: true })
-    : { data: [], error: null };
+  let itemsQuery = supabase
+    .from("daily_checklist_items")
+    .select("*")
+    .eq("organization_id", organization.id)
+    .eq("assigned_to", user.id)
+    .in("status", ["open", "done"])
+    .is("deleted_at", null)
+    .is("archived_at", null);
+  const dateOrChecklist = [`due_date.lte.${date}`];
+  if (checklist?.id) dateOrChecklist.push(`checklist_id.eq.${checklist.id}`);
+  itemsQuery = itemsQuery.or(dateOrChecklist.join(","));
+  const { data: rawItems, error } = await itemsQuery
+    .order("is_emergency", { ascending: false })
+    .order("created_at", { ascending: true });
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  const items = (rawItems ?? []).filter((item) => {
+    if (item.status === "open") return !item.due_date || item.due_date <= date;
+    return item.due_date === date || item.completed_at?.slice(0, 10) === date;
+  });
 
-  return NextResponse.json({ checklist, items: items ?? [] });
+  return NextResponse.json({ checklist, items });
 }
 
 export async function POST(request: Request) {
@@ -50,7 +59,7 @@ export async function POST(request: Request) {
   const parsed = createItemSchema.safeParse(body);
   if (!parsed.success) return NextResponse.json({ error: "Item invalido." }, { status: 400 });
 
-  const { data: checklist, error: upsertError } = await supabase
+  const { data: checklistRows, error: upsertError } = await supabase
     .from("daily_checklists")
     .upsert(
       {
@@ -61,10 +70,12 @@ export async function POST(request: Request) {
       { onConflict: "organization_id,user_id,checklist_date" },
     )
     .select("*")
-    .single();
+    .limit(1);
   if (upsertError) return NextResponse.json({ error: upsertError.message }, { status: 500 });
+  const checklist = checklistRows?.[0];
+  if (!checklist) return NextResponse.json({ error: "Nao foi possivel criar o checklist do dia." }, { status: 500 });
 
-  const { data: item, error } = await supabase
+  const { data: itemRows, error } = await supabase
     .from("daily_checklist_items")
     .insert({
       checklist_id: checklist.id,
@@ -77,8 +88,23 @@ export async function POST(request: Request) {
       source: "self",
     })
     .select("*")
-    .single();
+    .limit(1);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  const item = itemRows?.[0];
+  if (!item) return NextResponse.json({ error: "Nao foi possivel criar o item." }, { status: 500 });
+
+  await supabase.from("routine_items").insert({
+    organization_id: organization.id,
+    user_id: user.id,
+    title: item.title,
+    description: item.description,
+    routine_scope: "daily",
+    routine_date: parsed.data.date,
+    is_emergency: item.is_emergency,
+    source: "widget_task",
+    daily_checklist_item_id: item.id,
+    created_by: user.id,
+  });
 
   await supabase.from("organization_activity_log").insert({
     organization_id: organization.id,

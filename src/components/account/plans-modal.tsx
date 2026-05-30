@@ -54,7 +54,7 @@ export function PlansModal({
                       <PlanLine label="Mensalidade" value={formatCurrency((plan.price_monthly_cents ?? 0) / 100)} />
                       <PlanLine label="Usuarios" value={`ate ${plan.max_users ?? 3} contas ativas`} />
                       <PlanLine label="Armazenamento" value={`${plan.storage_limit_mb ?? plan.storage_quota_mb ?? 3072} MB`} />
-                      <PlanLine label="Assistente IA" value={plan.ai_enabled ? "habilitado" : "indisponivel"} />
+                      <PlanLine label="Sophia" value={plan.ai_enabled ? "habilitado" : "indisponivel"} />
                     </div>
                     <Button disabled variant={isCurrent ? "default" : "outline"}>
                       {isCurrent ? (

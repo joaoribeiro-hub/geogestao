@@ -15,23 +15,15 @@ export async function GET() {
 
   const ownerUserIds = await getOrganizationOwnerIds(supabase, organization.id);
 
-  const { data: checklist } = await supabase
-    .from("daily_checklists")
-    .select("id")
+  const { data: checklistItems, error: checklistError } = await supabase
+    .from("daily_checklist_items")
+    .select("status,source,created_by,is_emergency")
     .eq("organization_id", organization.id)
-    .eq("user_id", user.id)
-    .eq("checklist_date", today)
-    .maybeSingle();
-
-  const { data: checklistItems, error: checklistError } = checklist?.id
-    ? await supabase
-        .from("daily_checklist_items")
-        .select("status,source,created_by,is_emergency")
-        .eq("organization_id", organization.id)
-        .eq("assigned_to", user.id)
-        .eq("checklist_id", checklist.id)
-        .neq("status", "canceled")
-    : { data: [], error: null };
+    .eq("assigned_to", user.id)
+    .eq("status", "open")
+    .is("deleted_at", null)
+    .is("archived_at", null)
+    .or(`due_date.lte.${today},due_date.is.null`);
   if (checklistError) return NextResponse.json({ error: checklistError.message }, { status: 500 });
 
   const { data: reads, error: readError } = await supabase

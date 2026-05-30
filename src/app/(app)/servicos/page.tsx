@@ -4,6 +4,7 @@ import { ServiceKanban } from "@/components/kanban/service-kanban";
 import { PageHeader } from "@/components/layout/page-header";
 import { EmptyState } from "@/components/ui/empty-state";
 import { NewServiceModal } from "@/components/services/new-service-modal";
+import { ServiceImportModal } from "@/components/services/service-import-modal";
 import { ServiceSchedule } from "@/components/services/service-schedule";
 import { monthBounds, parseMonthParam } from "@/lib/agenda/calendar";
 import { requireUser } from "@/lib/auth";
@@ -172,12 +173,15 @@ export default async function ServicesPage({
           title="Servicos"
           description="Centro da operacao: documentos, proposta, contrato, execucao, equipe e financeiro em um quadro simples."
         />
-        <NewServiceModal
-          clients={clients}
-          columns={allColumns}
-          columnByServiceType={columnByServiceType}
-          members={memberOptions}
-        />
+        <div className="flex flex-wrap gap-2">
+          <ServiceImportModal selectedBoardId={selectedBoard?.id ?? null} />
+          <NewServiceModal
+            clients={clients}
+            columns={allColumns}
+            columnByServiceType={columnByServiceType}
+            members={memberOptions}
+          />
+        </div>
       </div>
 
       <PeriodFilter

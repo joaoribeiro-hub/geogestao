@@ -48,7 +48,7 @@ export function AssistantChat() {
       id: "welcome",
       role: "assistant",
       content:
-        "Sou o Assistente IA do GeoGestao. Posso consultar servicos, clientes, tarefas, propostas/contratos e registrar tarefas ou interacoes sem usar SQL livre.",
+        "Sou a Sophia, assistente do GeoGestao. Posso consultar servicos, clientes, tarefas, propostas/contratos e registrar tarefas ou interacoes sem usar SQL livre.",
     },
   ]);
   const [pending, startTransition] = useTransition();
@@ -139,7 +139,7 @@ export function AssistantChat() {
             {
               id: crypto.randomUUID(),
               role: "assistant",
-              content: "Nao foi possivel conectar ao Assistente IA agora.",
+              content: "Nao foi possivel conectar a Sophia agora.",
             },
           ]);
         }
@@ -293,7 +293,7 @@ export function AssistantChat() {
         <Card>
           <CardContent className="space-y-2 p-4 text-sm text-muted-foreground">
             <p className="font-medium text-foreground">Seguranca</p>
-            <p>O assistente nao executa SQL livre e nao apaga dados. Escritas passam pela action registry e ficam registradas em log.</p>
+            <p>A Sophia nao executa SQL livre e nao apaga dados. Escritas passam pela action registry e ficam registradas em log.</p>
           </CardContent>
         </Card>
       </aside>

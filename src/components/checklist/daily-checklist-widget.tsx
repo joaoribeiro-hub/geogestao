@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useMemo, useState, useTransition } from "react";
-import { AlertTriangle, CalendarCheck, CheckCircle2, Loader2, Plus, X } from "lucide-react";
+import { AlertTriangle, Bell, CalendarCheck, CheckCircle2, Loader2, Pencil, Plus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { DailyChecklistItem } from "@/types/database";
@@ -17,6 +17,21 @@ type ChecklistBadgeCounts = {
   ownerAssignedOpenCount: number;
 };
 
+type QuickReminder = {
+  id: string;
+  title: string;
+  description: string | null;
+  reminder_date: string;
+  reminder_time: string | null;
+  notification_preference: "due" | "10m" | "1h" | "none";
+  completed_at: string | null;
+};
+
+type QuickReminderMember = {
+  id: string;
+  label: string;
+};
+
 export function DailyChecklistWidget({
   counts,
   onCountsChanged,
@@ -28,8 +43,21 @@ export function DailyChecklistWidget({
   const [dateMode, setDateMode] = useState<"today" | "yesterday" | "custom">("today");
   const [customDate, setCustomDate] = useState(todayDate());
   const [items, setItems] = useState<DailyChecklistItem[]>([]);
+  const [activeTab, setActiveTab] = useState<"task" | "reminder">("task");
+  const [reminders, setReminders] = useState<QuickReminder[]>([]);
+  const [members, setMembers] = useState<QuickReminderMember[]>([]);
   const [title, setTitle] = useState("");
+  const [reminderTitle, setReminderTitle] = useState("");
+  const [reminderDate, setReminderDate] = useState(todayDate());
+  const [reminderTime, setReminderTime] = useState("");
+  const [reminderRecipientId, setReminderRecipientId] = useState("");
+  const [notificationPreference, setNotificationPreference] = useState<"due" | "10m" | "1h" | "none">("due");
   const [isEmergency, setIsEmergency] = useState(false);
+  const [editingItem, setEditingItem] = useState<DailyChecklistItem | null>(null);
+  const [editTitle, setEditTitle] = useState("");
+  const [editDescription, setEditDescription] = useState("");
+  const [editDate, setEditDate] = useState(todayDate());
+  const [editEmergency, setEditEmergency] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const selectedDate = useMemo(() => {
@@ -37,6 +65,10 @@ export function DailyChecklistWidget({
     if (dateMode === "yesterday") return offsetDate(-1);
     return customDate;
   }, [dateMode, customDate]);
+
+  useEffect(() => {
+    setReminderDate(selectedDate);
+  }, [selectedDate]);
 
   const loadItems = useCallback(async (date: string) => {
     setError(null);
@@ -54,6 +86,28 @@ export function DailyChecklistWidget({
     if (!open) return;
     void loadItems(selectedDate);
   }, [loadItems, open, selectedDate]);
+
+  const loadReminders = useCallback(async (date: string) => {
+    setError(null);
+    const response = await fetch(`/api/reminders/quick?date=${encodeURIComponent(date)}`, { cache: "no-store" });
+    const data = (await response.json().catch(() => null)) as {
+      reminders?: QuickReminder[];
+      members?: QuickReminderMember[];
+      error?: string;
+    } | null;
+    if (!response.ok || data?.error) {
+      setError(data?.error ?? "Nao foi possivel carregar lembretes.");
+      return;
+    }
+    setReminders(data?.reminders ?? []);
+    setMembers(data?.members ?? []);
+    setReminderRecipientId((current) => current || data?.members?.[0]?.id || "");
+  }, []);
+
+  useEffect(() => {
+    if (!open || activeTab !== "reminder") return;
+    void loadReminders(selectedDate);
+  }, [activeTab, loadReminders, open, selectedDate]);
 
   function addItem(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -79,7 +133,16 @@ export function DailyChecklistWidget({
     });
   }
 
-  async function updateItem(item: DailyChecklistItem, update: { status?: "open" | "done"; isEmergency?: boolean }) {
+  async function updateItem(
+    item: DailyChecklistItem,
+    update: {
+      status?: "open" | "done";
+      isEmergency?: boolean;
+      title?: string;
+      description?: string | null;
+      dueDate?: string;
+    },
+  ) {
     const response = await fetch(`/api/daily-checklist/${item.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -92,7 +155,74 @@ export function DailyChecklistWidget({
       return;
     }
     setItems((current) => current.map((currentItem) => (currentItem.id === item.id ? data.item! : currentItem)));
+    setEditingItem(null);
     onCountsChanged?.();
+  }
+
+  function startEdit(item: DailyChecklistItem) {
+    setEditingItem(item);
+    setEditTitle(item.title);
+    setEditDescription(item.description ?? "");
+    setEditDate(item.due_date ?? selectedDate);
+    setEditEmergency(item.is_emergency);
+  }
+
+  function submitEdit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!editingItem || !editTitle.trim()) return;
+    void updateItem(editingItem, {
+      title: editTitle.trim(),
+      description: editDescription.trim() || null,
+      dueDate: editDate,
+      isEmergency: editEmergency,
+    });
+  }
+
+  async function deleteItem(item: DailyChecklistItem) {
+    const confirmed = window.confirm("Apagar este item da tarefa?");
+    if (!confirmed) return;
+    const response = await fetch(`/api/daily-checklist/${item.id}`, {
+      method: "DELETE",
+      cache: "no-store",
+    });
+    const data = (await response.json().catch(() => null)) as ChecklistResponse | null;
+    if (!response.ok || data?.error) {
+      setError(data?.error ?? "Nao foi possivel apagar o item.");
+      return;
+    }
+    setItems((current) => current.filter((currentItem) => currentItem.id !== item.id));
+    onCountsChanged?.();
+  }
+
+  function addReminder(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!reminderTitle.trim() || pending) return;
+    startTransition(() => {
+      void (async () => {
+        const response = await fetch("/api/reminders/quick", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          cache: "no-store",
+          body: JSON.stringify({
+            title: reminderTitle.trim(),
+            date: reminderDate,
+            time: reminderTime || null,
+            recipientUserIds: reminderRecipientId ? [reminderRecipientId] : undefined,
+            notificationPreference,
+          }),
+        });
+        const data = (await response.json().catch(() => null)) as { error?: string } | null;
+        if (!response.ok || data?.error) {
+          setError(data?.error ?? "Nao foi possivel criar o lembrete.");
+          return;
+        }
+        setReminderTitle("");
+        setReminderTime("");
+        setNotificationPreference("due");
+        window.dispatchEvent(new Event("geogestao:notifications-refresh"));
+        await loadReminders(selectedDate);
+      })();
+    });
   }
 
   return (
@@ -101,17 +231,28 @@ export function DailyChecklistWidget({
         <section
           className="flex h-[min(560px,calc(100vh-9rem))] w-[calc(100vw-2rem)] max-w-[390px] flex-col overflow-hidden rounded-lg border bg-card shadow-xl"
           data-testid="daily-checklist-panel"
-          aria-label="Checklist de hoje"
+          aria-label="Tarefa"
         >
           <header className="flex items-center justify-between border-b px-4 py-3">
             <div className="flex items-center gap-2">
               <CalendarCheck className="size-4 text-primary" aria-hidden="true" />
-              <p className="text-sm font-semibold">Checklist de hoje</p>
+              <p className="text-sm font-semibold">Tarefa</p>
             </div>
-            <Button type="button" variant="ghost" size="icon" aria-label="Fechar checklist" onClick={() => setOpen(false)}>
+            <Button type="button" variant="ghost" size="icon" aria-label="Fechar tarefa" onClick={() => setOpen(false)}>
               <X aria-hidden="true" />
             </Button>
           </header>
+
+          <div className="grid grid-cols-2 gap-2 border-b p-3">
+            <Button type="button" size="sm" variant={activeTab === "task" ? "default" : "outline"} onClick={() => setActiveTab("task")}>
+              <CalendarCheck aria-hidden="true" />
+              Tarefa
+            </Button>
+            <Button type="button" size="sm" variant={activeTab === "reminder" ? "default" : "outline"} onClick={() => setActiveTab("reminder")}>
+              <Bell aria-hidden="true" />
+              Lembrete
+            </Button>
+          </div>
 
           <div className="space-y-3 border-b p-3">
             <div className="grid grid-cols-3 gap-2">
@@ -127,6 +268,7 @@ export function DailyChecklistWidget({
                 className="h-10 w-full rounded-md border bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
               />
             ) : null}
+            {activeTab === "task" ? (
             <form className="grid gap-2" onSubmit={addItem}>
               <input
                 value={title}
@@ -146,11 +288,76 @@ export function DailyChecklistWidget({
                 </Button>
               </div>
             </form>
+            ) : (
+              <form className="grid gap-2" onSubmit={addReminder}>
+                <input
+                  value={reminderTitle}
+                  onChange={(event) => setReminderTitle(event.target.value)}
+                  className="h-10 rounded-md border bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  placeholder="Titulo do lembrete"
+                  maxLength={180}
+                />
+                <div className="grid grid-cols-2 gap-2">
+                  <input
+                    type="date"
+                    value={reminderDate}
+                    onChange={(event) => setReminderDate(event.target.value)}
+                    className="h-10 rounded-md border bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  />
+                  <input
+                    type="time"
+                    value={reminderTime}
+                    onChange={(event) => setReminderTime(event.target.value)}
+                    className="h-10 rounded-md border bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  />
+                </div>
+                <select
+                  value={reminderRecipientId}
+                  onChange={(event) => setReminderRecipientId(event.target.value)}
+                  className="h-10 rounded-md border bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  {members.map((member) => (
+                    <option key={member.id} value={member.id}>{member.label}</option>
+                  ))}
+                </select>
+                <select
+                  value={notificationPreference}
+                  onChange={(event) => setNotificationPreference(event.target.value as "due" | "10m" | "1h" | "none")}
+                  className="h-10 rounded-md border bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  aria-label="Notifique-me"
+                >
+                  <option value="due">Na data final</option>
+                  <option value="10m">10 minutos antes</option>
+                  <option value="1h">1 hora antes</option>
+                  <option value="none">Nao notificar</option>
+                </select>
+                <Button type="submit" size="sm" disabled={pending || !reminderTitle.trim()}>
+                  {pending ? <Loader2 className="animate-spin" aria-hidden="true" /> : <Plus aria-hidden="true" />}
+                  Adicionar lembrete
+                </Button>
+              </form>
+            )}
           </div>
 
           <div className="flex-1 space-y-2 overflow-y-auto p-3">
             {error ? <p className="rounded-md bg-destructive/10 p-2 text-sm text-destructive">{error}</p> : null}
-            {items.length ? (
+            {activeTab === "reminder" ? (
+              reminders.length ? (
+                reminders.map((reminder) => (
+                  <div key={reminder.id} className="rounded-md border p-3 text-sm">
+                    <p className="font-medium">{reminder.title}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {reminder.reminder_date}
+                      {reminder.reminder_time ? ` as ${reminder.reminder_time.slice(0, 5)}` : ""}
+                      {" - "}
+                      {reminder.notification_preference === "none" ? "sem notificacao" : "com notificacao"}
+                    </p>
+                  </div>
+                ))
+              ) : (
+                <p className="rounded-md bg-secondary p-3 text-sm text-muted-foreground">Nenhum lembrete para esta data.</p>
+              )
+            ) : items.length ? (
               items.map((item) => (
                 <div
                   key={item.id}
@@ -160,6 +367,48 @@ export function DailyChecklistWidget({
                     item.status === "done" && "opacity-70",
                   )}
                 >
+                  {editingItem?.id === item.id ? (
+                    <form className="grid gap-2" onSubmit={submitEdit}>
+                      <input
+                        value={editTitle}
+                        onChange={(event) => setEditTitle(event.target.value)}
+                        className="h-10 rounded-md border bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        maxLength={240}
+                        aria-label="Titulo do item"
+                      />
+                      <textarea
+                        value={editDescription}
+                        onChange={(event) => setEditDescription(event.target.value)}
+                        className="min-h-20 rounded-md border bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        maxLength={1000}
+                        placeholder="Descricao"
+                      />
+                      <div className="grid grid-cols-[1fr_auto] gap-2">
+                        <input
+                          type="date"
+                          value={editDate}
+                          onChange={(event) => setEditDate(event.target.value)}
+                          className="h-10 rounded-md border bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        />
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant={editEmergency ? "destructive" : "outline"}
+                          onClick={() => setEditEmergency((current) => !current)}
+                        >
+                          <AlertTriangle aria-hidden="true" />
+                        </Button>
+                      </div>
+                      <div className="flex justify-end gap-2">
+                        <Button type="button" size="sm" variant="ghost" onClick={() => setEditingItem(null)}>
+                          Cancelar
+                        </Button>
+                        <Button type="submit" size="sm" disabled={!editTitle.trim()}>
+                          Salvar
+                        </Button>
+                      </div>
+                    </form>
+                  ) : (
                   <div className="flex items-start gap-2">
                     <button
                       type="button"
@@ -179,10 +428,19 @@ export function DailyChecklistWidget({
                         <p className="mt-1 text-xs text-muted-foreground">Atribuido pelo proprietario da empresa</p>
                       ) : null}
                     </div>
-                    <Button type="button" size="sm" variant={item.is_emergency ? "destructive" : "ghost"} onClick={() => updateItem(item, { isEmergency: !item.is_emergency })}>
-                      <AlertTriangle aria-hidden="true" />
-                    </Button>
+                    <div className="flex shrink-0 items-center gap-1">
+                      <Button type="button" size="icon" variant="ghost" aria-label="Editar item" onClick={() => startEdit(item)}>
+                        <Pencil aria-hidden="true" />
+                      </Button>
+                      <Button type="button" size="icon" variant={item.is_emergency ? "destructive" : "ghost"} aria-label="Alternar emergencia" onClick={() => updateItem(item, { isEmergency: !item.is_emergency })}>
+                        <AlertTriangle aria-hidden="true" />
+                      </Button>
+                      <Button type="button" size="icon" variant="ghost" aria-label="Apagar item" onClick={() => deleteItem(item)}>
+                        <X aria-hidden="true" />
+                      </Button>
+                    </div>
                   </div>
+                  )}
                 </div>
               ))
             ) : (
@@ -196,7 +454,7 @@ export function DailyChecklistWidget({
         type="button"
         size="icon"
         className="relative size-12 rounded-full shadow-lg"
-        aria-label={open ? "Minimizar checklist" : "Abrir checklist de hoje"}
+        aria-label={open ? "Minimizar tarefa" : "Abrir tarefa"}
         onClick={() => setOpen((current) => !current)}
         data-testid="daily-checklist-button"
       >

@@ -306,9 +306,12 @@ export const checklistSchema = z.object({
 });
 
 export const checklistItemSchema = z.object({
-  checklist_id: z.string().uuid(),
+  checklist_id: z.string().uuid().optional(),
+  service_card_id: z.string().uuid().optional(),
+  checklist_type: z.enum(["documents", "steps"]).optional(),
   title: z.string().trim().min(2, "Informe o item."),
   is_done: z.coerce.boolean().optional().default(false),
+  created_at: dateString,
   due_date: dateString,
   due_time: optionalText,
 });

@@ -1,13 +1,14 @@
 import Link from "next/link";
 import { AlertTriangle, Bell, CalendarClock, CircleDollarSign, FolderKanban, Search, Users } from "lucide-react";
 import { PeriodFilter } from "@/components/filters/period-filter";
+import { HomeAgentCards, type HomeAgentCardData } from "@/components/home/home-agent-cards";
 import { HomeNotifications } from "@/components/home/home-notifications";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { requireUser } from "@/lib/auth";
-import { getCurrentOrganizationForUser } from "@/lib/organization";
+import { getCurrentOrganizationContext } from "@/lib/organization";
 import { filterByPeriod, resolvePeriodRange } from "@/lib/period";
 import { filterOrganizationRows } from "@/lib/services/dashboard-metrics";
 import { calculateServiceFinanceSummary } from "@/lib/services/service-finance";
@@ -25,7 +26,13 @@ export default async function DashboardPage({
   const q = Array.isArray(params.q) ? params.q[0] ?? "" : params.q ?? "";
   const supabase = await createServerSupabase();
   const user = await requireUser(supabase);
-  const organization = await getCurrentOrganizationForUser(supabase, user.id);
+  const context = await getCurrentOrganizationContext(supabase, user.id);
+  if (!context.organization || !context.membership) {
+    throw new Error("Usuario sem organizacao vinculada.");
+  }
+  const organization = context.organization;
+  const isOwner = context.membership.role === "owner";
+  const today = new Date().toISOString().slice(0, 10);
   const [
     clientsResult,
     proposalsResult,
@@ -36,6 +43,8 @@ export default async function DashboardPage({
     expensesResult,
     profileResult,
     checklistResult,
+    agentsResult,
+    agentRunsResult,
   ] = await Promise.all([
     supabase.from("clients").select("id,organization_id,name").eq("organization_id", organization.id),
     supabase.from("proposals").select("*").eq("organization_id", organization.id),
@@ -46,12 +55,29 @@ export default async function DashboardPage({
     supabase.from("expenses").select("*").eq("organization_id", organization.id).order("due_date"),
     supabase.from("profiles").select("full_name").eq("id", user.id).maybeSingle(),
     supabase
-      .from("daily_checklists")
-      .select("id,daily_checklist_items(*)")
+      .from("daily_checklist_items")
+      .select("*")
       .eq("organization_id", organization.id)
-      .eq("user_id", user.id)
-      .eq("checklist_date", new Date().toISOString().slice(0, 10))
-      .maybeSingle(),
+      .eq("assigned_to", user.id)
+      .in("status", ["open", "done"])
+      .is("deleted_at", null)
+      .is("archived_at", null)
+      .or(`due_date.lte.${today},due_date.is.null`)
+      .order("is_emergency", { ascending: false })
+      .order("created_at", { ascending: true }),
+    supabase
+      .from("ai_agents")
+      .select("id,slug,name")
+      .in("slug", ["briefing-matinal", "revisao-semanal"])
+      .eq("is_active", true),
+    supabase
+      .from("ai_agent_runs")
+      .select("agent_id,summary,status,created_at,output")
+      .eq("organization_id", organization.id)
+      .eq("triggered_by", user.id)
+      .in("status", ["completed", "error"])
+      .order("created_at", { ascending: false })
+      .limit(20),
   ]);
   const clients = filterOrganizationRows(clientsResult.data ?? [], organization.id);
   const proposals = filterByPeriod(
@@ -116,9 +142,31 @@ export default async function DashboardPage({
   const currentHour = new Date().getHours();
   const greeting = currentHour < 12 ? "Bom dia" : currentHour < 18 ? "Boa tarde" : "Boa noite";
   const displayName = profileResult.data?.full_name ?? user.email ?? "usuario";
-  const todayTasks = (Array.isArray(checklistResult.data?.daily_checklist_items)
-    ? checklistResult.data.daily_checklist_items
-    : []) as DailyChecklistItem[];
+  const todayTasks = ((checklistResult.data ?? []) as DailyChecklistItem[]).filter((item) => {
+    if (item.status === "open") return !item.due_date || item.due_date <= today;
+    return item.completed_at?.slice(0, 10) === today || item.due_date === today;
+  });
+  const agentBySlug = new Map((agentsResult.data ?? []).map((agent) => [agent.slug, agent]));
+  const latestRunFor = (slug: HomeAgentCardData["slug"]) => {
+    const agent = agentBySlug.get(slug);
+    return (agentRunsResult.data ?? []).find((run) => run.agent_id === agent?.id) ?? null;
+  };
+  const homeAgentCards: HomeAgentCardData[] = [
+    {
+      slug: "briefing-matinal",
+      title: agentBySlug.get("briefing-matinal")?.name ?? "Briefing da manha",
+      summary: latestRunFor("briefing-matinal")?.summary ?? null,
+      status: latestRunFor("briefing-matinal")?.status ?? null,
+      createdAt: latestRunFor("briefing-matinal")?.created_at ?? null,
+    },
+    {
+      slug: "revisao-semanal",
+      title: agentBySlug.get("revisao-semanal")?.name ?? "Revisao semanal",
+      summary: latestRunFor("revisao-semanal")?.summary ?? null,
+      status: latestRunFor("revisao-semanal")?.status ?? null,
+      createdAt: latestRunFor("revisao-semanal")?.created_at ?? null,
+    },
+  ];
   const normalizedQuery = q.trim().toLowerCase();
   const searchResults = normalizedQuery
     ? [
@@ -206,7 +254,7 @@ export default async function DashboardPage({
                 ))
               ) : (
                 <p className="text-sm text-muted-foreground">
-                  Nao encontrei registro direto. Use o Assistente IA flutuante para interpretar como pergunta ou comando.
+                  Nao encontrei registro direto. Use a Sophia flutuante para interpretar como pergunta ou comando.
                 </p>
               )}
             </div>
@@ -214,7 +262,9 @@ export default async function DashboardPage({
         </CardContent>
       </Card>
 
-      <PeriodFilter range={periodRange} action="/" />
+      <PeriodFilter range={periodRange} action="/" compact />
+
+      <HomeAgentCards cards={homeAgentCards} />
 
       <div className="mb-6 grid gap-6 xl:grid-cols-[minmax(0,1fr)_420px]">
         <Card>
@@ -252,6 +302,7 @@ export default async function DashboardPage({
         </Card>
       </div>
 
+      {isOwner ? (
       <div className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Metric title="Total de clientes" value={clients.length.toString()} icon={<Users />} />
         <Metric title="Propostas enviadas" value={sentProposals.length.toString()} icon={<FolderKanban />} />
@@ -270,7 +321,9 @@ export default async function DashboardPage({
         <Metric title="Projetos em andamento" value={inProgressCards.length.toString()} icon={<CalendarClock />} />
         <Metric title="Projetos atrasados" value={overdueCards.length.toString()} icon={<AlertTriangle />} />
       </div>
+      ) : null}
 
+      {isOwner ? (
       <div className="grid gap-6 xl:grid-cols-2">
         <Card>
           <CardHeader>
@@ -321,6 +374,7 @@ export default async function DashboardPage({
           </CardContent>
         </Card>
       </div>
+      ) : null}
     </div>
   );
 }

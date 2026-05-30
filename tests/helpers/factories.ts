@@ -75,6 +75,12 @@ export function makeServiceCard(overrides: Partial<ServiceCard> = {}): ServiceCa
     custom_fields_json: { existente: true },
     position: 0,
     created_from_proposal_id: "proposal-1",
+    import_source: null,
+    import_external_id: null,
+    import_external_url: null,
+    imported_at: null,
+    imported_by: null,
+    raw_import_data: null,
     ...overrides,
   };
 }

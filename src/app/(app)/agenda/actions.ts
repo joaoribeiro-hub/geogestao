@@ -5,6 +5,7 @@ import { requireUser } from "@/lib/auth";
 import { formDataToObject } from "@/lib/form-data";
 import { agendaReminderSchema } from "@/lib/schemas";
 import { canManageOrganization, getCurrentOrganizationContext } from "@/lib/organization";
+import { markGoogleCalendarSyncsDeleted, syncReminderToGoogleCalendar } from "@/lib/integrations/google-calendar-sync";
 import { generateReminderNotifications } from "@/lib/notifications/reminders";
 import { createServerSupabase } from "@/lib/supabase/server";
 
@@ -64,6 +65,15 @@ export async function createAgendaReminderAction(formData: FormData) {
     actorUserId: user.id,
     actionUrl: `/agenda?month=${parsed.reminder_date.slice(0, 7)}`,
     metadata: { reminder_id: reminder.id },
+  });
+  await syncReminderToGoogleCalendar(supabase, {
+    organizationId: context.organization.id,
+    reminderId: reminder.id,
+    title: parsed.title,
+    description: parsed.description,
+    reminderDate: parsed.reminder_date,
+    reminderTime: parsed.reminder_time,
+    recipientUserIds: uniqueRecipients,
   });
 
   revalidatePath("/agenda");
@@ -147,6 +157,15 @@ export async function updateAgendaReminderAction(reminderId: string, formData: F
     actionUrl: `/agenda?month=${parsed.reminder_date.slice(0, 7)}`,
     metadata: { reminder_id: reminderId, category: parsed.category },
   });
+  await syncReminderToGoogleCalendar(supabase, {
+    organizationId: context.organization.id,
+    reminderId,
+    title: parsed.title,
+    description: parsed.description,
+    reminderDate: parsed.reminder_date,
+    reminderTime: parsed.reminder_time,
+    recipientUserIds: uniqueRecipients,
+  });
 
   revalidatePath("/agenda");
 }
@@ -182,6 +201,7 @@ export async function deleteAgendaReminderAction(reminderId: string) {
     .eq("organization_id", context.organization.id)
     .eq("metadata->>reminder_id", reminderId)
     .is("read_at", null);
+  await markGoogleCalendarSyncsDeleted(supabase, context.organization.id, reminderId);
 
   revalidatePath("/agenda");
 }
