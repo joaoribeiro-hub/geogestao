@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 export type HomeAgentCardData = {
   slug: "briefing-matinal" | "revisao-semanal";
   title: string;
+  helperText?: string;
   summary: string | null;
   status: string | null;
   createdAt: string | null;
@@ -50,6 +51,11 @@ export function HomeAgentCards({ cards }: { cards: HomeAgentCardData[] }) {
                 <Bot className="size-5 text-primary" aria-hidden="true" />
                 {card.title}
               </CardTitle>
+              {card.helperText ? (
+                <p className="mt-1 max-w-md text-xs font-semibold text-foreground">
+                  {card.helperText}
+                </p>
+              ) : null}
               <p className="mt-1 text-xs text-muted-foreground">
                 {card.createdAt ? `Ultima execucao: ${new Date(card.createdAt).toLocaleString("pt-BR")}` : "Ainda sem execucao salva."}
               </p>

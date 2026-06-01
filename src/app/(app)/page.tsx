@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { requireUser } from "@/lib/auth";
+import { getBrazilGreeting } from "@/lib/home/greeting";
 import { getCurrentOrganizationContext } from "@/lib/organization";
 import { filterByPeriod, resolvePeriodRange } from "@/lib/period";
 import { filterOrganizationRows } from "@/lib/services/dashboard-metrics";
@@ -139,8 +140,7 @@ export default async function DashboardPage({
   );
   const expenseAmount = expenses.reduce((sum, item) => sum + Number(item.amount), 0);
   const serviceFinance = calculateServiceFinanceSummary(cards, columnMap);
-  const currentHour = new Date().getHours();
-  const greeting = currentHour < 12 ? "Bom dia" : currentHour < 18 ? "Boa tarde" : "Boa noite";
+  const greeting = getBrazilGreeting();
   const displayName = profileResult.data?.full_name ?? user.email ?? "usuario";
   const todayTasks = ((checklistResult.data ?? []) as DailyChecklistItem[]).filter((item) => {
     if (item.status === "open") return !item.due_date || item.due_date <= today;
@@ -155,6 +155,7 @@ export default async function DashboardPage({
     {
       slug: "briefing-matinal",
       title: agentBySlug.get("briefing-matinal")?.name ?? "Briefing da manha",
+      helperText: "Quer ajuda para saber o que tem para hoje? Aperte o botao.",
       summary: latestRunFor("briefing-matinal")?.summary ?? null,
       status: latestRunFor("briefing-matinal")?.status ?? null,
       createdAt: latestRunFor("briefing-matinal")?.created_at ?? null,
@@ -162,6 +163,7 @@ export default async function DashboardPage({
     {
       slug: "revisao-semanal",
       title: agentBySlug.get("revisao-semanal")?.name ?? "Revisao semanal",
+      helperText: "Quer revisar sua semana e ver pendencias? Aperte o botao.",
       summary: latestRunFor("revisao-semanal")?.summary ?? null,
       status: latestRunFor("revisao-semanal")?.status ?? null,
       createdAt: latestRunFor("revisao-semanal")?.created_at ?? null,

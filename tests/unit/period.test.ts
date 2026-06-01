@@ -12,6 +12,14 @@ describe("filtro reutilizavel por periodo", () => {
     });
   });
 
+  it("permite telas iniciarem com Tudo como padrao", () => {
+    expect(resolvePeriodRange({}, now, "all")).toEqual({
+      period: "all",
+      from: null,
+      to: null,
+    });
+  });
+
   it("resolve intervalo personalizado por query params", () => {
     expect(resolvePeriodRange({ period: "custom", from: "2026-04-01", to: "2026-04-30" }, now)).toEqual({
       period: "custom",

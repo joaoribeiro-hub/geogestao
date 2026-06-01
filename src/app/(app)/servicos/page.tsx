@@ -32,7 +32,7 @@ export default async function ServicesPage({
   const scheduleMonth = Array.isArray(params.scheduleMonth)
     ? params.scheduleMonth[0]
     : params.scheduleMonth;
-  const periodRange = resolvePeriodRange(params);
+  const periodRange = resolvePeriodRange(params, new Date(), "all");
   const scheduleMonthData = parseMonthParam(scheduleMonth);
   const scheduleBounds = monthBounds(scheduleMonthData.year, scheduleMonthData.monthIndex);
   const supabase = await createServerSupabase();
@@ -191,6 +191,7 @@ export default async function ServicesPage({
         range={periodRange}
         action="/servicos"
         preserveParams={{ board: selectedBoard?.slug }}
+        compact
       />
 
       <div className="mb-5 flex flex-wrap gap-2">

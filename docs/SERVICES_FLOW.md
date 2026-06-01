@@ -38,16 +38,17 @@ A rota `/mapa` permanece preservada conforme decisoes anteriores, mas a fase atu
 Georreferenciamento:
 
 1. Aguardando documentos
-2. Proposta/Contrato
-3. Geo em Andamento
-4. Prioridade
-5. Em atraso
-6. Geo Protocolado no Cartorio
-7. Geo Protocolado no INCRA
-8. Geo - Pendencia de Confrontante
-9. Antigos a concluir
-10. Geo Concluido
-11. Servico perdido (oculto na experiencia principal desta fase; dados antigos nao sao apagados)
+2. Geo em Andamento
+3. Prioridade
+4. Em atraso
+5. Geo Protocolado no Cartorio
+6. Geo Protocolado no INCRA
+7. Geo - Pendencia de Confrontante
+8. Antigos a concluir
+9. Geo Concluido
+10. Servico perdido (oculto na experiencia principal desta fase; dados antigos nao sao apagados)
+
+A coluna legada `Proposta/Contrato` nao aparece mais no Kanban de Georreferenciamento. Propostas e contratos continuam acessiveis no detalhe do servico.
 
 CAR:
 
@@ -139,7 +140,7 @@ Na coluna `Aguardando documentos`, o card mostra:
 - Cadastrar cliente, se nao houver cliente;
 - Concluir documentacao.
 
-Ao concluir documentacao, o card vai para `Proposta/Contrato` nos fluxos que possuem essa etapa. No fluxo CAR, que nao possui mais `Proposta/Contrato`, o card segue para a proxima coluna oficial: `CAR em Retificacao`.
+Ao concluir documentacao, o card vai para `Proposta/Contrato` nos fluxos que possuem essa etapa. Nos fluxos sem `Proposta/Contrato`, como Georreferenciamento e CAR, o card segue para a proxima coluna oficial.
 
 Na coluna `Proposta/Contrato`, o card mostra:
 

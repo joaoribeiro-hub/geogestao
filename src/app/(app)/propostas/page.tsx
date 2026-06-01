@@ -18,7 +18,7 @@ export default async function ProposalsPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const resolvedSearchParams = await searchParams;
-  const periodRange = resolvePeriodRange(resolvedSearchParams);
+  const periodRange = resolvePeriodRange(resolvedSearchParams, new Date(), "all");
   const supabase = await createServerSupabase();
   const user = await requireUser(supabase);
   const organization = await getCurrentOrganizationForUser(supabase, user.id);
@@ -63,7 +63,7 @@ export default async function ProposalsPage({
         <ProposalV2Create clients={clients} />
       </div>
 
-      <PeriodFilter range={periodRange} action="/propostas" />
+      <PeriodFilter range={periodRange} action="/propostas" compact />
 
       <div className="mb-6 grid gap-4 md:grid-cols-2 xl:grid-cols-6">
         <SummaryCard title="Enviadas" value={metrics.sentCount.toString()} />

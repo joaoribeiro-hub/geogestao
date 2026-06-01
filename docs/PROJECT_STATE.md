@@ -320,7 +320,6 @@ Status da Fase ASSISTANT-1: implementada no codigo. Pendente aplicar `supabase/m
 - Novo servico entra em `Aguardando documentos`.
 - Colunas de Georreferenciamento preparadas para:
   - Aguardando documentos;
-  - Proposta/Contrato;
   - Geo em Andamento;
   - Prioridade;
   - Em atraso;
@@ -329,6 +328,7 @@ Status da Fase ASSISTANT-1: implementada no codigo. Pendente aplicar `supabase/m
   - Geo - Pendencia de Confrontante;
   - Antigos a concluir;
   - Geo Concluido.
+- A coluna `Proposta/Contrato` nao aparece mais no Kanban de Georreferenciamento; propostas e contratos continuam no detalhe do servico.
 - Fluxo CAR ajustado para: Aguardando documentos, CAR em Retificacao, CAR em Andamento, Prioridade, Em atraso, Aguardando Sincronizacao, Antigos a concluir e CAR Concluido. Colunas legadas de CAR ficam ocultas e cards antigos sao movidos por migration corretiva.
 - Cards de servico foram simplificados para estilo Trello:
   - cliente;

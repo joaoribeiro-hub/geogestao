@@ -59,6 +59,20 @@ export function secondsBetween(fromIso: string, toIso: string, maxSeconds = HEAR
   return Math.max(0, Math.min(seconds, maxSeconds));
 }
 
+export function continuousSecondsBetween(fromIso: string, toIso: string) {
+  const seconds = Math.floor((new Date(toIso).getTime() - new Date(fromIso).getTime()) / 1000);
+  return Math.max(0, seconds);
+}
+
+export function getSaoPauloDayStartIso(dateKey: string) {
+  return new Date(`${dateKey}T00:00:00-03:00`).toISOString();
+}
+
+export function getSaoPauloNextDayStartIso(dateKey: string) {
+  return new Date(new Date(`${dateKey}T00:00:00-03:00`).getTime() + 24 * 60 * 60 * 1000)
+    .toISOString();
+}
+
 export function getDefaultExpectedMinutesByWeekday() {
   return { 0: 0, 1: 480, 2: 480, 3: 480, 4: 480, 5: 480, 6: 0 } satisfies Record<number, number>;
 }

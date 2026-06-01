@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { DndContext, type DragEndEvent, useDraggable, useDroppable } from "@dnd-kit/core";
 import {
@@ -44,21 +44,31 @@ export function ServiceKanban({
   const [items, setItems] = useState(cards);
   const [zoom, setZoom] = useState<"compacto" | "normal" | "ampliado">("compacto");
   const [columnSearch, setColumnSearch] = useState<Record<string, string>>({});
+  const [kanbanScrollWidth, setKanbanScrollWidth] = useState(0);
+  const topScrollRef = useRef<HTMLDivElement>(null);
+  const bottomScrollRef = useRef<HTMLDivElement>(null);
+  const syncingScrollRef = useRef(false);
   const [, startTransition] = useTransition();
 
   useEffect(() => {
     setItems(cards);
   }, [cards]);
 
-  useEffect(() => {
-    const saved = window.localStorage.getItem("geogestao:service-kanban-zoom");
-    if (saved === "compacto" || saved === "normal" || saved === "ampliado") setZoom(saved);
-  }, []);
-
   function updateZoom(next: "compacto" | "normal" | "ampliado") {
     setZoom(next);
-    window.localStorage.setItem("geogestao:service-kanban-zoom", next);
   }
+
+  useEffect(() => {
+    function updateScrollWidth() {
+      setKanbanScrollWidth(bottomScrollRef.current?.scrollWidth ?? 0);
+    }
+    const frame = window.requestAnimationFrame(updateScrollWidth);
+    window.addEventListener("resize", updateScrollWidth);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      window.removeEventListener("resize", updateScrollWidth);
+    };
+  }, [columns.length, items.length, zoom]);
 
   const grouped = useMemo(() => {
     return columns.reduce<Record<string, ServiceCardWithClient[]>>((acc, column) => {
@@ -95,6 +105,15 @@ export function ServiceKanban({
     });
   }
 
+  function syncKanbanScroll(source: HTMLDivElement | null, target: HTMLDivElement | null) {
+    if (!source || !target || syncingScrollRef.current) return;
+    syncingScrollRef.current = true;
+    target.scrollLeft = source.scrollLeft;
+    window.requestAnimationFrame(() => {
+      syncingScrollRef.current = false;
+    });
+  }
+
   return (
     <DndContext onDragEnd={onDragEnd}>
       <div className="mb-3 flex flex-wrap items-center gap-2">
@@ -112,8 +131,19 @@ export function ServiceKanban({
         ))}
       </div>
       <div
+        ref={topScrollRef}
+        className="mb-2 overflow-x-auto pb-2"
+        data-testid="service-kanban-top-scroll"
+        aria-label="Rolagem horizontal superior do Kanban"
+        onScroll={() => syncKanbanScroll(topScrollRef.current, bottomScrollRef.current)}
+      >
+        <div style={{ width: kanbanScrollWidth, height: 1 }} aria-hidden="true" />
+      </div>
+      <div
+        ref={bottomScrollRef}
         className="flex gap-4 overflow-x-auto pb-4"
         data-testid="service-kanban"
+        onScroll={() => syncKanbanScroll(bottomScrollRef.current, topScrollRef.current)}
       >
         {columns.map((column) => (
           <ServiceColumnView
@@ -303,7 +333,7 @@ function ServiceCardView({
           <GripVertical className="size-4" aria-hidden="true" />
         </button>
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-semibold">
+          <p className="truncate text-sm font-bold">
             {card.client?.name ?? "Sem cliente vinculado"}
           </p>
           <p className="mt-0.5 line-clamp-2 text-sm text-muted-foreground">{card.title}</p>

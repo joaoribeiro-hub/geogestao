@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   calculateDailyWorkSummary,
   calculatePeriodWorkSummary,
+  continuousSecondsBetween,
   expectedSecondsForDate,
   formatDuration,
   safetyState,
@@ -82,6 +83,22 @@ describe("work time calculations", () => {
     expect(prompt.isFrozen).toBe(false);
     expect(frozen.shouldPrompt).toBe(true);
     expect(frozen.isFrozen).toBe(true);
+  });
+
+  it("does not prompt safety while field mode is active", () => {
+    const state = safetyState(
+      { ...baseDay, status: "field_mode" },
+      new Date("2026-05-27T20:30:00.000Z"),
+    );
+
+    expect(state.shouldPrompt).toBe(false);
+    expect(state.isFrozen).toBe(false);
+  });
+
+  it("allows field mode to accrue beyond the heartbeat cap", () => {
+    expect(
+      continuousSecondsBetween("2026-05-27T11:00:00.000Z", "2026-05-27T14:00:00.000Z"),
+    ).toBe(3 * 3600);
   });
 
   it("formats durations for the topbar", () => {

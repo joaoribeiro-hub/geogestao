@@ -20,6 +20,7 @@ import {
   getNextColumn,
   getProposalContractColumn,
   getInitialServiceColumn,
+  getServiceColumns,
 } from "@/lib/services/service-flow";
 import {
   isConcludedServiceColumn,
@@ -284,9 +285,12 @@ export async function completeServiceDocumentationAction(cardId: string) {
   const supabase = await createServerSupabase();
   const user = await requireUser(supabase);
   const context = await getServiceColumnContext(supabase, cardId);
+  const workflowColumns = context.card.service_type
+    ? getServiceColumns(context.card.service_type, context.columns)
+    : context.columns;
   const target =
-    getProposalContractColumn(context.columns) ??
-    getNextColumn(context.columns, context.card.column_id);
+    getProposalContractColumn(workflowColumns) ??
+    getNextColumn(workflowColumns, context.card.column_id);
   if (!target || target.id === context.card.column_id) {
     throw new Error("Proxima coluna do servico nao encontrada.");
   }

@@ -41,7 +41,6 @@ describe("service-flow", () => {
   it("define colunas iniciais por tipo de servico", () => {
     expect(serviceWorkflowDefinitions.georreferenciamento.map((item) => item.name)).toEqual([
       "Aguardando documentos",
-      "Proposta/Contrato",
       "Geo em Andamento",
       "Prioridade",
       "Em atraso",
@@ -52,6 +51,7 @@ describe("service-flow", () => {
       "Geo Concluido",
       "Servico perdido",
     ]);
+    expect(serviceWorkflowDefinitions.georreferenciamento.some((item) => item.slug === serviceFlowSlugs.proposalContract)).toBe(false);
     expect(serviceWorkflowDefinitions.car.map((item) => item.name)).toEqual([
       "Aguardando documentos",
       "CAR em Retificacao",

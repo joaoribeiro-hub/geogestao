@@ -28,6 +28,10 @@
     @apply border-border;
   }
 
+  html {
+    font-size: 14px;
+  }
+
   body {
     @apply bg-background text-foreground antialiased;
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";

@@ -36,11 +36,12 @@ const validPeriods = new Set<PeriodPreset>(periodOptions.map((option) => option.
 export function resolvePeriodRange(
   params: Record<string, string | string[] | undefined> | undefined,
   now = new Date(),
+  defaultPeriod: PeriodPreset = "this_month",
 ): PeriodRange {
   const periodParam = getParam(params, "period");
   const period = validPeriods.has(periodParam as PeriodPreset)
     ? (periodParam as PeriodPreset)
-    : "this_month";
+    : defaultPeriod;
 
   if (period === "all") {
     return { period, from: null, to: null };

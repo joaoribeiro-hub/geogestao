@@ -112,7 +112,22 @@ describe("AGENTS-TASKS-SYNC-FIX-1", () => {
     expect(home).toContain("<PeriodFilter range={periodRange} action=\"/\" compact />");
     expect(home).toContain("<HomeAgentCards cards={homeAgentCards} />");
     expect(home).toContain("Briefing da manha");
+    expect(home).toContain("Quer ajuda para saber o que tem para hoje? Aperte o botao.");
+    expect(home).toContain("Quer revisar sua semana e ver pendencias? Aperte o botao.");
     expect(cards).toContain("Atualizar agora");
+  });
+
+  it("Servicos, Propostas e Contratos iniciam em Tudo com filtro recolhido", () => {
+    const services = readFileSync(join(process.cwd(), "src/app/(app)/servicos/page.tsx"), "utf8");
+    const proposals = readFileSync(join(process.cwd(), "src/app/(app)/propostas/page.tsx"), "utf8");
+    const contracts = readFileSync(join(process.cwd(), "src/app/(app)/contratos/page.tsx"), "utf8");
+
+    expect(services).toContain("resolvePeriodRange(params, new Date(), \"all\")");
+    expect(services).toContain("compact");
+    expect(proposals).toContain("resolvePeriodRange(resolvedSearchParams, new Date(), \"all\")");
+    expect(proposals).toContain("action=\"/propostas\" compact");
+    expect(contracts).toContain("resolvePeriodRange(await searchParams, new Date(), \"all\")");
+    expect(contracts).toContain("action=\"/contratos\" compact");
   });
 
   it("cron dos agentes é protegido e agendado para 08:00 UTC", () => {

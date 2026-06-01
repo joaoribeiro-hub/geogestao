@@ -12,6 +12,15 @@ describe("ajustes pontuais de Servicos e Clientes", () => {
     expect(kanban).not.toContain(">Proximo<");
   });
 
+  it("Kanban possui barra de rolagem horizontal superior sincronizada", () => {
+    const kanban = readFileSync(join(process.cwd(), "src/components/kanban/service-kanban.tsx"), "utf8");
+
+    expect(kanban).toContain("service-kanban-top-scroll");
+    expect(kanban).toContain("topScrollRef");
+    expect(kanban).toContain("bottomScrollRef");
+    expect(kanban).toContain("syncKanbanScroll");
+  });
+
   it("editar servico preserva cliente e oferece busca de cliente no modal", () => {
     const controls = readFileSync(join(process.cwd(), "src/components/services/service-detail-controls.tsx"), "utf8");
     const actions = readFileSync(join(process.cwd(), "src/app/(app)/servicos/actions.ts"), "utf8");
@@ -53,6 +62,19 @@ describe("ajustes pontuais de Servicos e Clientes", () => {
     expect(sql).toContain("proposta-contrato");
     expect(sql).toContain("notify pgrst");
     expect(servicesPage).toContain("getServiceColumns(selectedServiceType, selectedBoardColumns)");
+  });
+
+  it("migration 040 remove Proposta/Contrato do fluxo Georreferenciamento exibido", () => {
+    const sql = readFileSync(
+      join(process.cwd(), "supabase/migrations/040_geo_service_flow_remove_proposal_contract.sql"),
+      "utf8",
+    );
+
+    expect(sql).toContain("georreferenciamento");
+    expect(sql).toContain("Geo em Andamento");
+    expect(sql).toContain("proposta-contrato");
+    expect(sql).toContain("aguardando-documentos");
+    expect(sql).toContain("notify pgrst");
   });
 
   it("novo servico permite cadastrar etapas iniciais sem checklist padrao", () => {

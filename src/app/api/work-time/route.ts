@@ -3,7 +3,10 @@ import { requireUser } from "@/lib/auth";
 import { requireOrganization } from "@/lib/organization";
 import {
   addSeconds,
+  continuousSecondsBetween,
   getSaoPauloDateKey,
+  getSaoPauloDayStartIso,
+  getSaoPauloNextDayStartIso,
   HEARTBEAT_MAX_DELTA_SECONDS,
   SAFETY_GRACE_SECONDS,
   SAFETY_INTERVAL_SECONDS,
@@ -91,7 +94,7 @@ async function ensureTodayWorkDay({
   const now = new Date();
   const nowIso = now.toISOString();
   const today = getSaoPauloDateKey(now);
-  await closeOldOpenDays({ supabase, organizationId, userId, today, nowIso });
+  const oldDays = await closeOldOpenDays({ supabase, organizationId, userId, today, nowIso });
 
   const { data: existing, error: existingError } = await supabase
     .from("work_time_days")
@@ -104,6 +107,9 @@ async function ensureTodayWorkDay({
 
   let day = existing;
   if (!day) {
+    const resumeFieldFromIso = oldDays.resumeField ? getSaoPauloDayStartIso(today) : null;
+    const startedAtIso = resumeFieldFromIso ?? nowIso;
+    const initialStatus: WorkDayStatus = resumeFieldFromIso ? "field_mode" : "active";
     const nextSafety = addSeconds(now, SAFETY_INTERVAL_SECONDS);
     const { data: created, error } = await supabase
       .from("work_time_days")
@@ -111,9 +117,9 @@ async function ensureTodayWorkDay({
         organization_id: organizationId,
         user_id: userId,
         work_date: today,
-        status: "active",
-        first_started_at: nowIso,
-        last_seen_at: nowIso,
+        status: initialStatus,
+        first_started_at: startedAtIso,
+        last_seen_at: startedAtIso,
         last_safety_confirmed_at: nowIso,
         next_safety_due_at: nextSafety.toISOString(),
         safety_grace_until: addSeconds(nextSafety, SAFETY_GRACE_SECONDS).toISOString(),
@@ -122,8 +128,22 @@ async function ensureTodayWorkDay({
       .single();
     if (error) throw new Error(error.message);
     day = created;
-    await startSession({ supabase, organizationId, userId, dayId: day.id, mode: "work", nowIso });
-    await logEvent({ supabase, organizationId, userId, dayId: day.id, eventType: "work_started", nowIso });
+    await startSession({
+      supabase,
+      organizationId,
+      userId,
+      dayId: day.id,
+      mode: resumeFieldFromIso ? "field" : "work",
+      nowIso: startedAtIso,
+    });
+    await logEvent({
+      supabase,
+      organizationId,
+      userId,
+      dayId: day.id,
+      eventType: resumeFieldFromIso ? "field_started" : "work_started",
+      nowIso: startedAtIso,
+    });
   }
 
   day = await applyHeartbeat({ supabase, organizationId, userId, day, now });
@@ -149,7 +169,10 @@ async function applyHeartbeat({
   const nowIso = now.toISOString();
   const state = safetyState(day, now);
   const mode = statusToMode(day.status);
-  let delta = secondsBetween(day.last_seen_at, nowIso, HEARTBEAT_MAX_DELTA_SECONDS);
+  let delta =
+    mode === "field"
+      ? continuousSecondsBetween(day.last_seen_at, nowIso)
+      : secondsBetween(day.last_seen_at, nowIso, HEARTBEAT_MAX_DELTA_SECONDS);
   let status = day.status;
   let safetyFrozenEvent = false;
 
@@ -358,21 +381,40 @@ async function closeOldOpenDays({
 }) {
   const { data } = await supabase
     .from("work_time_days")
-    .select("id,work_date")
+    .select("*")
     .eq("organization_id", organizationId)
     .eq("user_id", userId)
     .neq("work_date", today)
     .neq("status", "closed");
+  let resumeField = false;
   for (const day of data ?? []) {
-    await endOpenSession({ supabase, organizationId, userId, dayId: day.id, nowIso, reason: "midnight" });
+    const wasFieldMode = day.status === "field_mode";
+    const closeAtIso = wasFieldMode ? minIso(getSaoPauloNextDayStartIso(day.work_date), nowIso) : nowIso;
+    const fieldDelta = wasFieldMode ? continuousSecondsBetween(day.last_seen_at, closeAtIso) : 0;
+    if (wasFieldMode) resumeField = true;
+    await endOpenSession({
+      supabase,
+      organizationId,
+      userId,
+      dayId: day.id,
+      nowIso: closeAtIso,
+      reason: "midnight",
+    });
     await supabase
       .from("work_time_days")
-      .update({ status: "closed", updated_at: nowIso })
+      .update({
+        status: "closed",
+        last_seen_at: wasFieldMode ? closeAtIso : day.last_seen_at,
+        total_work_seconds: day.total_work_seconds + fieldDelta,
+        total_field_seconds: day.total_field_seconds + fieldDelta,
+        updated_at: nowIso,
+      })
       .eq("id", day.id)
       .eq("organization_id", organizationId)
       .eq("user_id", userId);
-    await logEvent({ supabase, organizationId, userId, dayId: day.id, eventType: "day_closed", nowIso });
+    await logEvent({ supabase, organizationId, userId, dayId: day.id, eventType: "day_closed", nowIso: closeAtIso });
   }
+  return { resumeField };
 }
 
 async function startSession({
@@ -487,4 +529,8 @@ function statusToMode(status: WorkDayStatus): WorkMode {
   if (status === "field_mode") return "field";
   if (status === "safety_frozen") return "frozen";
   return "work";
+}
+
+function minIso(first: string, second: string) {
+  return new Date(first).getTime() <= new Date(second).getTime() ? first : second;
 }

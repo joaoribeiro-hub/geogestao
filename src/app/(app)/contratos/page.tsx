@@ -26,7 +26,7 @@ export default async function ContractsPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const periodRange = resolvePeriodRange(await searchParams);
+  const periodRange = resolvePeriodRange(await searchParams, new Date(), "all");
   const supabase = await createServerSupabase();
   const user = await requireUser(supabase);
   const organization = await getCurrentOrganizationForUser(supabase, user.id);
@@ -61,7 +61,7 @@ export default async function ContractsPage({
         description="Contratos vinculados a clientes, propostas, servicos e receitas previstas."
       />
 
-      <PeriodFilter range={periodRange} action="/contratos" />
+      <PeriodFilter range={periodRange} action="/contratos" compact />
 
       <Card data-testid="contracts-card">
         <CardHeader>
