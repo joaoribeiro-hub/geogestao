@@ -353,6 +353,7 @@ export const serviceEditSchema = z.object({
     .transform((value) => (value ? value : null)),
   service_type: z.enum(["georreferenciamento", "car", "itr_ccir", "outros_servicos"]),
   custom_service_name: optionalText,
+  service_date: dateString,
   due_date: dateString,
   payment_condition: optionalText,
   estimated_value: z

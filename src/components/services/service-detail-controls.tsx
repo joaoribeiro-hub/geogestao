@@ -12,6 +12,8 @@ import {
   createServiceInteractionAction,
   deleteServicePropertyInfoAction,
   deleteServiceReceiptAction,
+  deleteServiceEventAction,
+  deleteServiceMovementAction,
   linkExistingClientToServiceAction,
   updateServiceDetailsAction,
   updateServicePaymentStatusAction,
@@ -398,6 +400,7 @@ export function ServiceInteractionForm({ serviceCardId }: { serviceCardId: strin
 
 export function ServiceEditModal({
   card,
+  clients,
   members,
 }: {
   card: ServiceCard;
@@ -406,8 +409,20 @@ export function ServiceEditModal({
   members: Array<{ id: string; label: string }>;
 }) {
   const [open, setOpen] = useState(false);
+  const [clientSearch, setClientSearch] = useState("");
+  const [selectedClientId, setSelectedClientId] = useState(card.client_id ?? "");
   const [pending, startTransition] = useTransition();
   const [value, setValue] = useState(formatBrlCurrency(Number((card.custom_fields_json as Record<string, unknown>)?.valor_previsto ?? 0)));
+  const selectedClient = clients.find((client) => client.id === selectedClientId) ?? null;
+  const filteredClients = clients
+    .filter((client) => {
+      const query = clientSearch.trim().toLowerCase();
+      if (!query) return false;
+      return [client.name, client.document, client.phone, client.email]
+        .filter(Boolean)
+        .some((field) => field!.toLowerCase().includes(query));
+    })
+    .slice(0, 10);
 
   return (
     <>
@@ -440,10 +455,12 @@ export function ServiceEditModal({
                 <X aria-hidden="true" />
               </Button>
             </div>
+            <input type="hidden" name="client_id" value={selectedClientId} />
             <div className="grid gap-4 md:grid-cols-2">
-              <Field label="Nome do proprietario" name="description" defaultValue={card.description ?? ""} textarea />
+              <Field label="Informacoes iniciais" name="description" defaultValue={card.description ?? ""} textarea />
               <Field label="Nome do imovel" name="title" defaultValue={card.title} />
               <Field label="Municipio" name="municipality" defaultValue={card.municipality ?? ""} />
+              <Field label="Data de criacao" name="service_date" type="date" defaultValue={card.service_date ?? card.created_at?.slice(0, 10) ?? ""} />
               <Field label="Data prevista" name="due_date" type="date" defaultValue={card.due_date ?? ""} />
               <div className="space-y-2">
                 <Label>Responsavel principal</Label>
@@ -465,6 +482,52 @@ export function ServiceEditModal({
               <div className="space-y-2">
                 <Label>Valor combinado</Label>
                 <Input value={value} onChange={(event) => setValue(event.target.value)} />
+              </div>
+            </div>
+            <div className="mt-4 rounded-md border bg-background p-3">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <Label>Cliente vinculado</Label>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {selectedClient ? selectedClient.name : "Sem cliente vinculado"}
+                  </p>
+                </div>
+                <Button type="button" variant="outline" size="sm" onClick={() => setSelectedClientId("")}>
+                  Sem cliente vinculado
+                </Button>
+              </div>
+              <div className="mt-3 space-y-2">
+                <Input
+                  placeholder="Buscar cliente pelo nome, CPF/CNPJ ou telefone..."
+                  value={clientSearch}
+                  onChange={(event) => setClientSearch(event.target.value)}
+                />
+                {clientSearch.trim() ? (
+                  <div className="max-h-72 space-y-2 overflow-y-auto rounded-md border bg-card p-2">
+                    {filteredClients.length ? (
+                      filteredClients.map((client) => (
+                        <button
+                          key={client.id}
+                          type="button"
+                          className={`w-full rounded-md border p-3 text-left text-sm transition hover:border-primary ${
+                            selectedClientId === client.id ? "border-primary bg-primary/5" : "bg-background"
+                          }`}
+                          onClick={() => {
+                            setSelectedClientId(client.id);
+                            setClientSearch("");
+                          }}
+                        >
+                          <span className="block font-medium">{client.name}</span>
+                          <span className="block text-xs text-muted-foreground">
+                            {client.document ?? "Sem documento"} - {client.phone ?? client.email ?? "Sem contato"}
+                          </span>
+                        </button>
+                      ))
+                    ) : (
+                      <p className="p-3 text-sm text-muted-foreground">Nenhum cliente encontrado nesta empresa.</p>
+                    )}
+                  </div>
+                ) : null}
               </div>
             </div>
             <div className="mt-4 space-y-2">
@@ -534,6 +597,38 @@ export function ServiceFinancePanel({
         ))}
       </div>
     </div>
+  );
+}
+
+export function ServiceMovementDeleteButton({
+  id,
+  serviceCardId,
+  kind,
+}: {
+  id: string;
+  serviceCardId: string;
+  kind: "event" | "movement";
+}) {
+  const [pending, startTransition] = useTransition();
+
+  return (
+    <Button
+      type="button"
+      size="icon"
+      variant="ghost"
+      className="size-8 text-destructive"
+      title="Remover movimentacao"
+      aria-label="Remover movimentacao"
+      disabled={pending}
+      onClick={() =>
+        startTransition(() => {
+          if (kind === "event") void deleteServiceEventAction(id, serviceCardId);
+          if (kind === "movement") void deleteServiceMovementAction(id, serviceCardId);
+        })
+      }
+    >
+      {pending ? <Loader2 className="size-4 animate-spin" aria-hidden="true" /> : <X className="size-4" aria-hidden="true" />}
+    </Button>
   );
 }
 

@@ -9,7 +9,7 @@ import { ServiceSchedule } from "@/components/services/service-schedule";
 import { monthBounds, parseMonthParam } from "@/lib/agenda/calendar";
 import { requireUser } from "@/lib/auth";
 import { resolvePeriodRange } from "@/lib/period";
-import { getInitialServiceColumn } from "@/lib/services/service-flow";
+import { getInitialServiceColumn, getServiceColumns } from "@/lib/services/service-flow";
 import { serviceTypeToBoardSlug } from "@/lib/services/service-cards";
 import {
   filterServiceCardsByOperationalPeriod,
@@ -69,10 +69,13 @@ export default async function ServicesPage({
         .order("position")
     : { data: [] };
   const allColumns = allColumnsResult.data ?? [];
-  const columns = selectedBoard
+  const selectedBoardColumns = selectedBoard
     ? allColumns.filter((column) => column.board_id === selectedBoard.id)
-        .filter((column) => !isServiceLostColumn(column))
     : [];
+  const selectedServiceType = selectedBoard ? serviceTypeFromBoardSlug(selectedBoard.slug) : null;
+  const columns = selectedServiceType
+    ? getServiceColumns(selectedServiceType, selectedBoardColumns).filter((column) => !isServiceLostColumn(column))
+    : selectedBoardColumns.filter((column) => !isServiceLostColumn(column));
   const columnByServiceType = buildInitialColumnByServiceType(boards, allColumns);
 
   const columnIds = columns.map((column) => column.id);
@@ -228,6 +231,12 @@ function displayCardInOverdueColumn(
     return card;
   }
   return { ...card, column_id: overdueColumn.id };
+}
+
+function serviceTypeFromBoardSlug(slug: string): ProposalServiceType | null {
+  const found = (Object.entries(serviceTypeToBoardSlug) as Array<[ProposalServiceType, string]>)
+    .find(([, boardSlug]) => boardSlug === slug);
+  return found?.[0] ?? null;
 }
 
 function buildInitialColumnByServiceType(

@@ -13,6 +13,7 @@ import {
   ServiceFieldSelect,
   ServiceInteractionForm,
   ServiceMemberForm,
+  ServiceMovementDeleteButton,
   ServicePropertyInfoPanel,
   ServiceQuickActionButton,
 } from "@/components/services/service-detail-controls";
@@ -170,6 +171,7 @@ export default async function ServiceDetailPage({
           .order("position")
       ).data ?? []
     : [];
+  const columnNameById = new Map(boardColumns.map((item) => [item.id, item.name]));
 
   const memberUserIds = Array.from(
     new Set([...orgMembers.map((member) => member.user_id), ...currentMembers.map((member) => member.user_id)]),
@@ -238,7 +240,7 @@ export default async function ServiceDetailPage({
           {canEditService ? (
             <ServiceEditModal
               card={card}
-              clients={client ? [client] : []}
+              clients={clients}
               columns={boardColumns}
               members={orgMembers.map((member) => ({
                 id: member.user_id,
@@ -507,18 +509,29 @@ export default async function ServiceDetailPage({
               {events.length || movements.length ? (
                 <div className="space-y-3">
                   {events.map((event) => (
-                    <div key={event.id} className="rounded-md border bg-background p-3 text-sm">
-                      <p className="font-medium">{event.title}</p>
-                      {event.description ? (
-                        <p className="mt-1 text-sm text-muted-foreground">{event.description}</p>
-                      ) : null}
-                      <p className="text-xs text-muted-foreground">{formatDate(event.created_at)}</p>
+                    <div key={event.id} className="flex items-start justify-between gap-3 rounded-md border bg-background p-3 text-sm">
+                      <div>
+                        <p className="font-medium">{formatEventTitle(event.title, event.metadata, columnNameById)}</p>
+                        {event.description ? (
+                          <p className="mt-1 text-sm text-muted-foreground">{event.description}</p>
+                        ) : null}
+                        <p className="text-xs text-muted-foreground">{formatDate(event.created_at)}</p>
+                      </div>
+                      <ServiceMovementDeleteButton id={event.id} serviceCardId={card.id} kind="event" />
                     </div>
                   ))}
                   {movements.map((movement) => (
-                    <div key={movement.id} className="rounded-md border bg-background p-3 text-sm">
-                      <p className="font-medium">Movimentacao de etapa</p>
-                      <p className="text-xs text-muted-foreground">{formatDate(movement.created_at)}</p>
+                    <div key={movement.id} className="flex items-start justify-between gap-3 rounded-md border bg-background p-3 text-sm">
+                      <div>
+                        <p className="font-medium">
+                          {formatMovementTitle(
+                            columnNameById.get(movement.from_column_id ?? ""),
+                            columnNameById.get(movement.to_column_id),
+                          )}
+                        </p>
+                        <p className="text-xs text-muted-foreground">{formatDate(movement.created_at)}</p>
+                      </div>
+                      <ServiceMovementDeleteButton id={movement.id} serviceCardId={card.id} kind="movement" />
                     </div>
                   ))}
                 </div>
@@ -579,4 +592,30 @@ function asRecord(value: Json): Record<string, Json> {
 
 function textValue(value: Json | undefined) {
   return typeof value === "string" && value ? value : "-";
+}
+
+function formatMovementTitle(fromColumnName: string | undefined, toColumnName: string | undefined) {
+  if (fromColumnName && toColumnName) return `Servico movido de ${fromColumnName} para ${toColumnName}`;
+  if (toColumnName) return `Servico movido para ${toColumnName}`;
+  return "Servico movido";
+}
+
+function formatEventTitle(title: string, metadata: Json, columnNameById: Map<string, string>) {
+  if (!/servico movido|servico avancou etapa|servico enviado para execucao|documentacao concluida/i.test(title)) {
+    return title;
+  }
+  const data = asRecord(metadata);
+  const fromName = textValue(data.from_column_name) !== "-"
+    ? textValue(data.from_column_name)
+    : typeof data.from_column_id === "string"
+      ? columnNameById.get(data.from_column_id)
+      : undefined;
+  const toName = textValue(data.to_column_name) !== "-"
+    ? textValue(data.to_column_name)
+    : typeof data.to_column_id === "string"
+      ? columnNameById.get(data.to_column_id)
+      : undefined;
+  if (!toName) return title;
+  if (fromName) return `Servico movido de ${fromName} para ${toName}`;
+  return `Servico movido para ${toName}`;
 }

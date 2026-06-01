@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useTransition } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Loader2, Plus } from "lucide-react";
+import { Loader2, Pencil, Plus, X } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { createClientInlineAction } from "@/app/(app)/clientes/actions";
 import { createServiceCardAction } from "@/app/(app)/servicos/actions";
@@ -14,6 +14,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+
+type InitialServiceStepDraft = {
+  id: string;
+  title: string;
+  created_at: string;
+  due_date: string;
+  due_time: string;
+};
 
 export function ServiceCardForm({
   clients,
@@ -48,6 +56,9 @@ export function ServiceCardForm({
   });
   const [estimatedValue, setEstimatedValue] = useState("");
   const [clientSearch, setClientSearch] = useState("");
+  const [initialSteps, setInitialSteps] = useState<InitialServiceStepDraft[]>([]);
+  const [stepDraft, setStepDraft] = useState<InitialServiceStepDraft>(() => emptyStepDraft());
+  const [editingStepId, setEditingStepId] = useState<string | null>(null);
   const initialColumnId =
     columnByServiceType?.[defaultServiceType] ?? columns[0]?.id ?? "";
   const form = useForm<ServiceCardFormValues>({
@@ -104,6 +115,17 @@ export function ServiceCardForm({
       formData.set(key, value?.toString() ?? ""),
     );
     formData.set("custom_fields_json", JSON.stringify(metadata));
+    formData.set(
+      "initial_steps_json",
+      JSON.stringify(
+        initialSteps.map(({ title, created_at, due_date, due_time }) => ({
+          title,
+          created_at,
+          due_date,
+          due_time,
+        })),
+      ),
+    );
     startTransition(() => {
       void (async () => {
         setFeedback(null);
@@ -122,6 +144,9 @@ export function ServiceCardForm({
             custom_fields_json: "{}",
           });
           setEstimatedValue("");
+          setInitialSteps([]);
+          setStepDraft(emptyStepDraft());
+          setEditingStepId(null);
           setFeedback({ type: "success", message: "Servico criado com sucesso." });
           onCreated?.(result);
         } catch (error) {
@@ -135,6 +160,28 @@ export function ServiceCardForm({
         }
       })();
     });
+  }
+
+  function saveInitialStep() {
+    const title = stepDraft.title.trim();
+    if (title.length < 2) {
+      setFeedback({ type: "error", message: "Informe o nome da etapa." });
+      return;
+    }
+    const normalized = {
+      ...stepDraft,
+      title,
+      created_at: stepDraft.created_at || todayDate(),
+    };
+    setInitialSteps((current) => {
+      if (editingStepId) {
+        return current.map((item) => (item.id === editingStepId ? normalized : item));
+      }
+      return [...current, { ...normalized, id: createDraftId() }];
+    });
+    setStepDraft(emptyStepDraft());
+    setEditingStepId(null);
+    setFeedback(null);
   }
 
   return (
@@ -374,6 +421,109 @@ export function ServiceCardForm({
         />
       </div>
 
+      <section className="rounded-lg border bg-secondary/20 p-4">
+        <div className="mb-4">
+          <h3 className="text-sm font-semibold">Checklist - Etapas</h3>
+          <p className="text-xs text-muted-foreground">
+            Opcional. Cadastre etapas iniciais para ja aparecerem no detalhe do servico.
+          </p>
+        </div>
+        <div className="grid gap-3 md:grid-cols-[1.5fr_1fr_1fr_1fr_auto]">
+          <div className="space-y-2">
+            <Label htmlFor="initial-step-title">Nome da etapa</Label>
+            <Input
+              id="initial-step-title"
+              value={stepDraft.title}
+              onChange={(event) => setStepDraft((current) => ({ ...current, title: event.target.value }))}
+              placeholder="Ex.: Conferir documentos"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="initial-step-created-at">Data de criacao</Label>
+            <Input
+              id="initial-step-created-at"
+              type="date"
+              value={stepDraft.created_at}
+              onChange={(event) => setStepDraft((current) => ({ ...current, created_at: event.target.value }))}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="initial-step-due-date">Data prevista</Label>
+            <Input
+              id="initial-step-due-date"
+              type="date"
+              value={stepDraft.due_date}
+              onChange={(event) => setStepDraft((current) => ({ ...current, due_date: event.target.value }))}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="initial-step-due-time">Horario previsto</Label>
+            <Input
+              id="initial-step-due-time"
+              type="time"
+              value={stepDraft.due_time}
+              onChange={(event) => setStepDraft((current) => ({ ...current, due_time: event.target.value }))}
+            />
+          </div>
+          <div className="flex items-end">
+            <Button type="button" variant="outline" className="w-full" onClick={saveInitialStep}>
+              <Plus aria-hidden="true" />
+              {editingStepId ? "Salvar" : "Adicionar etapa"}
+            </Button>
+          </div>
+        </div>
+
+        {initialSteps.length ? (
+          <div className="mt-4 space-y-2">
+            {initialSteps.map((step) => (
+              <div key={step.id} className="flex items-start justify-between gap-3 rounded-md border bg-background p-3 text-sm">
+                <div>
+                  <p className="font-medium">{step.title}</p>
+                  <p className="text-xs text-muted-foreground">
+                    Criada em {step.created_at || todayDate()}
+                    {step.due_date ? ` - Prevista para ${step.due_date}` : ""}
+                    {step.due_time ? ` as ${step.due_time}` : ""}
+                  </p>
+                </div>
+                <div className="flex shrink-0 gap-1">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    aria-label="Editar etapa"
+                    onClick={() => {
+                      setStepDraft(step);
+                      setEditingStepId(step.id);
+                    }}
+                  >
+                    <Pencil aria-hidden="true" />
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    aria-label="Remover etapa"
+                    onClick={() => {
+                      setInitialSteps((current) => current.filter((item) => item.id !== step.id));
+                      if (editingStepId === step.id) {
+                        setStepDraft(emptyStepDraft());
+                        setEditingStepId(null);
+                      }
+                    }}
+                  >
+                    <X aria-hidden="true" />
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="mt-3 text-xs text-muted-foreground">
+            Nenhuma etapa adicionada. O servico pode ser criado assim mesmo.
+          </p>
+        )}
+      </section>
+
       <Button data-testid="create-service-submit" disabled={pending || !initialColumnId}>
         {pending ? <Loader2 className="animate-spin" aria-hidden="true" /> : <Plus aria-hidden="true" />}
         {pending ? "Criando..." : "Criar servico"}
@@ -395,7 +545,23 @@ export function ServiceCardForm({
 }
 
 function todayDate() {
-  return new Date().toISOString().slice(0, 10);
+  const now = new Date();
+  const local = new Date(now.getTime() - now.getTimezoneOffset() * 60000);
+  return local.toISOString().slice(0, 10);
+}
+
+function emptyStepDraft(): InitialServiceStepDraft {
+  return {
+    id: createDraftId(),
+    title: "",
+    created_at: todayDate(),
+    due_date: "",
+    due_time: "",
+  };
+}
+
+function createDraftId() {
+  return globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`;
 }
 
 function QuickClientField({

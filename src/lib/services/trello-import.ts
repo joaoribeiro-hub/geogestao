@@ -176,12 +176,14 @@ function resolveColumn(listName: string, columns: ServiceImportColumn[]) {
   if (direct) return direct;
   const mapped = [
     { pattern: /carta de confrontacao|confrontante/, target: /pendencia.*confrontante|confrontante/ },
-    { pattern: /protocolo cartorio|protocolado cartorio|cartorio/, target: /protocolado.*cartorio|cartorio/ },
-    { pattern: /protocolo incra|protocolado incra|incra/, target: /protocolado.*incra|incra/ },
+    { pattern: /protocolo cartorio|protocolado cartorio|cartorio/, target: /protocolado.*cartorio|cartorio|sincronizacao/ },
+    { pattern: /protocolo incra|protocolado incra|incra/, target: /protocolado.*incra|incra|sincronizacao/ },
+    { pattern: /retificacao|retificar/, target: /retificacao|retificar/ },
+    { pattern: /sincronizacao|sincronizar/, target: /sincronizacao|sincronizar/ },
     { pattern: /concluido|concluso|finalizado/, target: /concluido|concluso|finalizado/ },
     { pattern: /em andamento|andamento/, target: /geo.*andamento|em andamento|execucao/ },
+    { pattern: /antigos a concluir|geo antigos|a concluir/, target: /antigos a concluir|antigos-a-concluir/ },
     { pattern: /servico prioridades|prioridade/, target: /prioridade|urgente|andamento/ },
-    { pattern: /geo antigos|a concluir/, target: /andamento|execucao|prioridade/ },
   ].find((item) => item.pattern.test(normalized));
   if (mapped) {
     const found = columns.find((column) => mapped.target.test(normalizeImportText(`${column.name} ${column.slug}`)));

@@ -1,10 +1,10 @@
 import { notFound } from "next/navigation";
+import { ClientEditModal, ClientFinancePanel } from "@/components/clients/client-detail-panels";
 import { ClientInteractionModal } from "@/components/clients/client-interaction-modal";
 import { DeleteButton } from "@/components/delete-button";
 import { ProfessionalDocumentsPanel } from "@/components/documents/professional-documents-panel";
 import { AttachmentActions } from "@/components/files/attachment-actions";
 import { AttachmentUploadModal } from "@/components/files/attachment-upload-modal";
-import { ClientForm } from "@/components/forms/client-form";
 import { PageHeader } from "@/components/layout/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,7 +12,6 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { deleteClientAction } from "@/app/(app)/clientes/actions";
 import { requireUser } from "@/lib/auth";
 import { getCurrentOrganizationForUser } from "@/lib/organization";
-import { formatBrlCurrency, getServiceEstimatedValue } from "@/lib/services/service-finance";
 import { createServerSupabase } from "@/lib/supabase/server";
 import { formatDate } from "@/lib/utils";
 
@@ -49,6 +48,7 @@ export default async function ClientDetailPage({
     .eq("entity_id", client.id)
     .order("created_at", { ascending: false });
   const attachments = attachmentsData ?? [];
+
   const { data: servicesData } = await supabase
     .from("service_cards")
     .select("*")
@@ -56,6 +56,7 @@ export default async function ClientDetailPage({
     .eq("client_id", client.id)
     .order("created_at", { ascending: false });
   const services = servicesData ?? [];
+
   const { data: revenuesData } = services.length
     ? await supabase
         .from("revenues")
@@ -64,10 +65,18 @@ export default async function ClientDetailPage({
         .in("service_card_id", services.map((service) => service.id))
     : { data: [] };
   const revenues = revenuesData ?? [];
-  const combinedTotal = services.reduce((sum, service) => sum + getServiceEstimatedValue(service), 0);
-  const receivedTotal = revenues
-    .filter((revenue) => revenue.status === "paid")
-    .reduce((sum, revenue) => sum + Number(revenue.amount ?? 0), 0);
+
+  const { data: serviceColumnsData } = services.length
+    ? await supabase
+        .from("service_columns")
+        .select("id,slug,name")
+        .in("id", services.map((service) => service.column_id))
+    : { data: [] };
+  const serviceColumnsById = new Map((serviceColumnsData ?? []).map((column) => [column.id, column]));
+  const servicesWithColumns = services.map((service) => ({
+    ...service,
+    column: serviceColumnsById.get(service.column_id) ?? null,
+  }));
 
   return (
     <div>
@@ -83,11 +92,17 @@ export default async function ClientDetailPage({
 
       <div className="grid gap-6 xl:grid-cols-[420px_minmax(0,1fr)]">
         <Card>
-          <CardHeader>
+          <CardHeader className="flex-row items-center justify-between gap-3">
             <CardTitle>Dados cadastrais</CardTitle>
+            <ClientEditModal client={client} />
           </CardHeader>
-          <CardContent>
-            <ClientForm client={client} />
+          <CardContent className="grid gap-3 text-sm">
+            <Info label="Tipo" value={client.kind === "pj" ? "Pessoa juridica" : "Pessoa fisica"} />
+            <Info label="CPF/CNPJ" value={client.document || "-"} />
+            <Info label="E-mail" value={client.email || "-"} />
+            <Info label="Telefone" value={client.phone || "-"} />
+            <Info label="Endereco" value={client.address || "-"} />
+            <Info label="Observacoes" value={client.notes || "-"} />
           </CardContent>
         </Card>
 
@@ -96,30 +111,9 @@ export default async function ClientDetailPage({
             <CardHeader>
               <CardTitle>Financeiro do cliente</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid gap-3 md:grid-cols-4">
-                <FinanceInfo label="Valor combinado total" value={formatBrlCurrency(combinedTotal)} />
-                <FinanceInfo label="Valores recebidos" value={formatBrlCurrency(receivedTotal)} />
-                <FinanceInfo label="Valores a receber" value={formatBrlCurrency(Math.max(combinedTotal - receivedTotal, 0))} />
-                <FinanceInfo label="Servicos vinculados" value={String(services.length)} />
-              </div>
+            <CardContent>
               {services.length ? (
-                <div className="space-y-2">
-                  {services.map((service) => {
-                    const serviceReceived = revenues
-                      .filter((revenue) => revenue.service_card_id === service.id && revenue.status === "paid")
-                      .reduce((sum, revenue) => sum + Number(revenue.amount ?? 0), 0);
-                    const serviceValue = getServiceEstimatedValue(service);
-                    return (
-                      <div key={service.id} className="rounded-md border bg-background p-3 text-sm">
-                        <p className="font-medium">{service.title}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {formatBrlCurrency(serviceValue)} combinado · {formatBrlCurrency(serviceReceived)} recebido · {formatBrlCurrency(Math.max(serviceValue - serviceReceived, 0))} a receber
-                        </p>
-                      </div>
-                    );
-                  })}
-                </div>
+                <ClientFinancePanel services={servicesWithColumns} revenues={revenues} />
               ) : (
                 <EmptyState title="Nenhum servico vinculado ao cliente." />
               )}
@@ -177,7 +171,7 @@ export default async function ClientDetailPage({
                       <div>
                         <p className="font-medium">{attachment.file_name}</p>
                         <p className="text-xs text-muted-foreground">
-                          {attachment.category ?? "Documento"} · {formatDate(attachment.created_at)}
+                          {attachment.category ?? "Documento"} - {formatDate(attachment.created_at)}
                         </p>
                       </div>
                       <AttachmentActions
@@ -204,7 +198,7 @@ export default async function ClientDetailPage({
   );
 }
 
-function FinanceInfo({ label, value }: { label: string; value: string }) {
+function Info({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-md border bg-background p-3">
       <p className="text-xs text-muted-foreground">{label}</p>

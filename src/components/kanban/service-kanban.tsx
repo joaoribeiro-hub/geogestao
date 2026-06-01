@@ -14,10 +14,7 @@ import {
   X,
 } from "lucide-react";
 import {
-  advanceServiceCardAction,
   completeServiceDocumentationAction,
-  createContractForServiceAction,
-  createProposalForServiceAction,
   deleteServiceCardAction,
   moveServiceCardAction,
   moveServiceToExecutionAction,
@@ -218,10 +215,6 @@ function ServiceCardView({
   }[tone];
   const isAwaitingDocs = column.slug === serviceFlowSlugs.awaitingDocuments;
   const isProposalContract = column.slug === serviceFlowSlugs.proposalContract;
-  const isFinished =
-    column.slug === serviceFlowSlugs.finished ||
-    column.slug === serviceFlowSlugs.lost ||
-    /conclu/i.test(column.slug);
 
   function runAction(action: () => Promise<unknown>, success: string) {
     startTransition(() => {
@@ -376,81 +369,19 @@ function ServiceCardView({
         ) : null}
 
         {isProposalContract ? (
-          <>
-            <Button
-              size="sm"
-              variant="outline"
-              className="w-full"
-              disabled={pending}
-              onClick={() =>
-                runAction(
-                  () => createProposalForServiceAction(card.id),
-                  "Proposta vinculada ao servico.",
-                )
-              }
-            >
-              Nova Proposta
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              className="w-full"
-              disabled={pending}
-              onClick={() =>
-                runAction(
-                  () => createContractForServiceAction(card.id),
-                  "Contrato vinculado ao servico.",
-                )
-              }
-            >
-              Novo Contrato
-            </Button>
-            <Button
-              size="sm"
-              className="w-full"
-              disabled={pending}
-              onClick={() =>
-                runAction(
-                  () => moveServiceToExecutionAction(card.id),
-                  "Servico movido para execucao.",
-                )
-              }
-            >
-              Em execucao
-            </Button>
-          </>
-        ) : null}
-
-        {!isAwaitingDocs && !isProposalContract ? (
-          <>
-            <div className="grid grid-cols-2 gap-2">
-              <Button asChild size="sm" variant="outline">
-                <a href={card.proposal_id ? `/propostas/${card.proposal_id}` : `/servicos/${card.id}#proposta`}>
-                  Proposta
-                </a>
-              </Button>
-              <Button asChild size="sm" variant="outline">
-                <a href={card.contract_id ? `/contratos/${card.contract_id}` : `/servicos/${card.id}#contrato`}>
-                  Contrato
-                </a>
-              </Button>
-            </div>
-            {!isFinished ? (
-              <Button
-                size="sm"
-                className="w-full"
-                disabled={pending}
-                onClick={() =>
-                  runAction(
-                    () => advanceServiceCardAction(card.id),
-                    "Servico avancou para a proxima etapa.",
-                  )
-                }
-              >
-                Proximo
-              </Button>
-            ) : null}
-          </>
+          <Button
+            size="sm"
+            className="w-full"
+            disabled={pending}
+            onClick={() =>
+              runAction(
+                () => moveServiceToExecutionAction(card.id),
+                "Servico movido para execucao.",
+              )
+            }
+          >
+            Em execucao
+          </Button>
         ) : null}
 
         {card.proposal_id || card.created_from_proposal_id ? (

@@ -45,19 +45,22 @@ Georreferenciamento:
 6. Geo Protocolado no Cartorio
 7. Geo Protocolado no INCRA
 8. Geo - Pendencia de Confrontante
-9. Geo Concluido
-10. Servico perdido (oculto na experiencia principal desta fase; dados antigos nao sao apagados)
+9. Antigos a concluir
+10. Geo Concluido
+11. Servico perdido (oculto na experiencia principal desta fase; dados antigos nao sao apagados)
 
 CAR:
 
 1. Aguardando documentos
-2. Proposta/Contrato
+2. CAR em Retificacao
 3. CAR em Andamento
 4. Prioridade
 5. Em atraso
-6. CAR Protocolado/Em Analise
-7. CAR Concluido
-8. Servico perdido (oculto)
+6. Aguardando Sincronizacao
+7. Antigos a concluir
+8. CAR Concluido
+
+As colunas legadas de CAR, como `Proposta/Contrato` e `CAR Protocolado/Em Analise`, nao aparecem mais na aba CAR. A migration corretiva move cards antigos dessas colunas para destinos seguros e preserva as colunas antigas apenas para nao quebrar historico.
 
 ITR/CCIR:
 
@@ -67,8 +70,9 @@ ITR/CCIR:
 4. Prioridade
 5. Em atraso
 6. Protocolado/Enviado
-7. Concluido
-8. Servico perdido (oculto)
+7. Antigos a concluir
+8. Concluido
+9. Servico perdido (oculto)
 
 Outros Servicos:
 
@@ -77,8 +81,9 @@ Outros Servicos:
 3. Em Andamento
 4. Prioridade
 5. Em atraso
-6. Concluido
-7. Servico perdido (oculto)
+6. Antigos a concluir
+7. Concluido
+8. Servico perdido (oculto)
 
 Todo servico novo deve entrar primeiro em `Aguardando documentos`.
 
@@ -113,6 +118,8 @@ Ao criar o servico:
 - o card e criado na primeira coluna do quadro do tipo escolhido;
 - se existir a coluna `Aguardando documentos`, ela e usada;
 - sao criados dois checklists vazios: `Checklist - Documentos` e `Checklist - Etapas`.
+- o modal de novo servico permite adicionar etapas iniciais opcionais em `Checklist - Etapas`; se nenhuma etapa for informada, o checklist continua vazio.
+- etapas iniciais com data prevista alimentam Agenda, Rotina e notificacoes usando a mesma regra de etapas criadas no detalhe do servico.
 - o servidor recalcula a coluna inicial a partir do `service_type`, evitando depender apenas de um campo escondido do formulario.
 - apos sucesso, o modal fecha, a tela atualiza e o usuario e levado para a aba do tipo de servico criado.
 - o seletor de cliente usa busca reaproveitavel por nome, documento, telefone ou e-mail.
@@ -132,7 +139,7 @@ Na coluna `Aguardando documentos`, o card mostra:
 - Cadastrar cliente, se nao houver cliente;
 - Concluir documentacao.
 
-Ao concluir documentacao, o card vai para `Proposta/Contrato`.
+Ao concluir documentacao, o card vai para `Proposta/Contrato` nos fluxos que possuem essa etapa. No fluxo CAR, que nao possui mais `Proposta/Contrato`, o card segue para a proxima coluna oficial: `CAR em Retificacao`.
 
 Na coluna `Proposta/Contrato`, o card mostra:
 
@@ -145,7 +152,7 @@ Ao clicar em `Em execucao`:
 - prioridade alta vai para `Prioridade`;
 - demais prioridades vao para `Geo em Andamento`.
 
-Nas colunas de execucao, o botao `Proximo` move o card para a proxima coluna a direita dentro do fluxo daquele tipo.
+Nas colunas de execucao, a movimentacao principal e feita por arrastar o card entre colunas. A regra server-side de proxima coluna continua existindo para acoes internas e usa apenas o fluxo oficial do tipo selecionado.
 
 A coluna `Servico perdido` pode existir por compatibilidade em dados antigos, mas nao aparece no Kanban principal desta fase. Quando um servico antigo estiver nessa coluna:
 

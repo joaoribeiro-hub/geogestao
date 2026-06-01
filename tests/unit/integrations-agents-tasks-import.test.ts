@@ -44,6 +44,7 @@ describe("INTEGRATIONS-AGENTS-TASKS-IMPORT-1", () => {
       { id: "cartorio", name: "Geo Protocolado no Cartorio", slug: "geo-protocolado-cartorio" },
       { id: "incra", name: "Geo Protocolado no INCRA", slug: "geo-protocolado-incra" },
       { id: "confrontante", name: "Geo - Pendencia de Confrontante", slug: "geo-pendencia-confrontante" },
+      { id: "old", name: "Antigos a concluir", slug: "antigos-a-concluir" },
       { id: "done", name: "Geo Concluido", slug: "geo-concluido" },
     ];
 
@@ -68,6 +69,54 @@ describe("INTEGRATIONS-AGENTS-TASKS-IMPORT-1", () => {
     expect(rows[0].sourceLabels).toContain("CARTA");
     expect(rows[1].columnId).toBe("cartorio");
     expect(rows[1].priority).toBe("urgent");
+  });
+
+  it("mapeia Antigos a concluir quando a planilha informa esse status", () => {
+    const rows = mapTrelloRowsToServices(
+      [
+        {
+          "Card Name": "Fazenda Antiga",
+          Card: "ANTIGOS A CONCLUIR",
+        },
+      ],
+      [
+        { id: "waiting", name: "Aguardando documentos", slug: "aguardando-documentos" },
+        { id: "old", name: "Antigos a concluir", slug: "antigos-a-concluir" },
+      ],
+    );
+
+    expect(rows[0].columnId).toBe("old");
+  });
+
+  it("mapeia colunas especificas do fluxo CAR pela coluna Card", () => {
+    const columns = [
+      { id: "waiting", name: "Aguardando documentos", slug: "aguardando-documentos" },
+      { id: "retification", name: "CAR em Retificacao", slug: "car-em-retificacao" },
+      { id: "progress", name: "CAR em Andamento", slug: "car-em-andamento" },
+      { id: "priority", name: "Prioridade", slug: "prioridade" },
+      { id: "overdue", name: "Em atraso", slug: "em-atraso" },
+      { id: "sync", name: "Aguardando Sincronizacao", slug: "aguardando-sincronizacao" },
+      { id: "old", name: "Antigos a concluir", slug: "antigos-a-concluir" },
+      { id: "done", name: "CAR Concluido", slug: "car-concluido" },
+    ];
+
+    const rows = mapTrelloRowsToServices(
+      [
+        { "Card Name": "CAR Retificar", Card: "CAR EM RETIFICACAO" },
+        { "Card Name": "CAR Sincronizar", Card: "AGUARDANDO SINCRONIZACAO" },
+        { "Card Name": "CAR Protocolo", Card: "PROTOCOLO INCRA" },
+        { "Card Name": "CAR Concluido", Card: "CONCLUIDO" },
+        { "Card Name": "CAR Urgente", Card: "EM ANDAMENTO, URGENTE" },
+      ],
+      columns,
+    );
+
+    expect(rows[0].columnId).toBe("retification");
+    expect(rows[1].columnId).toBe("sync");
+    expect(rows[2].columnId).toBe("sync");
+    expect(rows[3].columnId).toBe("done");
+    expect(rows[4].columnId).toBe("progress");
+    expect(rows[4].priority).toBe("urgent");
   });
 
   it("migration cria integracoes, agentes, sync de calendario e importacao", () => {

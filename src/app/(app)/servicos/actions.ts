@@ -35,6 +35,13 @@ import { createServerSupabase } from "@/lib/supabase/server";
 import { revertServiceToProposal as revertServiceToProposalAction } from "@/app/(app)/propostas/actions";
 import type { Json, OrganizationMember, PaymentStatus, Priority, ProposalServiceType, ServiceCard, ServiceColumn } from "@/types/database";
 
+type InitialServiceStepInput = {
+  title: string;
+  created_at: string | null;
+  due_date: string | null;
+  due_time: string | null;
+};
+
 export async function revertServiceToProposal(cardId: string) {
   return revertServiceToProposalAction(cardId);
 }
@@ -44,6 +51,7 @@ export async function createServiceCardAction(formData: FormData) {
   const user = await requireUser(supabase);
   const organization = await getCurrentOrganizationForUser(supabase, user.id);
   const parsed = serviceCardSchema.parse(formDataToObject(formData));
+  const initialSteps = parseInitialServiceSteps(formData.get("initial_steps_json"));
   const serviceType = parsed.service_type ?? "georreferenciamento";
   const initialColumnId = await resolveInitialColumnForServiceType(
     supabase,
@@ -93,6 +101,31 @@ export async function createServiceCardAction(formData: FormData) {
     data.id,
     organization.id,
   );
+  if (initialSteps.length) {
+    const stepsChecklistId = await ensureServiceChecklistByType(
+      supabase,
+      organization.id,
+      data.id,
+      "steps",
+    );
+    for (const step of initialSteps) {
+      await createServiceChecklistItemRecord(supabase, {
+        organizationId: organization.id,
+        actorUserId: user.id,
+        checklistId: stepsChecklistId,
+        checklistType: "steps",
+        serviceCardId: data.id,
+        serviceTitle: parsed.title,
+        responsibleUserId: parsed.responsible_user_id,
+        title: step.title,
+        isDone: false,
+        createdDate: step.created_at,
+        dueDate: step.due_date,
+        dueTime: step.due_time,
+      });
+    }
+    await refreshChecklistPercent(supabase, data.id);
+  }
   await recordServiceEvent(supabase, {
     organizationId: organization.id,
     serviceCardId: data.id,
@@ -251,8 +284,12 @@ export async function completeServiceDocumentationAction(cardId: string) {
   const supabase = await createServerSupabase();
   const user = await requireUser(supabase);
   const context = await getServiceColumnContext(supabase, cardId);
-  const target = getProposalContractColumn(context.columns);
-  if (!target) throw new Error("Coluna Proposta/Contrato nao encontrada.");
+  const target =
+    getProposalContractColumn(context.columns) ??
+    getNextColumn(context.columns, context.card.column_id);
+  if (!target || target.id === context.card.column_id) {
+    throw new Error("Proxima coluna do servico nao encontrada.");
+  }
 
   await moveCardToColumn(supabase, {
     cardId,
@@ -392,6 +429,17 @@ export async function updateServiceDetailsAction(cardId: string, formData: FormD
   assertCanEditService(context.membership, user.id, card);
 
   const parsed = serviceEditSchema.parse(formDataToObject(formData));
+  const nextClientId = formData.has("client_id") ? parsed.client_id : card.client_id;
+  if (nextClientId) {
+    const { data: selectedClient, error: selectedClientError } = await supabase
+      .from("clients")
+      .select("id")
+      .eq("id", nextClientId)
+      .eq("organization_id", context.organization.id)
+      .maybeSingle();
+    if (selectedClientError) throw new Error(selectedClientError.message);
+    if (!selectedClient) throw new Error("Cliente selecionado nao pertence a organizacao atual.");
+  }
   const metadata = asRecord(card.custom_fields_json);
   const nextMetadata = {
     ...metadata,
@@ -401,13 +449,14 @@ export async function updateServiceDetailsAction(cardId: string, formData: FormD
   const { error } = await supabase
     .from("service_cards")
     .update({
-      client_id: parsed.client_id,
+      client_id: nextClientId,
       title: parsed.title,
       description: parsed.description,
       municipality: parsed.municipality,
       responsible_user_id: parsed.responsible_user_id,
       service_type: parsed.service_type,
       custom_service_name: parsed.custom_service_name,
+      service_date: parsed.service_date,
       due_date: parsed.due_date,
       payment_condition: parsed.payment_condition,
       custom_fields_json: nextMetadata,
@@ -450,6 +499,8 @@ export async function updateServiceDetailsAction(cardId: string, formData: FormD
   revalidatePath("/servicos");
   revalidatePath(`/servicos/${card.id}`);
   revalidatePath("/financeiro");
+  if (card.client_id) revalidatePath(`/clientes/${card.client_id}`);
+  if (nextClientId) revalidatePath(`/clientes/${nextClientId}`);
 }
 
 export async function addServiceReceiptAction(formData: FormData) {
@@ -643,6 +694,7 @@ export async function linkExistingClientToServiceAction(cardId: string, clientId
   });
 
   revalidatePath("/clientes");
+  if (card.client_id) revalidatePath(`/clientes/${card.client_id}`);
   revalidatePath(`/clientes/${client.id}`);
   revalidatePath("/servicos");
   revalidatePath(`/servicos/${card.id}`);
@@ -876,75 +928,34 @@ export async function createChecklistItemAction(formData: FormData) {
     .eq("organization_id", organization.id)
     .single();
   if (checklistError) throw new Error(checklistError.message);
+  const checklistOrganizationId = checklist.organization_id ?? organization.id;
 
-  const scheduledAt =
-    parsed.due_date && parsed.due_time
-      ? new Date(`${parsed.due_date}T${parsed.due_time}:00-03:00`).toISOString()
-      : null;
-  const { data: item, error } = await supabase
-    .from("checklist_items")
-    .insert({
-      checklist_id: checklistId,
-      title: parsed.title,
-      is_done: parsed.is_done,
-      due_date: parsed.due_date,
-      due_time: parsed.due_time,
-      created_at: parsed.created_at ? `${parsed.created_at}T00:00:00-03:00` : undefined,
-      scheduled_at: scheduledAt,
-    })
-    .select("id,title,due_date,due_time")
-    .single();
-  if (error) throw new Error(error.message);
-
-  await refreshChecklistPercent(supabase, checklist.service_card_id);
-  if (item?.due_date && checklist.checklist_type === "steps" && checklist.organization_id) {
-    const { data: card } = await supabase
+  const { data: card } =
+    checklist.checklist_type === "steps"
+      ? await supabase
       .from("service_cards")
       .select("title,responsible_user_id")
       .eq("id", checklist.service_card_id)
-      .eq("organization_id", checklist.organization_id)
-      .maybeSingle();
-    const { data: owners } = await supabase
-      .from("organization_members")
-      .select("user_id")
-      .eq("organization_id", checklist.organization_id)
-      .eq("status", "active")
-      .eq("role", "owner");
-    const recipients = [
-      user.id,
-      card?.responsible_user_id,
-      ...((owners ?? []).map((owner) => owner.user_id) ?? []),
-    ].filter(Boolean) as string[];
-    await createAgendaReminderForEntity(supabase, {
-      organizationId: checklist.organization_id,
-      entityType: "service_card",
-      entityId: checklist.service_card_id,
-      title: `Etapa: ${item.title}`,
-      description: `Servico ${card?.title ?? "servico"}: ${item.title}`,
-      reminderDate: item.due_date,
-      reminderTime: item.due_time,
-      createdBy: user.id,
-      recipientUserIds: recipients,
-      category: "Servicos",
-    });
-    await createDailyTaskForServiceStep(supabase, {
-      organizationId: checklist.organization_id,
-      userId: card?.responsible_user_id ?? user.id,
-      createdBy: user.id,
-      serviceCardId: checklist.service_card_id,
-      serviceTitle: card?.title ?? "servico",
-      itemTitle: item.title,
-      dueDate: item.due_date,
-    });
-  }
-  if (parsed.is_done && checklist.checklist_type === "steps" && checklist.organization_id) {
-    await notifyOwnersAboutServiceStepCompletion(supabase, {
-      organizationId: checklist.organization_id,
-      actorUserId: user.id,
-      serviceCardId: checklist.service_card_id,
-      itemTitle: parsed.title,
-    });
-  }
+      .eq("organization_id", checklistOrganizationId)
+      .maybeSingle()
+      : { data: null };
+
+  await createServiceChecklistItemRecord(supabase, {
+    organizationId: checklistOrganizationId,
+    actorUserId: user.id,
+    checklistId,
+    checklistType: checklist.checklist_type,
+    serviceCardId: checklist.service_card_id,
+    serviceTitle: card?.title ?? "servico",
+    responsibleUserId: card?.responsible_user_id ?? null,
+    title: parsed.title,
+    isDone: parsed.is_done,
+    createdDate: parsed.created_at,
+    dueDate: parsed.due_date,
+    dueTime: parsed.due_time,
+  });
+
+  await refreshChecklistPercent(supabase, checklist.service_card_id);
   revalidatePath(`/servicos/${checklist.service_card_id}`);
   revalidatePath("/servicos");
 }
@@ -1075,6 +1086,114 @@ export async function deleteServiceEventAction(eventId: string, serviceCardId: s
     .eq("organization_id", organization.id);
   if (error) throw new Error(error.message);
   revalidatePath(`/servicos/${serviceCardId}`);
+}
+
+export async function deleteServiceMovementAction(movementId: string, serviceCardId: string) {
+  const supabase = await createServerSupabase();
+  const user = await requireUser(supabase);
+  const organization = await getCurrentOrganizationForUser(supabase, user.id);
+  await getServiceCardForOrganization(supabase, serviceCardId, organization.id);
+  const { error } = await supabase
+    .from("service_card_movements")
+    .delete()
+    .eq("id", movementId)
+    .eq("service_card_id", serviceCardId);
+  if (error) throw new Error(error.message);
+  revalidatePath(`/servicos/${serviceCardId}`);
+}
+
+async function createServiceChecklistItemRecord(
+  supabase: Awaited<ReturnType<typeof createServerSupabase>>,
+  {
+    organizationId,
+    actorUserId,
+    checklistId,
+    checklistType,
+    serviceCardId,
+    serviceTitle,
+    responsibleUserId,
+    title,
+    isDone,
+    createdDate,
+    dueDate,
+    dueTime,
+  }: {
+    organizationId: string;
+    actorUserId: string;
+    checklistId: string;
+    checklistType: "documents" | "steps";
+    serviceCardId: string;
+    serviceTitle: string;
+    responsibleUserId: string | null | undefined;
+    title: string;
+    isDone: boolean;
+    createdDate: string | null;
+    dueDate: string | null;
+    dueTime: string | null;
+  },
+) {
+  const scheduledAt =
+    dueDate && dueTime
+      ? new Date(`${dueDate}T${dueTime}:00-03:00`).toISOString()
+      : null;
+  const { data: item, error } = await supabase
+    .from("checklist_items")
+    .insert({
+      checklist_id: checklistId,
+      title,
+      is_done: isDone,
+      due_date: dueDate,
+      due_time: dueTime,
+      created_at: createdDate ? `${createdDate}T00:00:00-03:00` : undefined,
+      scheduled_at: scheduledAt,
+    })
+    .select("id,title,due_date,due_time")
+    .single();
+  if (error) throw new Error(error.message);
+
+  if (item?.due_date && checklistType === "steps") {
+    const { data: owners } = await supabase
+      .from("organization_members")
+      .select("user_id")
+      .eq("organization_id", organizationId)
+      .eq("status", "active")
+      .eq("role", "owner");
+    const recipients = [
+      actorUserId,
+      responsibleUserId,
+      ...((owners ?? []).map((owner) => owner.user_id) ?? []),
+    ].filter(Boolean) as string[];
+    await createAgendaReminderForEntity(supabase, {
+      organizationId,
+      entityType: "service_card",
+      entityId: serviceCardId,
+      title: `Etapa: ${item.title}`,
+      description: `Servico ${serviceTitle}: ${item.title}`,
+      reminderDate: item.due_date,
+      reminderTime: item.due_time,
+      createdBy: actorUserId,
+      recipientUserIds: recipients,
+      category: "Servicos",
+    });
+    await createDailyTaskForServiceStep(supabase, {
+      organizationId,
+      userId: responsibleUserId ?? actorUserId,
+      createdBy: actorUserId,
+      serviceCardId,
+      serviceTitle,
+      itemTitle: item.title,
+      dueDate: item.due_date,
+    });
+  }
+
+  if (isDone && checklistType === "steps") {
+    await notifyOwnersAboutServiceStepCompletion(supabase, {
+      organizationId,
+      actorUserId,
+      serviceCardId,
+      itemTitle: title,
+    });
+  }
 }
 
 async function refreshChecklistPercent(
@@ -1372,15 +1491,6 @@ async function moveCardToColumn(
     moved_by: userId,
   });
 
-  await recordServiceEvent(supabase, {
-    organizationId,
-    serviceCardId: cardId,
-    userId,
-    eventType: "service.stage_changed",
-    title: eventTitle,
-    metadata: { from_column_id: fromColumnId, to_column_id: toColumnId },
-  });
-
   await logAudit(supabase, {
     action: "service_card.moved",
     entityType: "service_card",
@@ -1394,6 +1504,26 @@ async function moveCardToColumn(
     : { data: [] };
   const fromColumn = movementColumns?.find((column) => column.id === fromColumnId) ?? null;
   const toColumn = movementColumns?.find((column) => column.id === toColumnId) ?? null;
+  const movementTitle = toColumn?.name
+    ? fromColumn?.name
+      ? `${eventTitle} de ${fromColumn.name} para ${toColumn.name}`
+      : `${eventTitle} para ${toColumn.name}`
+    : eventTitle;
+
+  await recordServiceEvent(supabase, {
+    organizationId,
+    serviceCardId: cardId,
+    userId,
+    eventType: "service.stage_changed",
+    title: movementTitle,
+    metadata: {
+      from_column_id: fromColumnId,
+      from_column_name: fromColumn?.name ?? null,
+      to_column_id: toColumnId,
+      to_column_name: toColumn?.name ?? null,
+    },
+  });
+
   const wasLost = isServiceLostColumn(fromColumn);
   const isLost = isServiceLostColumn(toColumn);
   const wasOverdue = isOverdueServiceColumn(fromColumn);
@@ -1621,6 +1751,62 @@ function asRecord(value: Json | undefined): Record<string, Json> {
     return value as Record<string, Json>;
   }
   return {};
+}
+
+function parseInitialServiceSteps(value: FormDataEntryValue | null): InitialServiceStepInput[] {
+  if (!value) return [];
+  if (typeof value !== "string") throw new Error("Etapas iniciais invalidas.");
+  const raw = value.trim();
+  if (!raw) return [];
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    throw new Error("Etapas iniciais invalidas.");
+  }
+
+  if (!Array.isArray(parsed)) throw new Error("Etapas iniciais invalidas.");
+  return parsed.map((entry, index) => {
+    if (!entry || typeof entry !== "object") {
+      throw new Error(`Etapa inicial ${index + 1} invalida.`);
+    }
+    const record = entry as Record<string, unknown>;
+    const title = String(record.title ?? "").trim();
+    if (title.length < 2) throw new Error(`Informe o nome da etapa ${index + 1}.`);
+
+    return {
+      title,
+      created_at: normalizeDateField(record.created_at, todayBrazilDate()),
+      due_date: normalizeDateField(record.due_date, null),
+      due_time: normalizeTimeField(record.due_time),
+    };
+  });
+}
+
+function normalizeDateField(value: unknown, fallback: string | null) {
+  const text = typeof value === "string" ? value.trim() : "";
+  if (!text) return fallback;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(text)) throw new Error("Data da etapa invalida.");
+  return text;
+}
+
+function normalizeTimeField(value: unknown) {
+  const text = typeof value === "string" ? value.trim() : "";
+  if (!text) return null;
+  if (!/^\d{2}:\d{2}$/.test(text)) throw new Error("Horario da etapa invalido.");
+  const [hours, minutes] = text.split(":").map(Number);
+  if (hours > 23 || minutes > 59) throw new Error("Horario da etapa invalido.");
+  return text;
+}
+
+function todayBrazilDate() {
+  return new Intl.DateTimeFormat("sv-SE", {
+    timeZone: "America/Sao_Paulo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
 }
 
 async function createAgendaReminderForEntity(

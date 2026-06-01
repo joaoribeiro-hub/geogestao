@@ -120,7 +120,7 @@ Data do checkpoint: 2026-05-11
 
 46. O menu lateral deve priorizar uma experiencia simples: Dashboard, Servicos e Financeiro como eixo operacional, com cadastros e bibliotecas em Configuracoes.
 
-47. Novo servico deve nascer em `Aguardando documentos`, com checklist padrao por tipo de servico. A fase `Proposta/Contrato` e o ponto de criacao ou visualizacao de proposta e contrato vinculados.
+47. Novo servico deve nascer em `Aguardando documentos`, com checklist padrao por tipo de servico. A fase `Proposta/Contrato` e o ponto de criacao ou visualizacao de proposta e contrato vinculados nos fluxos que possuem essa etapa. O fluxo CAR nao usa mais `Proposta/Contrato`; depois de `Aguardando documentos`, segue para `CAR em Retificacao`.
 
 48. Reset de dados operacionais por empresa deve ser feito somente por script admin com dry-run por padrao e flag explicita `--confirm`. O reset nunca deve apagar usuarios, profiles, organizacoes, membros, planos, migrations ou bases geograficas globais.
 

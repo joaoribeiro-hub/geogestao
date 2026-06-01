@@ -323,10 +323,13 @@ Status da Fase ASSISTANT-1: implementada no codigo. Pendente aplicar `supabase/m
   - Proposta/Contrato;
   - Geo em Andamento;
   - Prioridade;
+  - Em atraso;
   - Geo Protocolado no Cartorio;
   - Geo Protocolado no INCRA;
   - Geo - Pendencia de Confrontante;
+  - Antigos a concluir;
   - Geo Concluido.
+- Fluxo CAR ajustado para: Aguardando documentos, CAR em Retificacao, CAR em Andamento, Prioridade, Em atraso, Aguardando Sincronizacao, Antigos a concluir e CAR Concluido. Colunas legadas de CAR ficam ocultas e cards antigos sao movidos por migration corretiva.
 - Cards de servico foram simplificados para estilo Trello:
   - cliente;
   - imovel/empreendimento;
