@@ -1,14 +1,12 @@
 import Link from "next/link";
 import { ChevronLeft, ChevronRight, RotateCcw } from "lucide-react";
 import { createRoutineItemAction } from "@/app/(app)/rotina/actions";
+import { RoutineItemFields } from "@/components/routine/routine-item-fields";
 import { RoutineItemToggle } from "@/components/routine/routine-item-toggle";
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { ModalDisclosure } from "@/components/ui/modal-disclosure";
-import { Textarea } from "@/components/ui/textarea";
 import { requireUser } from "@/lib/auth";
 import { getCurrentOrganizationForUser } from "@/lib/organization";
 import { createServerSupabase } from "@/lib/supabase/server";
@@ -34,6 +32,19 @@ export default async function RoutinePage({
     current: toDateKey(new Date()),
     next: shiftDateKey(days[0], 7),
   };
+  const { data: orgMembers } = await supabase
+    .from("organization_members")
+    .select("user_id,role")
+    .eq("organization_id", organization.id)
+    .eq("status", "active");
+  const { data: profiles } = orgMembers?.length
+    ? await supabase.from("profiles").select("id,full_name,email").in("id", orgMembers.map((member) => member.user_id))
+    : { data: [] };
+  const profileMap = new Map((profiles ?? []).map((profile) => [profile.id, profile.full_name ?? profile.email ?? "Membro"]));
+  const memberOptions = (orgMembers ?? []).map((member) => ({
+    id: member.user_id,
+    label: profileMap.get(member.user_id) ?? member.role ?? "Membro",
+  }));
 
   const { data: routineItems } = await supabase
     .from("routine_items")
@@ -44,6 +55,7 @@ export default async function RoutinePage({
     .is("archived_at", null)
     .neq("status", "canceled")
     .or(`and(routine_scope.eq.daily,routine_date.lte.${days[6]}),routine_scope.in.(weekly,monthly,annual)`)
+    .order("sort_order", { ascending: true })
     .order("created_at", { ascending: true });
 
   const items = routineItems ?? [];
@@ -82,33 +94,7 @@ export default async function RoutinePage({
             trigger={<Button type="button">+ Adicionar item de rotina</Button>}
           >
             <form action={createRoutineItemAction} className="grid gap-3">
-              <div className="space-y-2">
-                <Label>Tarefa</Label>
-                <Input name="title" required />
-              </div>
-              <div className="grid gap-3 md:grid-cols-3">
-                <div className="space-y-2">
-                  <Label>Escopo</Label>
-                  <select name="routine_scope" className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm">
-                    <option value="daily">Diaria</option>
-                    <option value="weekly">Semanal</option>
-                    <option value="monthly">Mensal</option>
-                    <option value="annual">Anual</option>
-                  </select>
-                </div>
-                <div className="space-y-2">
-                  <Label>Data</Label>
-                  <Input name="routine_date" type="date" defaultValue={toDateKey(new Date())} />
-                </div>
-                <div className="space-y-2">
-                  <Label>Horario</Label>
-                  <Input name="due_time" type="time" />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label>Descricao</Label>
-                <Textarea name="description" rows={3} />
-              </div>
+              <RoutineItemFields members={memberOptions} />
               <Button>Adicionar</Button>
             </form>
           </ModalDisclosure>

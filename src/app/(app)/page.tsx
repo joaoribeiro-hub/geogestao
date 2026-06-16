@@ -64,7 +64,7 @@ export default async function DashboardPage({
       .is("deleted_at", null)
       .is("archived_at", null)
       .or(`due_date.lte.${today},due_date.is.null`)
-      .order("is_emergency", { ascending: false })
+      .order("sort_order", { ascending: true })
       .order("created_at", { ascending: true }),
     supabase
       .from("ai_agents")

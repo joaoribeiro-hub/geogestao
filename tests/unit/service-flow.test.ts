@@ -15,7 +15,8 @@ const columns = [
   column("1", serviceFlowSlugs.awaitingDocuments, "Aguardando documentos", 1),
   column("2", serviceFlowSlugs.proposalContract, "Proposta/Contrato", 2),
   column("3", serviceFlowSlugs.inProgress, "Geo em Andamento", 3),
-  column("4", serviceFlowSlugs.priority, "Prioridade", 4),
+  column("4", serviceFlowSlugs.priorityMax, "Prioridade máxima", 4),
+  column("5", serviceFlowSlugs.priority, "Prioridade", 5),
 ] as ServiceColumn[];
 
 describe("service-flow", () => {
@@ -42,6 +43,7 @@ describe("service-flow", () => {
     expect(serviceWorkflowDefinitions.georreferenciamento.map((item) => item.name)).toEqual([
       "Aguardando documentos",
       "Geo em Andamento",
+      "Prioridade máxima",
       "Prioridade",
       "Em atraso",
       "Geo Protocolado no Cartorio",
@@ -56,6 +58,7 @@ describe("service-flow", () => {
       "Aguardando documentos",
       "CAR em Retificacao",
       "CAR em Andamento",
+      "Prioridade máxima",
       "Prioridade",
       "Em atraso",
       "Aguardando Sincronizacao",
@@ -63,6 +66,10 @@ describe("service-flow", () => {
       "CAR Concluido",
     ]);
     expect(serviceWorkflowDefinitions.car.some((item) => item.slug === serviceFlowSlugs.oldToFinish)).toBe(true);
+    expect(serviceWorkflowDefinitions.georreferenciamento.some((item) => item.slug === serviceFlowSlugs.priorityMax)).toBe(true);
+    expect(serviceWorkflowDefinitions.car.some((item) => item.slug === serviceFlowSlugs.priorityMax)).toBe(true);
+    expect(serviceWorkflowDefinitions.itr_ccir.some((item) => item.slug === serviceFlowSlugs.priorityMax)).toBe(true);
+    expect(serviceWorkflowDefinitions.outros_servicos.some((item) => item.slug === serviceFlowSlugs.priorityMax)).toBe(true);
     expect(serviceWorkflowDefinitions.itr_ccir.some((item) => item.slug === serviceFlowSlugs.oldToFinish)).toBe(true);
     expect(serviceWorkflowDefinitions.outros_servicos.some((item) => item.slug === serviceFlowSlugs.oldToFinish)).toBe(true);
     expect(serviceWorkflowDefinitions.car.some((item) => item.name === "CAR em Andamento")).toBe(true);

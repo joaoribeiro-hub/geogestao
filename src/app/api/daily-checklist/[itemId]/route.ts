@@ -11,6 +11,7 @@ const updateItemSchema = z.object({
   title: z.string().trim().min(2).max(240).optional(),
   description: z.string().trim().max(1000).nullable().optional(),
   dueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  sortOrder: z.number().int().min(0).optional(),
 });
 
 export async function PATCH(
@@ -42,6 +43,7 @@ export async function PATCH(
     ...(parsed.data.title ? { title: parsed.data.title } : {}),
     ...(parsed.data.description !== undefined ? { description: parsed.data.description } : {}),
     ...(parsed.data.dueDate ? { due_date: parsed.data.dueDate } : {}),
+    ...(typeof parsed.data.sortOrder === "number" ? { sort_order: parsed.data.sortOrder } : {}),
     ...(parsed.data.status === "done" ? { completed_at: new Date().toISOString() } : {}),
     ...(parsed.data.status === "open" ? { completed_at: null } : {}),
   };
@@ -63,6 +65,7 @@ export async function PATCH(
     ...(parsed.data.title ? { title: parsed.data.title } : {}),
     ...(parsed.data.description !== undefined ? { description: parsed.data.description } : {}),
     ...(parsed.data.dueDate ? { routine_date: parsed.data.dueDate } : {}),
+    ...(typeof parsed.data.sortOrder === "number" ? { sort_order: parsed.data.sortOrder } : {}),
     ...(parsed.data.status === "done" ? { completed_at: item.completed_at } : {}),
     ...(parsed.data.status === "open" ? { completed_at: null } : {}),
   };

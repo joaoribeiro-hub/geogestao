@@ -1,5 +1,26 @@
 # GeoGestao - Roadmap
 
+## UI-SOPHIA-ROUTINE-TASKS-1
+
+Status: implementado no codigo com migration `041_ui_sophia_routine_tasks.sql`, pendente aplicar no Supabase de teste.
+
+Concluido nesta fase:
+
+- limpeza visual do topo de Servicos e alinhamento de filtro, acoes, tipo de servico e zoom;
+- configuracao global de Aparencia com fonte maior e tema claro/escuro;
+- formulario de lembrete rapido recolhido no widget Tarefa;
+- reordenacao de tarefas por drag and drop com `sort_order`;
+- Rotina, Relatorios, Inicio e Sophia usando a ordem salva;
+- mencoes `@` na Rotina com notificacao para membros da mesma organizacao;
+- comandos da Sophia para adiar datas previstas de servicos;
+- textos de apoio dos cards Briefing da manha e Revisao semanal no Inicio.
+
+Proximos incrementos:
+
+- editar mencoes ja salvas em itens antigos da Rotina;
+- refinar o tema escuro em telas especializadas;
+- sincronizacao explicita de notificacoes futuras quando datas de servico forem adiadas pela Sophia.
+
 ## AGENTS-TASKS-SYNC-FIX-1
 
 Concluido nesta fase corretiva:

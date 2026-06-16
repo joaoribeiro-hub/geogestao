@@ -1,5 +1,14 @@
 # Rotina
 
+Atualizacao `UI-SOPHIA-ROUTINE-TASKS-1`:
+
+- itens diarios possuem `sort_order` para preservar a ordem definida pelo usuario;
+- a Rotina diaria ordena primeiro por `sort_order` e depois por criacao;
+- a mesma ordem e usada pelo widget Tarefa, Inicio, Relatorios e respostas da Sophia;
+- ao criar item de Rotina, campos de titulo e descricao aceitam mencoes com `@`;
+- sugestoes de mencao mostram apenas membros ativos da mesma organizacao;
+- mencoes salvas criam registros em `routine_item_mentions` e notificacoes internas para os mencionados.
+
 Atualizacao `AGENTS-TASKS-SYNC-FIX-1`:
 
 - Rotina diaria e widget Tarefa passaram a compartilhar os mesmos itens por vinculo entre `routine_items.daily_checklist_item_id` e `daily_checklist_items.id`;

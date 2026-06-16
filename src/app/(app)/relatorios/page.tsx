@@ -31,6 +31,7 @@ type TaskRow = {
   source: string;
   originHref: string | null;
   dateKey: string;
+  sortOrder: number;
 };
 
 const quickFilters = [
@@ -105,6 +106,7 @@ export default async function ReportsPage({
       source: "Checklist de Hoje",
       originHref: item.related_service_id ? `/servicos/${item.related_service_id}` : "/rotina",
       dateKey: item.due_date ?? item.created_at.slice(0, 10),
+      sortOrder: item.sort_order ?? 0,
     })) satisfies TaskRow[]),
     ...((routineResult.data ?? []).map((item) => ({
       id: `routine-${item.id}`,
@@ -119,11 +121,17 @@ export default async function ReportsPage({
       source: "Rotina",
       originHref: "/rotina",
       dateKey: item.routine_date ?? item.created_at.slice(0, 10),
+      sortOrder: item.sort_order ?? 0,
     })) satisfies TaskRow[]),
   ]
     .filter((row) => member === "all" || row.responsibleId === member)
     .filter((row) => filterByStatus(row, quick, status))
-    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+    .sort((a, b) =>
+      a.responsibleName.localeCompare(b.responsibleName) ||
+      a.dateKey.localeCompare(b.dateKey) ||
+      a.sortOrder - b.sortOrder ||
+      b.createdAt.localeCompare(a.createdAt)
+    );
 
   const chart = buildWeekChart(rows);
   const maxValue = Math.max(1, ...chart.map((item) => item.count));

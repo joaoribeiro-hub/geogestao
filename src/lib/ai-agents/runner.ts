@@ -166,7 +166,7 @@ async function buildAgentContext(
   weekAgo.setDate(weekAgo.getDate() - 7);
   let checklistQuery = supabase
     .from("daily_checklist_items")
-    .select("id,title,description,status,is_emergency,due_date,created_at,completed_at,source,assigned_to,related_service_id")
+    .select("id,title,description,status,is_emergency,due_date,created_at,completed_at,source,assigned_to,related_service_id,sort_order")
     .eq("organization_id", organizationId)
     .is("deleted_at", null);
   if (!isOwner) checklistQuery = checklistQuery.eq("assigned_to", userId);
@@ -176,7 +176,7 @@ async function buildAgentContext(
 
   let routineQuery = supabase
     .from("routine_items")
-    .select("id,title,description,status,is_emergency,routine_date,due_time,created_at,completed_at,source,user_id,daily_checklist_item_id")
+    .select("id,title,description,status,is_emergency,routine_date,due_time,created_at,completed_at,source,user_id,daily_checklist_item_id,sort_order")
     .eq("organization_id", organizationId)
     .eq("routine_scope", "daily")
     .is("deleted_at", null);
@@ -233,11 +233,17 @@ async function buildAgentContext(
   ]);
   const checklistTaskIds = new Set((checklists.data ?? []).map((item) => item.id));
   const routineOnlyTasks = (routineItems.data ?? []).filter((item) => !item.daily_checklist_item_id || !checklistTaskIds.has(item.daily_checklist_item_id));
+  const tasks = [...(checklists.data ?? []), ...routineOnlyTasks].sort((left, right) => {
+    const leftOrder = Number(left.sort_order ?? 0);
+    const rightOrder = Number(right.sort_order ?? 0);
+    if (leftOrder !== rightOrder) return leftOrder - rightOrder;
+    return String(left.created_at ?? "").localeCompare(String(right.created_at ?? ""));
+  });
 
   return {
     today,
     slug,
-    tasks: [...(checklists.data ?? []), ...routineOnlyTasks],
+    tasks,
     reminders: reminders.data ?? [],
     notifications: notifications.data ?? [],
     services: serviceCards.data ?? [],
@@ -293,18 +299,31 @@ function fallbackSummary(agentName: string, context: unknown) {
   if (value.slug === "briefing-matinal" && !value.tasks?.length && !value.reminders?.length && !value.notifications?.length) {
     return "Nenhuma tarefa, prazo ou pendencia encontrada para hoje.";
   }
+  const taskTitles = listTitles(value.tasks, "title", 5);
+  const reminderTitles = listTitles(value.reminders, "title", 5);
+  const serviceTitles = listTitles(value.services, "title", 5);
   return [
     `${agentName}`,
     `Tarefas encontradas: ${value.tasks?.length ?? 0}.`,
+    taskTitles.length ? `Principais tarefas: ${taskTitles.join("; ")}.` : null,
     `Lembretes encontrados: ${value.reminders?.length ?? 0}.`,
+    reminderTitles.length ? `Lembretes: ${reminderTitles.join("; ")}.` : null,
     `Notificacoes abertas: ${value.notifications?.length ?? 0}.`,
     `Servicos considerados: ${value.services?.length ?? 0}.`,
+    serviceTitles.length ? `Servicos em destaque: ${serviceTitles.join("; ")}.` : null,
     `Checklists de etapas considerados: ${value.serviceSteps?.length ?? 0}.`,
     `Documentos considerados: ${value.documents?.length ?? 0}.`,
     `Registros de expediente: ${value.workTime?.length ?? 0}.`,
     value.finance?.length ? `Lancamentos financeiros considerados: ${value.finance.length}.` : null,
     "Revise os itens listados no GeoGestao para priorizar o proximo passo.",
   ].filter(Boolean).join("\n");
+}
+
+function listTitles(items: Array<Record<string, unknown>> | undefined, key: string, limit: number) {
+  return (items ?? [])
+    .map((item) => String(item[key] ?? "").trim())
+    .filter(Boolean)
+    .slice(0, limit);
 }
 
 export function buildAgentOutput({

@@ -49,6 +49,7 @@ export const assistantActionRegistry: Record<string, ActionHandler> = {
   createClientInteraction,
   createService,
   completeServiceStep,
+  postponeServiceDueDate,
   listTodayChecklist,
   createChecklistItem,
   assignChecklistItem,
@@ -70,6 +71,7 @@ export const intentToActionName: Record<string, string> = {
   create_client_interaction: "createClientInteraction",
   create_service: "createService",
   complete_service_step: "completeServiceStep",
+  postpone_service_due_date: "postponeServiceDueDate",
   list_today_checklist: "listTodayChecklist",
   list_member_checklist: "listMemberActivity",
   list_member_current_status: "listMemberActivity",
@@ -578,6 +580,186 @@ async function completeServiceStep(
     status: "ok",
     message: `Etapa "${target.title}" do servico "${service.title}" marcada como concluida.`,
     data: { type: "service_step_completed", serviceId: service.id, checklistItemId },
+  });
+}
+
+async function postponeServiceDueDate(
+  context: AssistantContext,
+  params: Record<string, Json>,
+  confirmation?: AssistantConfirmationPayload,
+) {
+  const scope = stringParam(params.scope) === "bulk" ? "bulk" : "specific";
+  const amount = numberParam(params.amount) ?? 1;
+  const unit = parseDateUnit(stringParam(params.unit));
+  const base = stringParam(params.base) === "today" ? "today" : "current_due_date";
+  if (amount <= 0 || !unit) {
+    return result({
+      actionName: "postponeServiceDueDate",
+      input: params,
+      status: "ok",
+      message: "Nao entendi o periodo. Use dias, semanas, meses ou anos.",
+    });
+  }
+
+  const isOwner = await isOrganizationOwner(context);
+  let services: ServiceCard[] = [];
+  if (scope === "bulk") {
+    if (!isOwner) {
+      return result({
+        actionName: "postponeServiceDueDate",
+        input: params,
+        status: "ok",
+        message: "Apenas o owner pode alterar prazos de servicos em massa.",
+      });
+    }
+    const serviceType = parseOptionalServiceType(stringParam(params.serviceType));
+    if (!serviceType) {
+      return result({
+        actionName: "postponeServiceDueDate",
+        input: params,
+        status: "ok",
+        message: "Informe o tipo de servico que deve ter o prazo adiado.",
+      });
+    }
+    const { data, error } = await context.supabase
+      .from("service_cards")
+      .select("*")
+      .eq("organization_id", context.organizationId)
+      .eq("service_type", serviceType);
+    if (error) throw new Error(error.message);
+    services = data ?? [];
+  } else {
+    const serviceName = stringParam(params.serviceName);
+    if (!serviceName) {
+      return result({
+        actionName: "postponeServiceDueDate",
+        input: params,
+        status: "ok",
+        message: "Informe o nome do servico que deve ter o prazo adiado.",
+      });
+    }
+    const matches = await findServicesByText(context, serviceName);
+    if (!matches.length) {
+      return result({
+        actionName: "postponeServiceDueDate",
+        input: params,
+        status: "ok",
+        message: `Nao encontrei servico parecido com "${serviceName}" nesta empresa.`,
+      });
+    }
+    if (matches.length > 1) {
+      return result({
+        actionName: "postponeServiceDueDate",
+        input: params,
+        status: "ok",
+        message: `Encontrei mais de um servico parecido com "${serviceName}": ${matches.slice(0, 5).map((item) => item.title).join(", ")}. Informe um nome mais especifico.`,
+        data: { type: "service_candidates", items: matches.slice(0, 5).map((item) => ({ id: item.id, title: item.title })) },
+      });
+    }
+    const allowed = isOwner || await canUpdateServiceDueDate(context, matches[0]);
+    if (!allowed) {
+      return result({
+        actionName: "postponeServiceDueDate",
+        input: params,
+        status: "ok",
+        message: "Voce nao tem permissao para alterar esse servico.",
+      });
+    }
+    services = matches;
+  }
+
+  if (!services.length) {
+    return result({
+      actionName: "postponeServiceDueDate",
+      input: params,
+      status: "ok",
+      message: "Nao encontrei servicos para atualizar.",
+    });
+  }
+
+  const updates = services.map((service) => {
+    const baseDate = base === "today" || !service.due_date ? todayDate() : service.due_date;
+    return {
+      service,
+      previousDueDate: service.due_date,
+      nextDueDate: addToDate(baseDate, amount, unit),
+    };
+  });
+
+  if (!params.confirmed && !confirmation?.params?.confirmed) {
+    const serviceLabel = scope === "bulk"
+      ? `${updates.length} servico(s) de ${serviceTypeLabel(stringParam(params.serviceType))}`
+      : `o servico "${updates[0].service.title}"`;
+    return result({
+      actionName: "postponeServiceDueDate",
+      input: params,
+      status: "needs_confirmation",
+      message: `Encontrei ${serviceLabel}. Vou alterar a data prevista em ${formatDateUnit(amount, unit)}. Confirma?`,
+      requiresConfirmation: true,
+      confirmation: {
+        actionName: "postponeServiceDueDate",
+        params: {
+          ...params,
+          serviceIds: updates.map((update) => update.service.id),
+          confirmed: true,
+        },
+      },
+    });
+  }
+
+  const now = new Date().toISOString();
+  await Promise.all(updates.map((update) =>
+    context.supabase
+      .from("service_cards")
+      .update({ due_date: update.nextDueDate })
+      .eq("id", update.service.id)
+      .eq("organization_id", context.organizationId),
+  ));
+
+  await context.supabase.from("service_events").insert(updates.map((update) => ({
+    organization_id: context.organizationId,
+    service_card_id: update.service.id,
+    event_type: "service.due_date_updated_by_sophia",
+    title: "Data prevista alterada pela Sophia",
+    description: `${update.previousDueDate ?? "sem data"} -> ${update.nextDueDate}`,
+    metadata: {
+      previous_due_date: update.previousDueDate,
+      next_due_date: update.nextDueDate,
+      amount,
+      unit,
+      base,
+    } as Json,
+    created_by: context.user.id,
+  })));
+
+  await recordOrganizationActivity(context, {
+    activityType: "service_due_date_updated_by_sophia",
+    entityType: scope === "bulk" ? "service_cards" : "service_card",
+    entityId: scope === "bulk" ? null : updates[0].service.id,
+    metadata: {
+      total: updates.length,
+      service_ids: updates.map((update) => update.service.id),
+      amount,
+      unit,
+      updated_at: now,
+    } as Json,
+  });
+
+  return result({
+    actionName: "postponeServiceDueDate",
+    input: params,
+    status: "ok",
+    message: `Atualizei ${updates.length} servico(s). As datas previstas foram ajustadas em ${formatDateUnit(amount, unit)}.`,
+    data: {
+      type: "service_due_date_updated",
+      items: updates.map((update) => ({
+        id: update.service.id,
+        title: update.service.title,
+        previousDueDate: update.previousDueDate,
+        nextDueDate: update.nextDueDate,
+      })),
+    },
+    output: { total: updates.length },
   });
 }
 
@@ -1181,16 +1363,26 @@ async function getChecklistForUserDate(context: AssistantContext, userId: string
     .maybeSingle();
   if (checklistError) throw new Error(checklistError.message);
 
-  if (!checklist) return { checklist: null, items: [] };
-  const { data: items, error } = await context.supabase
+  let itemsQuery = context.supabase
     .from("daily_checklist_items")
     .select("*")
     .eq("organization_id", context.organizationId)
-    .eq("checklist_id", checklist.id)
-    .order("is_emergency", { ascending: false })
+    .eq("assigned_to", userId)
+    .in("status", ["open", "done"])
+    .is("deleted_at", null)
+    .is("archived_at", null);
+  const dateOrChecklist = [`due_date.lte.${date}`];
+  if (checklist?.id) dateOrChecklist.push(`checklist_id.eq.${checklist.id}`);
+  itemsQuery = itemsQuery.or(dateOrChecklist.join(","));
+  const { data: rawItems, error } = await itemsQuery
+    .order("sort_order", { ascending: true })
     .order("created_at", { ascending: true });
   if (error) throw new Error(error.message);
-  return { checklist, items: items ?? [] };
+  const items = (rawItems ?? []).filter((item) => {
+    if (item.status === "open") return !item.due_date || item.due_date <= date;
+    return item.due_date === date || item.completed_at?.slice(0, 10) === date;
+  });
+  return { checklist: checklist ?? null, items };
 }
 
 async function ensureDailyChecklist(context: AssistantContext, userId: string, date: string) {
@@ -1234,6 +1426,7 @@ async function insertChecklistItem(
   },
 ) {
   const checklist = await ensureDailyChecklist(context, assignedTo, date);
+  const sortOrder = await nextChecklistSortOrder(context, assignedTo);
   const { data, error } = await context.supabase
     .from("daily_checklist_items")
     .insert({
@@ -1245,6 +1438,7 @@ async function insertChecklistItem(
       due_date: date,
       is_emergency: isEmergency,
       source,
+      sort_order: sortOrder,
     })
     .select("*")
     .single();
@@ -1257,7 +1451,33 @@ async function insertChecklistItem(
     entityId: data.id,
     metadata: { title, date, is_emergency: isEmergency, source },
   });
+  await context.supabase.from("routine_items").insert({
+    organization_id: context.organizationId,
+    user_id: assignedTo,
+    title,
+    description: null,
+    routine_scope: "daily",
+    routine_date: date,
+    is_emergency: isEmergency,
+    source,
+    daily_checklist_item_id: data.id,
+    created_by: context.user.id,
+    sort_order: sortOrder,
+  });
   return data;
+}
+
+async function nextChecklistSortOrder(context: AssistantContext, assignedTo: string) {
+  const { data } = await context.supabase
+    .from("daily_checklist_items")
+    .select("sort_order")
+    .eq("organization_id", context.organizationId)
+    .eq("assigned_to", assignedTo)
+    .is("deleted_at", null)
+    .is("archived_at", null)
+    .order("sort_order", { ascending: false })
+    .limit(1);
+  return Number(data?.[0]?.sort_order ?? 0) + 1000;
 }
 
 async function resolveOrganizationMember(context: AssistantContext, name: string): Promise<
@@ -1428,6 +1648,7 @@ function formatChecklistItem(item: {
   completed_at: string | null;
   created_by: string;
   assigned_to: string;
+  sort_order?: number | null;
 }) {
   return {
     id: item.id,
@@ -1439,6 +1660,7 @@ function formatChecklistItem(item: {
     completedAt: item.completed_at,
     createdBy: item.created_by,
     assignedTo: item.assigned_to,
+    sortOrder: item.sort_order ?? 0,
   };
 }
 
@@ -1461,6 +1683,87 @@ function formatActivityLogLine(activity: {
   if (activity.activity_type === "checklist_item_reopened") return `reabriu ${title ?? "um item"} as ${time}`;
   if (activity.activity_type === "checklist_item_assigned") return `recebeu ${title ?? "um item"} as ${time}`;
   return `${activity.activity_type} as ${time}`;
+}
+
+function parseDateUnit(value: string | null) {
+  if (value === "day" || value === "week" || value === "month" || value === "year") return value;
+  return null;
+}
+
+function addToDate(dateKey: string, amount: number, unit: "day" | "week" | "month" | "year") {
+  const date = new Date(`${dateKey}T00:00:00-03:00`);
+  if (unit === "day") date.setDate(date.getDate() + amount);
+  if (unit === "week") date.setDate(date.getDate() + amount * 7);
+  if (unit === "month") date.setMonth(date.getMonth() + amount);
+  if (unit === "year") date.setFullYear(date.getFullYear() + amount);
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
+
+function formatDateUnit(amount: number, unit: "day" | "week" | "month" | "year") {
+  const labels = {
+    day: amount === 1 ? "1 dia" : `${amount} dias`,
+    week: amount === 1 ? "1 semana" : `${amount} semanas`,
+    month: amount === 1 ? "1 mes" : `${amount} meses`,
+    year: amount === 1 ? "1 ano" : `${amount} anos`,
+  };
+  return labels[unit];
+}
+
+function parseOptionalServiceType(value: string | null): ProposalServiceType | null {
+  if (
+    value === "georreferenciamento" ||
+    value === "car" ||
+    value === "itr_ccir" ||
+    value === "outros_servicos"
+  ) {
+    return value;
+  }
+  return null;
+}
+
+function serviceTypeLabel(value: string | null) {
+  if (value === "itr_ccir") return "ITR/CCIR";
+  if (value === "car") return "CAR";
+  if (value === "georreferenciamento") return "Georreferenciamento";
+  if (value === "outros_servicos") return "Outros Servicos";
+  return "servicos";
+}
+
+async function findServicesByText(context: AssistantContext, search: string) {
+  const { cards, clientsById } = await getServiceDataset(context);
+  const normalized = normalizeAssistantText(search);
+  const scored = cards
+    .map((card) => {
+      const clientName = card.client_id ? clientsById.get(card.client_id)?.name ?? "" : "";
+      const haystack = normalizeAssistantText([
+        card.title,
+        card.description,
+        card.municipality,
+        clientName,
+      ].filter(Boolean).join(" "));
+      const exact = normalizeAssistantText(card.title) === normalized;
+      const includes = haystack.includes(normalized) || normalized.includes(normalizeAssistantText(card.title));
+      const tokens = normalized.split(/\s+/).filter((token) => token.length > 1);
+      const tokenMatch = tokens.length > 0 && tokens.every((token) => haystack.includes(token));
+      return { card, score: exact ? 3 : includes ? 2 : tokenMatch ? 1 : 0 };
+    })
+    .filter((item) => item.score > 0)
+    .sort((a, b) => b.score - a.score || a.card.title.localeCompare(b.card.title));
+  const bestScore = scored[0]?.score ?? 0;
+  return scored.filter((item) => item.score === bestScore).map((item) => item.card).slice(0, 10);
+}
+
+async function canUpdateServiceDueDate(context: AssistantContext, service: Pick<ServiceCard, "id" | "responsible_user_id">) {
+  if (service.responsible_user_id === context.user.id) return true;
+  const { data, error } = await context.supabase
+    .from("service_members")
+    .select("id")
+    .eq("organization_id", context.organizationId)
+    .eq("service_card_id", service.id)
+    .eq("user_id", context.user.id)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  return Boolean(data);
 }
 
 function parseServiceType(value: Json | undefined): ProposalServiceType {

@@ -37,6 +37,11 @@ export function detectAssistantIntent(message: string, context?: AssistantConver
     });
   }
 
+  const dueDateUpdate = extractServiceDueDateUpdate(message, normalized);
+  if (dueDateUpdate) {
+    return intent("postpone_service_due_date", 0.93, dueDateUpdate);
+  }
+
   if (hasMemberTaskLanguage(normalized)) {
     return intent(
       "create_member_task",
@@ -198,6 +203,79 @@ function extractStepName(message: string) {
 
 function extractServiceNameForStep(message: string) {
   return message.match(/servi[cç]o\s+(.+)$/i)?.[1]?.replace(/["“”']/g, "").trim() ?? null;
+}
+
+function extractServiceDueDateUpdate(message: string, normalized: string) {
+  const hasExplicitDueUpdate = hasAny(normalized, [
+    "adiar",
+    "adie",
+    "adiado",
+    "adiada",
+    "atualize a previsao",
+    "atualizar a previsao",
+    "data prevista",
+    "previsao de entrega",
+  ]);
+  const hasMoveToFutureLanguage =
+    hasAny(normalized, ["coloque", "jogar", "jogue"]) &&
+    hasAny(normalized, ["para daqui", "proximo ano", "ano que vem"]);
+  const mentionsService = hasAny(normalized, ["servico", "servicos", "itr", "ccir", "car", "georreferenciamento", "georeferenciamento", "geo", "outros servicos"]);
+  if ((!hasExplicitDueUpdate && !hasMoveToFutureLanguage) || !mentionsService) return null;
+
+  const serviceType = extractPostponeServiceType(normalized);
+  const amount = extractPostponeAmount(normalized);
+  const isBulk = hasAny(normalized, ["todos", "todas", "meus servicos", "servicos de"]) && Boolean(serviceType);
+  const serviceName = isBulk ? null : extractPostponeServiceName(message);
+  if (!isBulk && !serviceName) return null;
+
+  return {
+    scope: isBulk ? "bulk" : "specific",
+    serviceType,
+    serviceName,
+    amount: amount.amount,
+    unit: amount.unit,
+    base: isBulk ? "current_due_date" : extractPostponeBase(normalized),
+  };
+}
+
+function extractPostponeServiceType(normalized: string) {
+  if (/\bitr\b/.test(normalized) || /\bccir\b/.test(normalized)) return "itr_ccir";
+  if (/\bcar\b/.test(normalized)) return "car";
+  if (normalized.includes("georreferenciamento") || normalized.includes("georeferenciamento") || /\bgeo\b/.test(normalized)) return "georreferenciamento";
+  if (normalized.includes("outros servicos") || normalized.includes("outro servico")) return "outros_servicos";
+  return null;
+}
+
+function extractPostponeAmount(normalized: string) {
+  if (hasAny(normalized, ["proximo ano", "ano que vem"])) return { amount: 1, unit: "year" };
+  if (hasAny(normalized, ["uma semana", "1 semana"])) return { amount: 1, unit: "week" };
+  const match = /(?:em|daqui|por|para daqui)?\s*(\d+|um|uma|dois|duas|tres)\s*(dias?|semanas?|mes|meses|anos?)/.exec(normalized);
+  if (!match) return { amount: 1, unit: "year" };
+  const unitText = match[2];
+  const unit = unitText.startsWith("dia")
+    ? "day"
+    : unitText.startsWith("semana")
+      ? "week"
+      : unitText.startsWith("ano")
+        ? "year"
+        : "month";
+  return { amount: wordNumberToNumber(match[1]), unit };
+}
+
+function extractPostponeBase(normalized: string) {
+  return hasAny(normalized, ["para daqui", "coloque", "jogar", "jogue"]) ? "today" : "current_due_date";
+}
+
+function extractPostponeServiceName(message: string) {
+  const patterns = [
+    /(?:adie|adiar|coloque|jogue|jogar)\s+(?:a\s+data prevista\s+do\s+)?servi[cÃ§]o\s+(.+?)\s+(?:em|para|pra|daqui)/i,
+    /servi[cÃ§]o\s+(.+?)\s+(?:seja\s+)?(?:adiad[oa]|para|em|prazo|data prevista)/i,
+  ];
+  for (const pattern of patterns) {
+    const candidate = cleanServicePiece(pattern.exec(message)?.[1]?.replace(/["â€œâ€']/g, "").trim() ?? "");
+    if (candidate) return candidate;
+  }
+  return null;
 }
 
 export function normalizeAssistantText(value: string) {

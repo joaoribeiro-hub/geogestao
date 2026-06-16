@@ -1,5 +1,24 @@
 # GeoGestao - Estado Atual do Projeto
 
+## UI-SOPHIA-ROUTINE-TASKS-1
+
+Implementado:
+
+- topo de `/servicos` mais compacto, sem titulo/descricao grandes;
+- filtro de periodo na mesma faixa de `Importar servicos` e `Novo Servico`;
+- tipos de servico e zoom na mesma linha do Kanban;
+- cards do Kanban com cliente/imovel em fonte maior;
+- engrenagem flutuante de Aparencia com escala de fonte e tema claro/escuro salvos em `localStorage`;
+- aba Lembrete do widget Tarefa com formulario recolhido em `+ Adicionar lembrete`;
+- tarefas do widget com alca de arrastar e persistencia de `sort_order`;
+- Rotina, Inicio, Relatorios e Sophia passam a respeitar `sort_order`;
+- mencoes com `@` na criacao de item da Rotina, vinculadas a membros da mesma organizacao e com notificacao;
+- Sophia entende adiamento de data prevista de servicos em massa por tipo ou por servico especifico, sempre com confirmacao;
+- respostas da Sophia sobre "o que alguem esta fazendo agora" usam o primeiro item aberto pela ordem atual;
+- cards Briefing da manha/Revisao semanal no Inicio ganharam texto de orientacao em destaque.
+
+Migration: `041_ui_sophia_routine_tasks.sql`.
+
 ## AGENTS-TASKS-SYNC-FIX-1
 
 Implementado:

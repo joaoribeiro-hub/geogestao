@@ -7,22 +7,25 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { periodLabel, periodOptions, type PeriodRange } from "@/lib/period";
+import { cn } from "@/lib/utils";
 
 export function PeriodFilter({
   range,
   action,
   preserveParams,
   compact = false,
+  className,
 }: {
   range: PeriodRange;
   action: string;
   preserveParams?: Record<string, string | null | undefined>;
   compact?: boolean;
+  className?: string;
 }) {
   const [open, setOpen] = useState(false);
   if (compact) {
     return (
-      <div className="relative mb-6 flex flex-wrap items-center justify-center gap-3">
+      <div className={cn("relative flex flex-wrap items-center justify-center gap-3", className ?? "mb-6")}>
         <Button type="button" variant="outline" onClick={() => setOpen((current) => !current)}>
           <Filter aria-hidden="true" />
           Filtro

@@ -1,5 +1,29 @@
 # GeoGestao - Testes Automatizados
 
+## UI-SOPHIA-ROUTINE-TASKS-1
+
+Testes manuais recomendados:
+
+- Abrir `/servicos` e confirmar topo compacto sem titulo/descricao grandes.
+- Confirmar filtro na mesma linha de `Importar servicos` e `Novo Servico`.
+- Confirmar tipos de servico e Zoom na mesma linha.
+- Conferir cards do Kanban com cliente/imovel maiores.
+- Abrir engrenagem de Aparencia, testar escala de fonte e tema claro/escuro.
+- Abrir widget Tarefa, criar, editar, concluir, marcar emergencia, apagar e reordenar tarefas.
+- Reabrir a pagina e confirmar que a ordem permanece salva.
+- Abrir Rotina e Relatorios e confirmar que usam a ordem salva.
+- Abrir aba Lembrete e confirmar que os campos aparecem so depois de `+ Adicionar lembrete`.
+- Criar item de Rotina com `@Nome` de membro da organizacao e conferir notificacao.
+- Perguntar a Sophia `O que a Natalia esta fazendo agora?` e conferir que o primeiro item aberto pela ordem atual aparece como trabalho provavel.
+- Testar Sophia com `Adie todos os servicos de ITR para o proximo ano`, confirmar e conferir datas previstas.
+- Testar Sophia com `Adie o servico Fazenda Jussara em 5 dias`, confirmar e conferir historico do servico.
+
+Validacoes:
+
+- `npm run typecheck`
+- `npm run build`
+- `npm run test`
+
 ## AGENTS-TASKS-SYNC-FIX-1
 
 Testes automatizados adicionados:

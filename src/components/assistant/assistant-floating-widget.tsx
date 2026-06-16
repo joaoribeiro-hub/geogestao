@@ -199,7 +199,7 @@ export function AssistantFloatingWidget() {
   }
 
   return (
-    <div className="fixed bottom-24 right-4 z-40 flex flex-col items-end gap-3 lg:bottom-6 lg:right-6">
+    <div className="relative flex flex-col items-end gap-3">
       {open ? (
         <section
           className="flex h-[min(620px,calc(100vh-8rem))] w-[calc(100vw-2rem)] max-w-[420px] flex-col overflow-hidden rounded-lg border bg-card shadow-xl"
@@ -326,7 +326,7 @@ export function AssistantFloatingWidget() {
       <Button
         type="button"
         size="icon"
-        className="size-12 rounded-full shadow-lg"
+        className="size-11 rounded-full shadow-lg"
         aria-label={open ? "Minimizar Sophia" : "Abrir Sophia"}
         onClick={() => setOpen((current) => !current)}
         data-testid="assistant-floating-button"

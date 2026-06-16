@@ -169,11 +169,33 @@ function rowsToObjects(rows: string[][]) {
 
 function resolveColumn(listName: string, columns: ServiceImportColumn[]) {
   const normalized = normalizeImportText(stripLabelColors(listName));
+  if (/prioridade maxima|maxima prioridade|urgente|emergencia|extrema urgencia/.test(normalized)) {
+    const maximumPriority = columns.find((column) =>
+      /prioridade maxima/.test(normalizeImportText(`${column.name} ${column.slug}`)),
+    );
+    if (maximumPriority) return maximumPriority;
+
+    const priority = columns.find((column) => {
+      const value = normalizeImportText(`${column.name} ${column.slug}`);
+      return /(^| )prioridade( |$)/.test(value) && !/maxima/.test(value);
+    });
+    if (priority) return priority;
+  }
+
+  if (/servico prioridades|prioridade/.test(normalized)) {
+    const priority = columns.find((column) => {
+      const value = normalizeImportText(`${column.name} ${column.slug}`);
+      return /(^| )prioridade( |$)/.test(value) && !/maxima/.test(value);
+    });
+    if (priority) return priority;
+  }
+
   const direct = columns.find((column) => {
     const value = normalizeImportText(`${column.name} ${column.slug}`);
     return normalized && (value.includes(normalized) || normalized.includes(value));
   });
   if (direct) return direct;
+
   const mapped = [
     { pattern: /carta de confrontacao|confrontante/, target: /pendencia.*confrontante|confrontante/ },
     { pattern: /protocolo cartorio|protocolado cartorio|cartorio/, target: /protocolado.*cartorio|cartorio|sincronizacao/ },
@@ -183,7 +205,6 @@ function resolveColumn(listName: string, columns: ServiceImportColumn[]) {
     { pattern: /concluido|concluso|finalizado/, target: /concluido|concluso|finalizado/ },
     { pattern: /em andamento|andamento/, target: /geo.*andamento|em andamento|execucao/ },
     { pattern: /antigos a concluir|geo antigos|a concluir/, target: /antigos a concluir|antigos-a-concluir/ },
-    { pattern: /servico prioridades|prioridade/, target: /prioridade|urgente|andamento/ },
   ].find((item) => item.pattern.test(normalized));
   if (mapped) {
     const found = columns.find((column) => mapped.target.test(normalizeImportText(`${column.name} ${column.slug}`)));

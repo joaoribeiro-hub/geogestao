@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { DndContext, type DragEndEvent, useDraggable, useDroppable } from "@dnd-kit/core";
@@ -37,9 +38,11 @@ type ServiceCardWithClient = ServiceCard & {
 export function ServiceKanban({
   columns,
   cards,
+  toolbarLeft,
 }: {
   columns: ServiceColumn[];
   cards: ServiceCardWithClient[];
+  toolbarLeft?: ReactNode;
 }) {
   const [items, setItems] = useState(cards);
   const [zoom, setZoom] = useState<"compacto" | "normal" | "ampliado">("compacto");
@@ -116,19 +119,22 @@ export function ServiceKanban({
 
   return (
     <DndContext onDragEnd={onDragEnd}>
-      <div className="mb-3 flex flex-wrap items-center gap-2">
-        <span className="text-xs font-medium text-muted-foreground">Zoom</span>
-        {(["compacto", "normal", "ampliado"] as const).map((option) => (
-          <Button
-            key={option}
-            type="button"
-            size="sm"
-            variant={zoom === option ? "default" : "outline"}
-            onClick={() => updateZoom(option)}
-          >
-            {option}
-          </Button>
-        ))}
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-2">{toolbarLeft}</div>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs font-medium text-muted-foreground">Zoom</span>
+          {(["compacto", "normal", "ampliado"] as const).map((option) => (
+            <Button
+              key={option}
+              type="button"
+              size="sm"
+              variant={zoom === option ? "default" : "outline"}
+              onClick={() => updateZoom(option)}
+            >
+              {option}
+            </Button>
+          ))}
+        </div>
       </div>
       <div
         ref={topScrollRef}
@@ -176,7 +182,7 @@ function ServiceColumnView({
   zoom,
 }: {
   column: ServiceColumn;
-  children: React.ReactNode;
+  children: ReactNode;
   search: string;
   onSearch: (value: string) => void;
   zoom: "compacto" | "normal" | "ampliado";
@@ -333,10 +339,10 @@ function ServiceCardView({
           <GripVertical className="size-4" aria-hidden="true" />
         </button>
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-bold">
+          <p className="truncate font-bold leading-tight text-[length:var(--card-title-font-size)]">
             {card.client?.name ?? "Sem cliente vinculado"}
           </p>
-          <p className="mt-0.5 line-clamp-2 text-sm text-muted-foreground">{card.title}</p>
+          <p className="mt-1 line-clamp-2 leading-snug text-muted-foreground text-[length:var(--card-subtitle-font-size)]">{card.title}</p>
         </div>
       </div>
 

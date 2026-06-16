@@ -4,6 +4,7 @@ type ChecklistStatusItem = {
   status: string;
   created_at: string;
   completed_at: string | null;
+  sort_order?: number | null;
 };
 
 type ActivityLogItem = {
@@ -19,11 +20,7 @@ export function getMemberCurrentWorkStatusFromItems<TItem extends ChecklistStatu
   const orderedItems = [...items].sort(compareChecklistItems);
   const completedItems = orderedItems.filter((item) => item.status === "done");
   const openItems = orderedItems.filter((item) => item.status === "open");
-  const lastCompleted = [...completedItems].sort(compareCompletedItems).at(-1) ?? null;
-  const currentItem =
-    (lastCompleted
-      ? openItems.find((item) => compareChecklistItems(item, lastCompleted) > 0)
-      : openItems[0]) ?? openItems[0] ?? null;
+  const currentItem = openItems[0] ?? null;
   const lastActivity = [...activities].sort((a, b) => Date.parse(b.occurred_at) - Date.parse(a.occurred_at))[0] ?? null;
 
   return {
@@ -55,7 +52,7 @@ export function formatMemberCurrentWorkMessage({
     ? `Agora ele provavelmente esta fazendo:\n- ${currentTitle}`
     : "Nao ha item aberto em andamento agora.";
   const basis = currentTitle
-    ? `Baseei isso no checklist de ${dateLabel}: o ultimo item concluido e o proximo item aberto ajudam a indicar o item atual.`
+    ? `Baseei isso no checklist de ${dateLabel}: o primeiro item aberto pela ordem atual indica o trabalho provavel.`
     : `Baseei isso no checklist de ${dateLabel}.`;
 
   return [completedBlock, currentBlock, basis, lastActivityText ? `Ultima atividade registrada: ${lastActivityText}.` : null]
@@ -64,11 +61,8 @@ export function formatMemberCurrentWorkMessage({
 }
 
 function compareChecklistItems(left: ChecklistStatusItem, right: ChecklistStatusItem) {
+  const leftOrder = Number(left.sort_order ?? 0);
+  const rightOrder = Number(right.sort_order ?? 0);
+  if (leftOrder !== rightOrder) return leftOrder - rightOrder;
   return Date.parse(left.created_at) - Date.parse(right.created_at);
-}
-
-function compareCompletedItems(left: ChecklistStatusItem, right: ChecklistStatusItem) {
-  const leftTime = Date.parse(left.completed_at ?? left.created_at);
-  const rightTime = Date.parse(right.completed_at ?? right.created_at);
-  return leftTime - rightTime;
 }

@@ -170,7 +170,7 @@ export function TeamChatWidget({
   }
 
   return (
-    <div className="fixed bottom-56 right-4 z-40 flex flex-col items-end gap-3 lg:bottom-36 lg:right-6">
+    <div className="relative flex flex-col items-end gap-3">
       {open ? (
         <section
           className="flex h-[min(560px,calc(100vh-9rem))] w-[calc(100vw-2rem)] max-w-[390px] flex-col overflow-hidden rounded-lg border bg-card shadow-xl"
@@ -297,7 +297,7 @@ export function TeamChatWidget({
       <Button
         type="button"
         size="icon"
-        className="relative size-12 rounded-full shadow-lg"
+        className="relative size-11 rounded-full shadow-lg"
         aria-label={open ? "Minimizar Chat da equipe" : "Abrir Chat da equipe"}
         onClick={() => setOpen((current) => !current)}
         data-testid="team-chat-button"

@@ -1,5 +1,17 @@
 # GeoGestao - Decisoes do Projeto
 
+## UI-SOPHIA-ROUTINE-TASKS-1
+
+93. A ordenacao manual de tarefas usa `sort_order` e define o primeiro item aberto como trabalho provavel atual.
+
+94. Widget Tarefa, Rotina diaria, Inicio, Relatorios e Sophia devem usar a mesma ordem operacional.
+
+95. Preferencias visuais de escala de fonte e tema claro/escuro ficam em `localStorage` nesta fase, sem criar dependencia de banco.
+
+96. Mencoes com `@` na Rotina so podem apontar para membros ativos da mesma `organization_id`.
+
+97. Sophia pode adiar datas previstas de servicos apenas por action server-side com confirmacao e permissao; comandos em massa ficam restritos ao owner.
+
 ## AGENTS-TASKS-SYNC-FIX-1
 
 - Google OAuth sem variaveis de ambiente deve orientar o admin na UI e nao expor JSON cru.

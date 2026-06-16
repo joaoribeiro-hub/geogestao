@@ -1,5 +1,21 @@
 # Assistente IA - Base Privada de Intents
 
+## UI-SOPHIA-ROUTINE-TASKS-1
+
+Sophia reconhece comandos operacionais para adiar datas previstas de servicos:
+
+- comandos em massa por tipo de servico, como ITR, CAR, Georreferenciamento e Outros Servicos;
+- comandos para um servico especifico por nome do cliente, imovel, titulo ou descricao;
+- unidades de massa: mes/meses e ano/anos;
+- unidades especificas: dia/dias e semana/semanas;
+- `em X dias/semanas/meses/anos` usa a data prevista atual como base;
+- `para daqui X dias/semanas/meses/anos` usa hoje como base;
+- toda alteracao exige confirmacao antes de gravar;
+- owner pode executar em massa;
+- membros comuns so alteram servicos onde tenham permissao operacional.
+
+As respostas de status atual de membro tambem usam `sort_order`: concluidas, primeiro item aberto como trabalho provavel e demais pendentes.
+
 ## Objetivo
 
 A fase `AI-ASSISTANT-INTENTS-1` permite importar exemplos reais de frases/intents para o Assistente IA do GeoGestao.

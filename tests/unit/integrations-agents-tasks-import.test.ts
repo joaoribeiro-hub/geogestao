@@ -6,6 +6,7 @@ import { mapTrelloRowsToServices, normalizeImportText } from "@/lib/services/tre
 describe("INTEGRATIONS-AGENTS-TASKS-IMPORT-1", () => {
   it("normaliza textos Trello e mapeia listas para colunas do Kanban", () => {
     const columns = [
+      { id: "priority-max", name: "Prioridade máxima", slug: "prioridade_maxima" },
       { id: "priority", name: "Prioridade", slug: "prioridade" },
       { id: "done", name: "Concluido", slug: "concluido" },
       { id: "waiting", name: "Aguardando documentos", slug: "aguardando-documentos" },
@@ -35,6 +36,27 @@ describe("INTEGRATIONS-AGENTS-TASKS-IMPORT-1", () => {
     expect(row.dueDate).toBe("2026-06-10");
     expect(row.externalId).toBe("trello-1");
     expect(row.description).toContain("Descricao original");
+  });
+
+  it("mapeia extrema urgencia para Prioridade maxima sem alterar Prioridade", () => {
+    const columns = [
+      { id: "waiting", name: "Aguardando documentos", slug: "aguardando-documentos" },
+      { id: "priority-max", name: "Prioridade máxima", slug: "prioridade_maxima" },
+      { id: "priority", name: "Prioridade", slug: "prioridade" },
+    ];
+
+    const rows = mapTrelloRowsToServices(
+      [
+        { "Card Name": "Fazenda Urgente", Card: "EM ANDAMENTO (lime_dark), URGENTE (red_dark)" },
+        { "Card Name": "Fazenda Prioridade", Card: "PRIORIDADE (red_dark)" },
+      ],
+      columns,
+    );
+
+    expect(rows[0].columnId).toBe("priority-max");
+    expect(rows[0].priority).toBe("urgent");
+    expect(rows[1].columnId).toBe("priority");
+    expect(rows[1].priority).toBe("high");
   });
 
   it("mapeia planilha customizada pela coluna Card", () => {
@@ -93,6 +115,7 @@ describe("INTEGRATIONS-AGENTS-TASKS-IMPORT-1", () => {
       { id: "waiting", name: "Aguardando documentos", slug: "aguardando-documentos" },
       { id: "retification", name: "CAR em Retificacao", slug: "car-em-retificacao" },
       { id: "progress", name: "CAR em Andamento", slug: "car-em-andamento" },
+      { id: "priority-max", name: "Prioridade máxima", slug: "prioridade_maxima" },
       { id: "priority", name: "Prioridade", slug: "prioridade" },
       { id: "overdue", name: "Em atraso", slug: "em-atraso" },
       { id: "sync", name: "Aguardando Sincronizacao", slug: "aguardando-sincronizacao" },
@@ -115,7 +138,7 @@ describe("INTEGRATIONS-AGENTS-TASKS-IMPORT-1", () => {
     expect(rows[1].columnId).toBe("sync");
     expect(rows[2].columnId).toBe("sync");
     expect(rows[3].columnId).toBe("done");
-    expect(rows[4].columnId).toBe("progress");
+    expect(rows[4].columnId).toBe("priority-max");
     expect(rows[4].priority).toBe("urgent");
   });
 

@@ -403,6 +403,7 @@ function detectionFromConfirmation(confirmation: AssistantConfirmationPayload): 
     createChecklistItem: "create_checklist_item",
     assignChecklistItem: "assign_checklist_item",
     completeServiceStep: "complete_service_step",
+    postponeServiceDueDate: "postpone_service_due_date",
     listMemberActivity: "list_member_activity",
     listClientServices: "list_client_services",
     listClientCommercialRecords: "list_client_commercial_records",

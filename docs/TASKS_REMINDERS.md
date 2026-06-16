@@ -1,5 +1,13 @@
 # Tarefa e Lembrete
 
+Atualizacao `UI-SOPHIA-ROUTINE-TASKS-1`:
+
+- cada tarefa do widget possui alca de arrastar no lado esquerdo;
+- reordenar por drag and drop salva `sort_order` em `daily_checklist_items`;
+- quando a tarefa possui item diario vinculado na Rotina, o mesmo `sort_order` e refletido em `routine_items`;
+- a aba Lembrete fica limpa por padrao e abre o formulario em `+ Adicionar lembrete`;
+- a ordem salva define o primeiro item aberto como trabalho provavel atual para Sophia.
+
 Atualizacao `AGENTS-TASKS-SYNC-FIX-1`:
 
 - item criado no widget Tarefa tambem cria registro vinculado em `routine_items`;

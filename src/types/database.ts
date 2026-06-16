@@ -2654,6 +2654,7 @@ export type Database = {
           status: "open" | "done" | "canceled";
           is_emergency: boolean;
           source: string;
+          sort_order: number;
           daily_checklist_item_id: string | null;
           completed_at: string | null;
           created_by: string | null;
@@ -2672,6 +2673,7 @@ export type Database = {
           status?: "open" | "done" | "canceled";
           is_emergency?: boolean;
           source?: string;
+          sort_order?: number;
           daily_checklist_item_id?: string | null;
           completed_at?: string | null;
           created_by?: string | null;
@@ -2691,12 +2693,41 @@ export type Database = {
           status?: "open" | "done" | "canceled";
           is_emergency?: boolean;
           source?: string;
+          sort_order?: number;
           daily_checklist_item_id?: string | null;
           completed_at?: string | null;
           created_by?: string | null;
           deleted_at?: string | null;
           archived_at?: string | null;
           updated_at?: string;
+        };
+        Relationships: [];
+      };
+      routine_item_mentions: {
+        Row: {
+          id: string;
+          organization_id: string;
+          routine_item_id: string;
+          mentioned_user_id: string;
+          mentioned_by: string | null;
+          mention_text: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          organization_id: string;
+          routine_item_id: string;
+          mentioned_user_id: string;
+          mentioned_by?: string | null;
+          mention_text: string;
+          created_at?: string;
+        };
+        Update: {
+          organization_id?: string;
+          routine_item_id?: string;
+          mentioned_user_id?: string;
+          mentioned_by?: string | null;
+          mention_text?: string;
         };
         Relationships: [];
       };
@@ -3581,6 +3612,7 @@ export type Database = {
           status: "open" | "done" | "canceled";
           is_emergency: boolean;
           source: "self" | "owner_assignment" | "assistant";
+          sort_order: number;
           related_service_id: string | null;
           due_date: string | null;
           completed_at: string | null;
@@ -3598,6 +3630,7 @@ export type Database = {
           status?: "open" | "done" | "canceled";
           is_emergency?: boolean;
           source?: "self" | "owner_assignment" | "assistant";
+          sort_order?: number;
           related_service_id?: string | null;
           due_date?: string | null;
           completed_at?: string | null;
@@ -3616,6 +3649,7 @@ export type Database = {
           status?: "open" | "done" | "canceled";
           is_emergency?: boolean;
           source?: "self" | "owner_assignment" | "assistant";
+          sort_order?: number;
           related_service_id?: string | null;
           due_date?: string | null;
           completed_at?: string | null;

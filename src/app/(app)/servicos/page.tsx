@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { PeriodFilter } from "@/components/filters/period-filter";
 import { ServiceKanban } from "@/components/kanban/service-kanban";
-import { PageHeader } from "@/components/layout/page-header";
 import { EmptyState } from "@/components/ui/empty-state";
 import { NewServiceModal } from "@/components/services/new-service-modal";
 import { ServiceImportModal } from "@/components/services/service-import-modal";
@@ -171,10 +170,13 @@ export default async function ServicesPage({
 
   return (
     <div>
-      <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-        <PageHeader
-          title="Servicos"
-          description="Centro da operacao: documentos, proposta, contrato, execucao, equipe e financeiro em um quadro simples."
+      <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <PeriodFilter
+          range={periodRange}
+          action="/servicos"
+          preserveParams={{ board: selectedBoard?.slug }}
+          compact
+          className="mb-0 justify-start"
         />
         <div className="flex flex-wrap gap-2">
           <ServiceImportModal selectedBoardId={selectedBoard?.id ?? null} />
@@ -187,33 +189,26 @@ export default async function ServicesPage({
         </div>
       </div>
 
-      <PeriodFilter
-        range={periodRange}
-        action="/servicos"
-        preserveParams={{ board: selectedBoard?.slug }}
-        compact
-      />
-
-      <div className="mb-5 flex flex-wrap gap-2">
-        {boards.map((item) => (
-          <Link
-            key={item.id}
-            href={`/servicos?board=${item.slug}`}
-            className={cn(
-              "rounded-md border bg-card px-3 py-2 text-sm font-medium text-muted-foreground",
-              selectedBoard?.id === item.id && "border-primary text-primary",
-            )}
-          >
-            {item.name}
-          </Link>
-        ))}
-      </div>
-
       {!selectedBoard ? (
         <EmptyState title="Execute o seed para criar os quadros padrao." />
       ) : (
         <div className="grid gap-6">
-          <ServiceKanban columns={columns} cards={cardsWithClients} />
+          <ServiceKanban
+            columns={columns}
+            cards={cardsWithClients}
+            toolbarLeft={boards.map((item) => (
+              <Link
+                key={item.id}
+                href={`/servicos?board=${item.slug}`}
+                className={cn(
+                  "rounded-md border bg-card px-3 py-2 text-sm font-medium text-muted-foreground",
+                  selectedBoard?.id === item.id && "border-primary text-primary",
+                )}
+              >
+                {item.name}
+              </Link>
+            ))}
+          />
           <ServiceSchedule month={scheduleMonth} events={scheduleEvents} />
         </div>
       )}

@@ -40,7 +40,7 @@ export async function GET(request: Request) {
   if (checklist?.id) dateOrChecklist.push(`checklist_id.eq.${checklist.id}`);
   itemsQuery = itemsQuery.or(dateOrChecklist.join(","));
   const { data: rawItems, error } = await itemsQuery
-    .order("is_emergency", { ascending: false })
+    .order("sort_order", { ascending: true })
     .order("created_at", { ascending: true });
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   const items = (rawItems ?? []).filter((item) => {
@@ -74,6 +74,7 @@ export async function POST(request: Request) {
   if (upsertError) return NextResponse.json({ error: upsertError.message }, { status: 500 });
   const checklist = checklistRows?.[0];
   if (!checklist) return NextResponse.json({ error: "Nao foi possivel criar o checklist do dia." }, { status: 500 });
+  const sortOrder = await nextChecklistSortOrder(supabase, organization.id, user.id);
 
   const { data: itemRows, error } = await supabase
     .from("daily_checklist_items")
@@ -86,6 +87,7 @@ export async function POST(request: Request) {
       due_date: parsed.data.date,
       is_emergency: parsed.data.isEmergency,
       source: "self",
+      sort_order: sortOrder,
     })
     .select("*")
     .limit(1);
@@ -104,6 +106,7 @@ export async function POST(request: Request) {
     source: "widget_task",
     daily_checklist_item_id: item.id,
     created_by: user.id,
+    sort_order: sortOrder,
   });
 
   await supabase.from("organization_activity_log").insert({
@@ -117,4 +120,21 @@ export async function POST(request: Request) {
   });
 
   return NextResponse.json({ item });
+}
+
+async function nextChecklistSortOrder(
+  supabase: Awaited<ReturnType<typeof createServerSupabase>>,
+  organizationId: string,
+  userId: string,
+) {
+  const { data } = await supabase
+    .from("daily_checklist_items")
+    .select("sort_order")
+    .eq("organization_id", organizationId)
+    .eq("assigned_to", userId)
+    .is("deleted_at", null)
+    .is("archived_at", null)
+    .order("sort_order", { ascending: false })
+    .limit(1);
+  return Number(data?.[0]?.sort_order ?? 0) + 1000;
 }
