@@ -49,7 +49,7 @@ export function NewServiceModal({
               <div>
                 <h2 className="text-lg font-semibold">Novo Servico</h2>
                 <p className="text-sm text-muted-foreground">
-                  O servico sera criado em Aguardando documentos. Os checklists
+                  O servico sera criado na primeira etapa ativa do fluxo. Os checklists
                   de documentos e etapas comecam vazios para voce preencher.
                 </p>
               </div>
@@ -71,7 +71,7 @@ export function NewServiceModal({
                 members={members ?? []}
                 onCreated={(result) => {
                   setOpen(false);
-                  setFeedback("Servico criado em Aguardando documentos.");
+                  setFeedback("Servico criado na primeira etapa ativa do fluxo.");
                   router.push(`/servicos?board=${serviceTypeToBoardSlug[result.serviceType]}`);
                   router.refresh();
                 }}

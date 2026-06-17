@@ -1,5 +1,19 @@
 # GeoGestao - Estado Atual do Projeto
 
+## KANBAN-UX-THEME-SOPHIA-TIME-1
+
+Implementado:
+
+- Kanban de Servicos permite arrastar pelo card inteiro com `DragOverlay`, mantendo clique simples para abrir o detalhe.
+- Cards do Kanban ficaram mais largos e limpos, com badges compactos para checklist, anexos, prazo, prioridade e pagamento.
+- A coluna `Aguardando documentos` foi removida dos fluxos oficiais exibidos; a migration `043` move cards legados para a primeira coluna operacional valida.
+- Novo servico passa a nascer na primeira etapa ativa do fluxo, nao mais em `Aguardando documentos`.
+- Importacao Trello/planilha ignora `Aguardando documentos` como fallback automatico quando houver outra coluna operacional disponivel.
+- Sidebar desktop pode ser recolhida e o conteudo principal expande.
+- Topo usa avatar/dropdown da conta no lugar do email solto e do botao `Sair`.
+- Relogio de expediente inicia oculto com botao `Exibir tempo`, heartbeat server-side de 10 minutos e ciclo de seguranca de 3 horas.
+- Sophia melhora a resolucao de membros por nome/email/prefixo e formata respostas de status atual com Markdown, bullets e destaques.
+
 ## UI-SOPHIA-ROUTINE-TASKS-1
 
 Implementado:

@@ -1,5 +1,20 @@
 # Assistente IA - Workflow Operacional
 
+## Sophia - status atual de membro
+
+Na fase `KANBAN-UX-THEME-SOPHIA-TIME-1`, a Sophia resolve membros por nome completo, primeiro nome, email, prefixo de email, variacoes sem acento/caixa e pequenos erros de digitacao.
+
+Perguntas como `O que a Natalia esta fazendo agora?` usam os itens do checklist/tarefa do dia dentro da `organization_id` atual:
+
+- itens concluidos aparecem em bullets;
+- o primeiro item aberto pela ordem atual e tratado como trabalho provavel;
+- a ultima atividade registrada entra na resposta quando existir;
+- a resposta usa Markdown com nomes, itens, datas e horarios em destaque.
+
+## Feedback global
+
+Correcoes feitas pelo feedback continuam sendo salvas em `assistant_feedback` e tambem podem gerar exemplos em `assistant_feedback_examples`, tabela global sanitizada criada na migration `043`. Esses exemplos orientam comportamento/formato de intent, sem reutilizar dados privados de uma organizacao em outra.
+
 ## Conceito
 
 O Assistente IA deixou de ser item principal do menu lateral e passa a ser acesso flutuante global no app autenticado.

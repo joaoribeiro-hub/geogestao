@@ -1,5 +1,25 @@
 # GeoGestao - Testes Automatizados
 
+## KANBAN-UX-THEME-SOPHIA-TIME-1
+
+Validacao automatizada executada:
+
+- `npm run typecheck`
+- `npm run build`
+- `npm run test`
+
+Testes manuais recomendados:
+
+- Abrir `/servicos`, clicar rapido em um card e confirmar que abre o detalhe.
+- Arrastar o card pelo corpo inteiro e confirmar que o overlay acompanha o mouse sem ficar cortado.
+- Conferir que `Aguardando documentos` nao aparece nos fluxos exibidos.
+- Criar servico novo e conferir que entra na primeira coluna ativa.
+- Importar planilha com coluna `Card` e confirmar que o fallback nao usa `Aguardando documentos`.
+- Recolher/abrir sidebar e conferir que o Kanban ganha largura.
+- Abrir engrenagem, alternar fonte, tema e paleta; confirmar que so o texto escala, sem zoom da tela.
+- Abrir avatar da conta e conferir Minha conta/Fazer logout.
+- Perguntar a Sophia `O que a Natalia esta fazendo agora?` e conferir resposta com concluidos, item atual e ultima atividade.
+
 ## UI-SOPHIA-ROUTINE-TASKS-1
 
 Testes manuais recomendados:

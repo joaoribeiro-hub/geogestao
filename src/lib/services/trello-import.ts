@@ -169,13 +169,19 @@ function rowsToObjects(rows: string[][]) {
 
 function resolveColumn(listName: string, columns: ServiceImportColumn[]) {
   const normalized = normalizeImportText(stripLabelColors(listName));
+  const candidateColumns = columns.filter(
+    (column) =>
+      normalizeImportText(column.slug) !== "aguardando documentos" &&
+      !/^aguardando documentos$/.test(normalizeImportText(column.name)),
+  );
+  const searchableColumns = candidateColumns.length ? candidateColumns : columns;
   if (/prioridade maxima|maxima prioridade|urgente|emergencia|extrema urgencia/.test(normalized)) {
-    const maximumPriority = columns.find((column) =>
+    const maximumPriority = searchableColumns.find((column) =>
       /prioridade maxima/.test(normalizeImportText(`${column.name} ${column.slug}`)),
     );
     if (maximumPriority) return maximumPriority;
 
-    const priority = columns.find((column) => {
+    const priority = searchableColumns.find((column) => {
       const value = normalizeImportText(`${column.name} ${column.slug}`);
       return /(^| )prioridade( |$)/.test(value) && !/maxima/.test(value);
     });
@@ -183,14 +189,14 @@ function resolveColumn(listName: string, columns: ServiceImportColumn[]) {
   }
 
   if (/servico prioridades|prioridade/.test(normalized)) {
-    const priority = columns.find((column) => {
+    const priority = searchableColumns.find((column) => {
       const value = normalizeImportText(`${column.name} ${column.slug}`);
       return /(^| )prioridade( |$)/.test(value) && !/maxima/.test(value);
     });
     if (priority) return priority;
   }
 
-  const direct = columns.find((column) => {
+  const direct = searchableColumns.find((column) => {
     const value = normalizeImportText(`${column.name} ${column.slug}`);
     return normalized && (value.includes(normalized) || normalized.includes(value));
   });
@@ -207,11 +213,12 @@ function resolveColumn(listName: string, columns: ServiceImportColumn[]) {
     { pattern: /antigos a concluir|geo antigos|a concluir/, target: /antigos a concluir|antigos-a-concluir/ },
   ].find((item) => item.pattern.test(normalized));
   if (mapped) {
-    const found = columns.find((column) => mapped.target.test(normalizeImportText(`${column.name} ${column.slug}`)));
+    const found = searchableColumns.find((column) => mapped.target.test(normalizeImportText(`${column.name} ${column.slug}`)));
     if (found) return found;
   }
   return (
-    columns.find((column) => /aguard|document|pendente|prioridade/.test(normalizeImportText(`${column.name} ${column.slug}`))) ??
+    searchableColumns.find((column) => /pendente|prioridade|andamento/.test(normalizeImportText(`${column.name} ${column.slug}`))) ??
+    searchableColumns[0] ??
     columns[0]
   );
 }

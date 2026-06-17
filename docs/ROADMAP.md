@@ -1,5 +1,26 @@
 # GeoGestao - Roadmap
 
+## KANBAN-UX-THEME-SOPHIA-TIME-1
+
+Status: implementado no codigo com migration `043_kanban_ux_theme_sophia_time.sql`, pendente aplicar no Supabase de teste.
+
+Entregue:
+
+- drag pelo card inteiro no Kanban com overlay visivel;
+- cards de servico mais largos e limpos;
+- remocao operacional de `Aguardando documentos`;
+- preferencias visuais de fonte, tema e paleta;
+- sidebar recolhivel;
+- avatar/dropdown de conta;
+- expediente com relogio recolhido, heartbeat de 10 minutos e seguranca de 3 horas;
+- resolucao de membro e resposta formatada da Sophia.
+
+Proxima evolucao:
+
+- persistir preferencias visuais no backend usando `user_ui_preferences`;
+- implementar editor visual completo de fundos por menu usando `organization_page_visual_settings`;
+- evoluir editor de colunas por organizacao sem afetar quadros globais.
+
 ## UI-SOPHIA-ROUTINE-TASKS-1
 
 Status: implementado no codigo com migration `041_ui_sophia_routine_tasks.sql`, pendente aplicar no Supabase de teste.

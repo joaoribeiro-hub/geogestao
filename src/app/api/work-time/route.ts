@@ -8,6 +8,7 @@ import {
   getSaoPauloDayStartIso,
   getSaoPauloNextDayStartIso,
   HEARTBEAT_MAX_DELTA_SECONDS,
+  MISSED_HEARTBEAT_FREEZE_SECONDS,
   SAFETY_GRACE_SECONDS,
   SAFETY_INTERVAL_SECONDS,
   safetyState,
@@ -169,16 +170,20 @@ async function applyHeartbeat({
   const nowIso = now.toISOString();
   const state = safetyState(day, now);
   const mode = statusToMode(day.status);
+  const secondsSinceLastSeen = continuousSecondsBetween(day.last_seen_at, nowIso);
   let delta =
     mode === "field"
-      ? continuousSecondsBetween(day.last_seen_at, nowIso)
+      ? secondsSinceLastSeen
       : secondsBetween(day.last_seen_at, nowIso, HEARTBEAT_MAX_DELTA_SECONDS);
   let status = day.status;
   let safetyFrozenEvent = false;
 
-  if (state.isFrozen && day.status === "active") {
+  if (
+    (state.isFrozen || secondsSinceLastSeen > MISSED_HEARTBEAT_FREEZE_SECONDS) &&
+    day.status === "active"
+  ) {
     const untilFreeze = secondsBetween(day.last_seen_at, day.safety_grace_until, HEARTBEAT_MAX_DELTA_SECONDS);
-    delta = untilFreeze;
+    delta = state.isFrozen ? untilFreeze : HEARTBEAT_MAX_DELTA_SECONDS;
     status = "safety_frozen";
     safetyFrozenEvent = true;
   }

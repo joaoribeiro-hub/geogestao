@@ -1,9 +1,19 @@
 "use client";
 
-import type { ReactNode } from "react";
+import type { MutableRefObject, ReactNode } from "react";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { DndContext, type DragEndEvent, useDraggable, useDroppable } from "@dnd-kit/core";
+import {
+  DndContext,
+  DragOverlay,
+  PointerSensor,
+  type DragEndEvent,
+  type DragStartEvent,
+  useDraggable,
+  useDroppable,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core";
 import {
   AlertCircle,
   CalendarDays,
@@ -33,6 +43,7 @@ import { Button } from "@/components/ui/button";
 
 type ServiceCardWithClient = ServiceCard & {
   client?: Pick<Client, "id" | "name"> | null;
+  attachmentCount?: number;
 };
 
 export function ServiceKanban({
@@ -48,14 +59,28 @@ export function ServiceKanban({
   const [zoom, setZoom] = useState<"compacto" | "normal" | "ampliado">("compacto");
   const [columnSearch, setColumnSearch] = useState<Record<string, string>>({});
   const [kanbanScrollWidth, setKanbanScrollWidth] = useState(0);
+  const [activeCardId, setActiveCardId] = useState<string | null>(null);
   const topScrollRef = useRef<HTMLDivElement>(null);
   const bottomScrollRef = useRef<HTMLDivElement>(null);
   const syncingScrollRef = useRef(false);
+  const recentlyDraggedRef = useRef(false);
+  const dragResetTimeoutRef = useRef<number | null>(null);
   const [, startTransition] = useTransition();
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: { distance: 8 },
+    }),
+  );
 
   useEffect(() => {
     setItems(cards);
   }, [cards]);
+
+  useEffect(() => {
+    return () => {
+      if (dragResetTimeoutRef.current) window.clearTimeout(dragResetTimeoutRef.current);
+    };
+  }, []);
 
   function updateZoom(next: "compacto" | "normal" | "ampliado") {
     setZoom(next);
@@ -89,8 +114,31 @@ export function ServiceKanban({
     }, {});
   }, [columns, items, columnSearch]);
 
+  const columnById = useMemo(() => {
+    return new Map(columns.map((column) => [column.id, column]));
+  }, [columns]);
+
+  const activeCard = useMemo(() => {
+    return items.find((card) => card.id === activeCardId) ?? null;
+  }, [activeCardId, items]);
+
+  function markDragFinished() {
+    recentlyDraggedRef.current = true;
+    if (dragResetTimeoutRef.current) window.clearTimeout(dragResetTimeoutRef.current);
+    dragResetTimeoutRef.current = window.setTimeout(() => {
+      recentlyDraggedRef.current = false;
+      dragResetTimeoutRef.current = null;
+    }, 180);
+  }
+
+  function onDragStart(event: DragStartEvent) {
+    setActiveCardId(String(event.active.id));
+  }
+
   function onDragEnd(event: DragEndEvent) {
     const { active, over } = event;
+    setActiveCardId(null);
+    markDragFinished();
     if (!over) return;
     const cardId = String(active.id);
     const toColumnId = String(over.id);
@@ -108,6 +156,11 @@ export function ServiceKanban({
     });
   }
 
+  function onDragCancel() {
+    setActiveCardId(null);
+    markDragFinished();
+  }
+
   function syncKanbanScroll(source: HTMLDivElement | null, target: HTMLDivElement | null) {
     if (!source || !target || syncingScrollRef.current) return;
     syncingScrollRef.current = true;
@@ -118,7 +171,7 @@ export function ServiceKanban({
   }
 
   return (
-    <DndContext onDragEnd={onDragEnd}>
+    <DndContext sensors={sensors} onDragStart={onDragStart} onDragEnd={onDragEnd} onDragCancel={onDragCancel}>
       <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2">{toolbarLeft}</div>
         <div className="flex flex-wrap items-center gap-2">
@@ -165,11 +218,21 @@ export function ServiceKanban({
                 card={card}
                 column={column}
                 zoom={zoom}
+                recentlyDraggedRef={recentlyDraggedRef}
               />
             ))}
           </ServiceColumnView>
         ))}
       </div>
+      <DragOverlay zIndex={10000} dropAnimation={null}>
+        {activeCard ? (
+          <ServiceCardPreview
+            card={activeCard}
+            column={columnById.get(activeCard.column_id) ?? columns[0]}
+            zoom={zoom}
+          />
+        ) : null}
+      </DragOverlay>
     </DndContext>
   );
 }
@@ -195,7 +258,7 @@ function ServiceColumnView({
       data-service-column-name={column.name}
       className={`min-h-[32rem] shrink-0 rounded-md border bg-secondary/55 p-3 transition-colors ${
         isOver ? "border-primary bg-primary/5" : ""
-      } ${zoom === "compacto" ? "w-[260px]" : zoom === "ampliado" ? "w-[360px]" : "w-[320px]"}`}
+      } ${zoom === "compacto" ? "w-[300px]" : zoom === "ampliado" ? "w-[420px]" : "w-[360px]"}`}
     >
       <div className="mb-3 flex items-center justify-between gap-2">
         <h2 className="text-sm font-semibold">{column.name}</h2>
@@ -209,7 +272,7 @@ function ServiceColumnView({
         value={search}
         onChange={(event) => onSearch(event.target.value)}
       />
-      <div className="max-h-[46rem] space-y-3 overflow-y-auto pr-1" data-testid="service-column-scroll">
+      <div className="max-h-[39rem] space-y-3 overflow-y-auto pr-1" data-testid="service-column-scroll">
         {children}
       </div>
     </section>
@@ -220,13 +283,15 @@ function ServiceCardView({
   card,
   column,
   zoom,
+  recentlyDraggedRef,
 }: {
   card: ServiceCardWithClient;
   column: ServiceColumn;
   zoom: "compacto" | "normal" | "ampliado";
+  recentlyDraggedRef: MutableRefObject<boolean>;
 }) {
   const router = useRouter();
-  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: card.id,
   });
   const [pending, startTransition] = useTransition();
@@ -234,9 +299,6 @@ function ServiceCardView({
     type: "success" | "error";
     message: string;
   } | null>(null);
-  const style = transform
-    ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)` }
-    : undefined;
   const tone = getServiceCardTone({
     columnSlug: column.slug,
     priority: card.priority,
@@ -298,13 +360,17 @@ function ServiceCardView({
   return (
     <article
       ref={setNodeRef}
-      style={style}
+      {...listeners}
+      {...attributes}
       data-testid="service-card"
       data-service-card-title={card.title}
-      className={`group cursor-pointer rounded-md border bg-background shadow-sm transition hover:border-primary/50 ${
-        isDragging ? "opacity-70 shadow-soft" : ""
+      className={`group cursor-grab rounded-md border bg-background shadow-sm transition hover:border-primary/50 active:cursor-grabbing ${
+        isDragging ? "opacity-35" : ""
       } ${zoom === "compacto" ? "p-2 text-[13px]" : "p-3"}`}
-      onClick={() => router.push(`/servicos/${card.id}`)}
+      onClick={() => {
+        if (isDragging || recentlyDraggedRef.current) return;
+        router.push(`/servicos/${card.id}`);
+      }}
       role="button"
       tabIndex={0}
       onKeyDown={(event) => {
@@ -319,6 +385,7 @@ function ServiceCardView({
           aria-label="Apagar servico"
           title="Apagar servico"
           disabled={pending}
+          onPointerDown={(event) => event.stopPropagation()}
           onClick={(event) => {
             event.stopPropagation();
             deleteCard();
@@ -329,12 +396,10 @@ function ServiceCardView({
       </div>
       <div className="flex items-start gap-2">
         <button
-          className="mt-0.5 cursor-grab rounded p-1 text-muted-foreground active:cursor-grabbing"
+          className="mt-0.5 rounded p-1 text-muted-foreground"
           type="button"
-          aria-label="Arrastar servico"
-          onClick={(event) => event.stopPropagation()}
-          {...listeners}
-          {...attributes}
+          aria-label="Cartao arrastavel"
+          tabIndex={-1}
         >
           <GripVertical className="size-4" aria-hidden="true" />
         </button>
@@ -346,29 +411,35 @@ function ServiceCardView({
         </div>
       </div>
 
-      <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-        <span className="inline-flex items-center gap-1">
+      <div className="mt-3 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
+        <span className="inline-flex items-center gap-1 rounded-full border bg-secondary/60 px-2 py-0.5">
           <ClipboardCheck className="size-3.5" aria-hidden="true" />
           {Number(card.checklist_percent ?? 0).toFixed(0)}%
         </span>
-        <span className="inline-flex items-center gap-1">
+        <span className="inline-flex items-center gap-1 rounded-full border bg-secondary/60 px-2 py-0.5" title="Anexos/documentos">
           <Paperclip className="size-3.5" aria-hidden="true" />
-          Anexos
+          {card.attachmentCount ?? 0}
         </span>
         {card.due_date ? (
-          <span className="inline-flex items-center gap-1">
+          <span className="inline-flex items-center gap-1 rounded-full border bg-secondary/60 px-2 py-0.5" title={`Prazo: ${formatDate(card.due_date)}`}>
             <CalendarDays className="size-3.5" aria-hidden="true" />
-            {formatDate(card.due_date)}
           </span>
         ) : null}
+        <span className="rounded-full border bg-secondary/60 px-2 py-0.5 font-medium">
+          {priorityLabels[card.priority]}
+        </span>
+        <span className="inline-flex items-center gap-1 rounded-full border bg-secondary/60 px-2 py-0.5" title={paymentStatusLabels[card.payment_status]}>
+          {card.payment_status === "pagamento_efetuado" ? (
+            <CheckCircle2 className="size-3.5 text-emerald-600" aria-hidden="true" />
+          ) : (
+            <AlertCircle className="size-3.5 text-amber-600" aria-hidden="true" />
+          )}
+        </span>
       </div>
-
-      <p className="mt-2 text-xs text-muted-foreground">
-        {priorityLabels[card.priority]} · {paymentStatusLabels[card.payment_status]}
-      </p>
 
       <div
         className="mt-3 grid gap-2"
+        onPointerDown={(event) => event.stopPropagation()}
         onClick={(event) => event.stopPropagation()}
       >
         {!card.client_id ? (
@@ -448,6 +519,67 @@ function ServiceCardView({
           {feedback.message}
         </p>
       ) : null}
+    </article>
+  );
+}
+
+function ServiceCardPreview({
+  card,
+  column,
+  zoom,
+}: {
+  card: ServiceCardWithClient;
+  column?: ServiceColumn;
+  zoom: "compacto" | "normal" | "ampliado";
+}) {
+  const tone = getServiceCardTone({
+    columnSlug: column?.slug,
+    priority: card.priority,
+    dueDate: card.due_date,
+  });
+  const toneClasses = {
+    success: "bg-emerald-600",
+    warning: "bg-amber-500",
+    danger: "bg-red-600",
+    info: "bg-sky-600",
+    neutral: "bg-slate-400",
+  }[tone];
+
+  return (
+    <article
+      className={`w-[320px] rotate-1 rounded-md border bg-background shadow-2xl ring-2 ring-primary/20 ${
+        zoom === "compacto" ? "p-2 text-[13px]" : "p-3"
+      }`}
+      data-testid="service-card-drag-overlay"
+    >
+      <div className={`mb-3 h-1.5 rounded-full ${toneClasses}`} />
+      <div className="flex items-start gap-2">
+        <GripVertical className="mt-1 size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+        <div className="min-w-0 flex-1">
+          <p className="truncate font-bold leading-tight text-[length:var(--card-title-font-size)]">
+            {card.client?.name ?? "Sem cliente vinculado"}
+          </p>
+          <p className="mt-1 line-clamp-2 leading-snug text-muted-foreground text-[length:var(--card-subtitle-font-size)]">{card.title}</p>
+        </div>
+      </div>
+      <div className="mt-3 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
+        <span className="inline-flex items-center gap-1 rounded-full border bg-secondary/60 px-2 py-0.5">
+          <ClipboardCheck className="size-3.5" aria-hidden="true" />
+          {Number(card.checklist_percent ?? 0).toFixed(0)}%
+        </span>
+        <span className="inline-flex items-center gap-1 rounded-full border bg-secondary/60 px-2 py-0.5">
+          <Paperclip className="size-3.5" aria-hidden="true" />
+          {card.attachmentCount ?? 0}
+        </span>
+        {card.due_date ? (
+          <span className="inline-flex items-center gap-1 rounded-full border bg-secondary/60 px-2 py-0.5">
+            <CalendarDays className="size-3.5" aria-hidden="true" />
+          </span>
+        ) : null}
+        <span className="rounded-full border bg-secondary/60 px-2 py-0.5 font-medium">
+          {priorityLabels[card.priority]}
+        </span>
+      </div>
     </article>
   );
 }

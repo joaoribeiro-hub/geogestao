@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, useTransition } from "react";
-import { CheckCircle2, Clock3, Loader2, MapPinned, Pause, Play } from "lucide-react";
+import { CheckCircle2, ChevronUp, Clock3, Loader2, MapPinned, Pause, Play } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { formatDuration } from "@/lib/services/work-time";
@@ -24,6 +24,7 @@ type WorkTimeStatus = {
 export function WorkTimerTopbar() {
   const [status, setStatus] = useState<WorkTimeStatus | null>(null);
   const [tick, setTick] = useState(0);
+  const [collapsed, setCollapsed] = useState(true);
   const [pending, startTransition] = useTransition();
 
   async function load(method: "GET" | "POST" = "GET", action?: string) {
@@ -42,7 +43,7 @@ export function WorkTimerTopbar() {
     void load("POST", "heartbeat");
     const heartbeat = window.setInterval(() => {
       if (document.visibilityState === "visible") void load("POST", "heartbeat");
-    }, 60000);
+    }, 10 * 60 * 1000);
     const timer = window.setInterval(() => setTick((value) => value + 1), 1000);
     const onVisible = () => {
       if (document.visibilityState === "visible") void load("POST", "heartbeat");
@@ -69,6 +70,22 @@ export function WorkTimerTopbar() {
         <Loader2 className="size-4 animate-spin" aria-hidden="true" />
         Expediente
       </div>
+    );
+  }
+
+  if (collapsed) {
+    return (
+      <Button
+        type="button"
+        size="sm"
+        variant="outline"
+        className="h-8 bg-card px-2 text-xs"
+        onClick={() => setCollapsed(false)}
+        title="Exibir tempo de expediente"
+      >
+        <Clock3 className="size-4" aria-hidden="true" />
+        Exibir tempo
+      </Button>
     );
   }
 
@@ -135,6 +152,17 @@ export function WorkTimerTopbar() {
       >
         <MapPinned aria-hidden="true" />
         <span className="hidden md:inline">Campo</span>
+      </Button>
+      <Button
+        type="button"
+        size="icon"
+        variant="ghost"
+        className="h-7 w-7"
+        onClick={() => setCollapsed(true)}
+        title="Ocultar tempo"
+        aria-label="Ocultar tempo"
+      >
+        <ChevronUp className="size-4" aria-hidden="true" />
       </Button>
     </div>
   );

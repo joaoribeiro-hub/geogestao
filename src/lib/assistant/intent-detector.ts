@@ -582,6 +582,7 @@ function extractDays(message: string) {
 function cleanExtractedName(value: string | undefined) {
   return value
     ?.replace(/\b(dizendo|que|para|pra|com|sobre|daqui|amanha|amanhã|hoje)\b.*$/i, "")
+    .replace(/^(?:e|eh|Ã©|o|a|os|as)\s+/i, "")
     .replace(/[.?!,;:]+$/g, "")
     .trim() || null;
 }

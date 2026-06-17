@@ -20,8 +20,8 @@ const columns = [
 ] as ServiceColumn[];
 
 describe("service-flow", () => {
-  it("coloca novo servico em Aguardando documentos", () => {
-    expect(getInitialServiceColumn(columns)?.slug).toBe(serviceFlowSlugs.awaitingDocuments);
+  it("coloca novo servico na primeira coluna ativa do fluxo", () => {
+    expect(getInitialServiceColumn(columns)?.slug).toBe(serviceFlowSlugs.proposalContract);
   });
 
   it("prioridade alta entra na coluna Prioridade ao ir para execucao", () => {
@@ -41,7 +41,6 @@ describe("service-flow", () => {
 
   it("define colunas iniciais por tipo de servico", () => {
     expect(serviceWorkflowDefinitions.georreferenciamento.map((item) => item.name)).toEqual([
-      "Aguardando documentos",
       "Geo em Andamento",
       "Prioridade máxima",
       "Prioridade",
@@ -55,7 +54,6 @@ describe("service-flow", () => {
     ]);
     expect(serviceWorkflowDefinitions.georreferenciamento.some((item) => item.slug === serviceFlowSlugs.proposalContract)).toBe(false);
     expect(serviceWorkflowDefinitions.car.map((item) => item.name)).toEqual([
-      "Aguardando documentos",
       "CAR em Retificacao",
       "CAR em Andamento",
       "Prioridade máxima",
@@ -93,7 +91,6 @@ describe("service-flow", () => {
     ] as ServiceColumn[];
 
     expect(getServiceColumns("car", mixed).map((item) => item.slug)).toEqual([
-      "aguardando-documentos",
       "car-em-andamento",
     ]);
   });

@@ -92,6 +92,35 @@ export async function POST(request: Request) {
     }
   }
 
+  if (parsed.data.correctionText) {
+    const globalExamples = (
+      supabase as unknown as {
+        from: (table: "assistant_feedback_examples") => {
+          insert: (values: Record<string, unknown>) => Promise<{ error: { message: string } | null }>;
+        };
+      }
+    ).from("assistant_feedback_examples");
+    const { error: globalExampleError } = await globalExamples.insert({
+      original_prompt: sanitizeAssistantFeedbackText(parsed.data.messageText),
+      correction_text: sanitizeAssistantFeedbackText(parsed.data.correctionText),
+      resolved_intent: correctedIntent ?? parsed.data.detectedIntent ?? null,
+      approved_response_pattern: sanitizeAssistantFeedbackText(parsed.data.assistantResponse),
+      created_by: user.id,
+      organization_id: organization.id,
+      is_global_training: true,
+      status: parsed.data.rating === "positive" ? "approved" : "pending",
+    });
+    if (
+      globalExampleError &&
+      process.env.NODE_ENV !== "production" &&
+      !/assistant_feedback_examples/i.test(globalExampleError.message)
+    ) {
+      console.warn("[assistant:feedback] nao foi possivel salvar exemplo global", {
+        message: globalExampleError.message,
+      });
+    }
+  }
+
   await supabase.from("organization_activity_log").insert({
     organization_id: organization.id,
     actor_user_id: user.id,

@@ -20,6 +20,11 @@ export default async function AuthenticatedLayout({
 
   const pathname = (await headers()).get("x-pathname") ?? "/";
   const context = await getCurrentOrganizationContext(supabase, user.id);
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("full_name")
+    .eq("id", user.id)
+    .maybeSingle();
   const needsOrganization = !context.organization || !context.membership;
   const allowedWithoutOrganization =
     pathname.startsWith("/onboarding") || pathname.startsWith("/minha-conta");
@@ -31,6 +36,7 @@ export default async function AuthenticatedLayout({
   return (
     <AppShell
       userEmail={user.email}
+      userName={profile?.full_name ?? null}
       limitedMode={needsOrganization}
       membershipRole={context.membership?.role ?? null}
     >

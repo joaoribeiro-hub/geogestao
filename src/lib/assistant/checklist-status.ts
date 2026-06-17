@@ -46,14 +46,14 @@ export function formatMemberCurrentWorkMessage({
   lastActivityText?: string | null;
 }) {
   const completedBlock = completedTitles.length
-    ? `${memberName} concluiu:\n${completedTitles.map((title) => `- ${title}`).join("\n")}`
-    : `${memberName} ainda nao concluiu itens em ${dateLabel}.`;
+    ? `**${memberName}** concluiu:\n${completedTitles.map((title) => `* **${title}**;`).join("\n")}`
+    : `**${memberName}** ainda nao concluiu itens em **${dateLabel}**.`;
   const currentBlock = currentTitle
-    ? `Agora ele provavelmente esta fazendo:\n- ${currentTitle}`
+    ? `Agora ele provavelmente esta fazendo:\n\n* **${currentTitle}**;`
     : "Nao ha item aberto em andamento agora.";
   const basis = currentTitle
-    ? `Baseei isso no checklist de ${dateLabel}: o primeiro item aberto pela ordem atual indica o trabalho provavel.`
-    : `Baseei isso no checklist de ${dateLabel}.`;
+    ? `Baseei isso no checklist de **${dateLabel}**: o primeiro item aberto pela ordem atual indica o trabalho provavel.`
+    : `Baseei isso no checklist de **${dateLabel}**.`;
 
   return [completedBlock, currentBlock, basis, lastActivityText ? `Ultima atividade registrada: ${lastActivityText}.` : null]
     .filter(Boolean)

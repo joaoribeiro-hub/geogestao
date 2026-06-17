@@ -91,6 +91,23 @@ export default async function ServicesPage({
     columnsById,
     periodRange,
   );
+  const cardIds = cards.map((card) => card.id);
+  const { data: cardAttachments } = cardIds.length
+    ? await supabase
+        .from("attachments")
+        .select("entity_id")
+        .eq("organization_id", organization.id)
+        .eq("entity_type", "service_card")
+        .in("entity_id", cardIds)
+    : { data: [] };
+  const attachmentCountByCard = new Map<string, number>();
+  (cardAttachments ?? []).forEach((attachment) => {
+    if (!attachment.entity_id) return;
+    attachmentCountByCard.set(
+      attachment.entity_id,
+      (attachmentCountByCard.get(attachment.entity_id) ?? 0) + 1,
+    );
+  });
   const overdueColumn = columns.find((column) => isOverdueServiceColumn(column));
 
   if (process.env.NODE_ENV !== "production") {
@@ -110,6 +127,7 @@ export default async function ServicesPage({
   const cardsWithClients = cards.map((card) => ({
     ...displayCardInOverdueColumn(card, columnsById, overdueColumn),
     client: card.client_id ? clientMap.get(card.client_id) ?? null : null,
+    attachmentCount: attachmentCountByCard.get(card.id) ?? 0,
   }));
   const { data: scheduleCards } = await supabase
     .from("service_cards")

@@ -23,32 +23,57 @@
     --ring: 169 60% 25%;
     --radius: 0.5rem;
     --app-font-scale: 1;
-    --card-title-font-size: 1.35rem;
-    --card-subtitle-font-size: 1.12rem;
+    --card-title-font-size: calc(1.35rem * var(--app-font-scale));
+    --card-subtitle-font-size: calc(1.12rem * var(--app-font-scale));
   }
 
-  :root[data-font-size="padrao"] {
-    --app-font-scale: 1;
-    --card-title-font-size: 1.35rem;
-    --card-subtitle-font-size: 1.12rem;
+  :root[data-palette="azul_tecnico"] {
+    --background: 214 42% 98%;
+    --primary: 215 82% 42%;
+    --ring: 215 82% 42%;
+    --accent: 189 75% 45%;
   }
 
-  :root[data-font-size="grande"] {
-    --app-font-scale: 1.08;
-    --card-title-font-size: 1.46rem;
-    --card-subtitle-font-size: 1.21rem;
+  :root[data-palette="cerrado_terra"] {
+    --background: 42 42% 95%;
+    --primary: 142 35% 28%;
+    --ring: 142 35% 28%;
+    --secondary: 43 32% 90%;
+    --muted: 43 30% 88%;
+    --accent: 28 53% 42%;
   }
 
-  :root[data-font-size="muito_grande"] {
-    --app-font-scale: 1.16;
-    --card-title-font-size: 1.57rem;
-    --card-subtitle-font-size: 1.3rem;
+  :root[data-palette="grafite_profissional"] {
+    --background: 220 16% 13%;
+    --foreground: 210 40% 96%;
+    --card: 220 15% 17%;
+    --card-foreground: 210 40% 96%;
+    --primary: 166 53% 45%;
+    --primary-foreground: 222 47% 7%;
+    --secondary: 220 14% 22%;
+    --secondary-foreground: 210 40% 96%;
+    --muted: 220 14% 22%;
+    --muted-foreground: 215 20% 72%;
+    --border: 220 13% 28%;
+    --input: 220 13% 28%;
+    --ring: 166 53% 45%;
   }
 
-  :root[data-font-size="maximo"] {
-    --app-font-scale: 1.24;
-    --card-title-font-size: 1.67rem;
-    --card-subtitle-font-size: 1.39rem;
+  :root[data-palette="noite_atlantica"] {
+    --background: 213 50% 10%;
+    --foreground: 210 40% 96%;
+    --card: 213 42% 14%;
+    --card-foreground: 210 40% 96%;
+    --primary: 187 75% 42%;
+    --primary-foreground: 213 50% 10%;
+    --secondary: 214 36% 20%;
+    --secondary-foreground: 210 40% 96%;
+    --muted: 214 36% 20%;
+    --muted-foreground: 205 26% 76%;
+    --accent: 154 63% 42%;
+    --border: 213 28% 27%;
+    --input: 213 28% 27%;
+    --ring: 187 75% 42%;
   }
 
   :root[data-theme="dark"] {
@@ -158,6 +183,24 @@
     flex-direction: column;
     gap: 14px;
     align-items: center;
+  }
+
+  .app-sidebar {
+    transition: transform 180ms ease;
+  }
+
+  .app-content {
+    transition: padding-left 180ms ease;
+  }
+
+  :root[data-sidebar-collapsed="true"] .app-sidebar {
+    transform: translateX(-100%);
+  }
+
+  @media (min-width: 1024px) {
+    :root[data-sidebar-collapsed="true"] .app-content {
+      padding-left: 0;
+    }
   }
 
   @media (min-width: 1024px) {

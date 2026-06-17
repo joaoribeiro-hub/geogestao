@@ -49,10 +49,10 @@ describe("AI-ASSISTANT-CONTEXT-LEARNING-2", () => {
       lastActivityText: "marcou Projetar Fazenda Pinfa Fogo como concluido as 09:00",
     });
 
-    expect(message).toContain("Joao Pedro concluiu:");
-    expect(message).toContain("- Projetar Fazenda Pinfa Fogo");
+    expect(message).toContain("**Joao Pedro** concluiu:");
+    expect(message).toContain("* **Projetar Fazenda Pinfa Fogo**;");
     expect(message).toContain("Agora ele provavelmente esta fazendo:");
-    expect(message).toContain("- Caracterizar o projeto Planta_CAR_1");
+    expect(message).toContain("* **Caracterizar o projeto Planta_CAR_1**;");
   });
 
   it("sanitiza feedback negativo antes de virar exemplo global", () => {

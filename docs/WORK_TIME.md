@@ -1,5 +1,14 @@
 # Controle de Expediente
 
+## Ajuste KANBAN-UX-THEME-SOPHIA-TIME-1
+
+- O widget do expediente inicia recolhido no topo com o botao `Exibir tempo`.
+- Ocultar/exibir o widget nao pausa a contagem.
+- O heartbeat server-side foi ajustado para 10 minutos.
+- Se a diferenca entre heartbeats ultrapassar 4 ciclos de 10 minutos, o dia e congelado e exige confirmacao.
+- O ciclo de seguranca passa a ser de 3 horas, com janela de 15 minutos.
+- Em modo `Campo`, o tempo usa calculo server-side continuo e pode contar mesmo se o navegador for fechado ate o retorno/desativacao do modo campo.
+
 Fase: WORK-TIME-TRACKING-1.
 
 O controle de expediente e operacional interno. Nesta fase, ele nao deve ser apresentado como ponto eletronico legal.

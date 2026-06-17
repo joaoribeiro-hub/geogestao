@@ -1500,8 +1500,34 @@ async function resolveOrganizationMember(context: AssistantContext, name: string
     .in("id", userIds);
   if (profileError) throw new Error(profileError.message);
 
-  const normalized = normalizeAssistantText(name);
+  const normalized = normalizeAssistantText(name).replace(/^(?:e|eh|o|a|os|as)\s+/, "");
   const tokens = normalized.split(/\s+/).filter((token) => token.length >= 2);
+  const scoredProfiles = (profiles ?? [])
+    .map((profile) => ({
+      profile,
+      score: scoreMemberMatch(normalized, profile.full_name ?? "", profile.email ?? ""),
+    }))
+    .filter((item) => item.score > 0)
+    .sort((a, b) => b.score - a.score);
+  const best = scoredProfiles[0];
+  const next = scoredProfiles[1];
+  if (best && (best.score >= 90 || (best.score >= 65 && best.score - (next?.score ?? 0) >= 18))) {
+    return {
+      status: "ok",
+      userId: best.profile.id,
+      label: best.profile.full_name ?? best.profile.email ?? "Membro",
+    };
+  }
+  if (best && next && best.score >= 65 && best.score - next.score < 18) {
+    return {
+      status: "multiple",
+      candidates: scoredProfiles.slice(0, 5).map(({ profile }) => ({
+        id: profile.id,
+        label: profile.full_name ?? profile.email ?? "Membro",
+        description: profile.email,
+      })),
+    };
+  }
   const matches = (profiles ?? []).filter((profile) => {
     const fullName = normalizeAssistantText(profile.full_name ?? "");
     const email = normalizeAssistantText(profile.email ?? "");
@@ -1567,6 +1593,54 @@ async function resolveOrganizationMember(context: AssistantContext, name: string
     }
   }
   return { status: "not_found" };
+}
+
+function scoreMemberMatch(query: string, fullName: string, email: string) {
+  if (!query) return 0;
+  const normalizedName = normalizeAssistantText(fullName);
+  const normalizedEmail = normalizeAssistantText(email);
+  const emailPrefix = normalizedEmail.split(" ")[0] ?? "";
+  const nameTokens = normalizedName.split(/\s+/).filter(Boolean);
+  const queryTokens = query.split(/\s+/).filter(Boolean);
+
+  if (normalizedName === query || normalizedEmail === query || emailPrefix === query) return 100;
+  if (normalizedName.startsWith(query) || emailPrefix.startsWith(query)) return 92;
+  if (normalizedName.includes(query) || normalizedEmail.includes(query)) return 84;
+  if (
+    queryTokens.length &&
+    queryTokens.every((token) =>
+      nameTokens.some((nameToken) => nameToken === token || nameToken.startsWith(token)) ||
+      normalizedEmail.includes(token),
+    )
+  ) {
+    return 78;
+  }
+
+  const firstName = nameTokens[0] ?? "";
+  const distanceToFirst = levenshteinDistance(query, firstName);
+  if (firstName && distanceToFirst <= 2) return 70 - distanceToFirst * 4;
+  const distanceToPrefix = levenshteinDistance(query, emailPrefix);
+  if (emailPrefix && distanceToPrefix <= 2) return 68 - distanceToPrefix * 4;
+  return 0;
+}
+
+function levenshteinDistance(left: string, right: string) {
+  if (left === right) return 0;
+  if (!left) return right.length;
+  if (!right) return left.length;
+  const previous = Array.from({ length: right.length + 1 }, (_, index) => index);
+  for (let leftIndex = 0; leftIndex < left.length; leftIndex += 1) {
+    const current = [leftIndex + 1];
+    for (let rightIndex = 0; rightIndex < right.length; rightIndex += 1) {
+      current[rightIndex + 1] = Math.min(
+        current[rightIndex] + 1,
+        previous[rightIndex + 1] + 1,
+        previous[rightIndex] + (left[leftIndex] === right[rightIndex] ? 0 : 1),
+      );
+    }
+    previous.splice(0, previous.length, ...current);
+  }
+  return previous[right.length] ?? Math.max(left.length, right.length);
 }
 
 async function resolveOrganizationMemberById(context: AssistantContext, userId: string): Promise<
@@ -1678,11 +1752,11 @@ function formatActivityLogLine(activity: {
     timeZone: "America/Sao_Paulo",
   }).format(new Date(activity.occurred_at));
 
-  if (activity.activity_type === "checklist_item_completed") return `marcou ${title ?? "um item"} como concluido as ${time}`;
-  if (activity.activity_type === "checklist_item_created") return `criou ${title ?? "um item"} as ${time}`;
-  if (activity.activity_type === "checklist_item_reopened") return `reabriu ${title ?? "um item"} as ${time}`;
-  if (activity.activity_type === "checklist_item_assigned") return `recebeu ${title ?? "um item"} as ${time}`;
-  return `${activity.activity_type} as ${time}`;
+  if (activity.activity_type === "checklist_item_completed") return `marcou **${title ?? "um item"}** como concluido as **${time}**`;
+  if (activity.activity_type === "checklist_item_created") return `criou **${title ?? "um item"}** as **${time}**`;
+  if (activity.activity_type === "checklist_item_reopened") return `reabriu **${title ?? "um item"}** as **${time}**`;
+  if (activity.activity_type === "checklist_item_assigned") return `recebeu **${title ?? "um item"}** as **${time}**`;
+  return `${activity.activity_type} as **${time}**`;
 }
 
 function parseDateUnit(value: string | null) {

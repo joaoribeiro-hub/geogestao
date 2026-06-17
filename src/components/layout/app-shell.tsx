@@ -19,7 +19,8 @@ import { ptBR } from "@/lib/i18n/pt-br";
 import { cn } from "@/lib/utils";
 import { FloatingWidgets } from "@/components/floating/floating-widgets";
 import { NotificationBell } from "@/components/notifications/notification-bell";
-import { SignOutButton } from "@/components/layout/sign-out-button";
+import { SidebarToggleButton } from "@/components/layout/sidebar-toggle-button";
+import { UserAccountMenu } from "@/components/layout/user-account-menu";
 import { WorkTimerTopbar } from "@/components/work-time/work-timer-topbar";
 
 const mainNav = [
@@ -45,11 +46,13 @@ const settingsNav = [
 export async function AppShell({
   children,
   userEmail,
+  userName,
   limitedMode = false,
   membershipRole = null,
 }: {
   children: React.ReactNode;
   userEmail?: string | null;
+  userName?: string | null;
   limitedMode?: boolean;
   membershipRole?: string | null;
 }) {
@@ -67,7 +70,7 @@ export async function AppShell({
 
   return (
     <div className="min-h-screen bg-background" data-testid="app-shell">
-      <aside className="fixed inset-y-0 left-0 z-20 hidden w-64 border-r bg-card lg:block">
+      <aside className="app-sidebar fixed inset-y-0 left-0 z-20 hidden w-64 border-r bg-card lg:block">
         <div className="flex h-16 items-center gap-2 border-b px-5">
           <Archive className="size-6 text-primary" aria-hidden="true" />
           <div>
@@ -86,8 +89,9 @@ export async function AppShell({
           <NavSection label="CONFIGURACOES" pathname={pathname} items={visibleSettingsNav} />
         </nav>
       </aside>
+      <SidebarToggleButton />
 
-      <div className="lg:pl-64">
+      <div className="app-content lg:pl-64">
         <header className="sticky top-0 z-10 flex h-16 items-center justify-between border-b bg-background/90 px-4 backdrop-blur lg:px-8">
           <div className="lg:hidden">
             <p className="text-sm font-semibold">{ptBR.appName}</p>
@@ -95,13 +99,7 @@ export async function AppShell({
           <div className="ml-auto flex items-center gap-3">
             {!limitedMode ? <WorkTimerTopbar /> : null}
             {!limitedMode ? <NotificationBell /> : null}
-            <span
-              className="hidden max-w-56 truncate text-sm text-muted-foreground sm:inline"
-              data-testid="user-email"
-            >
-              {userEmail}
-            </span>
-            <SignOutButton />
+            <UserAccountMenu name={userName} email={userEmail} />
           </div>
         </header>
         <main className="app-grid min-h-[calc(100vh-4rem)] p-4 pb-24 lg:p-8">{children}</main>

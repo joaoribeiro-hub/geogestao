@@ -1,9 +1,11 @@
 import type { Json } from "@/types/database";
 
 export const WORK_TIME_TIMEZONE = "America/Sao_Paulo";
-export const SAFETY_INTERVAL_SECONDS = 2 * 60 * 60;
+export const SAFETY_INTERVAL_SECONDS = 3 * 60 * 60;
 export const SAFETY_GRACE_SECONDS = 15 * 60;
-export const HEARTBEAT_MAX_DELTA_SECONDS = 120;
+export const HEARTBEAT_INTERVAL_SECONDS = 10 * 60;
+export const MISSED_HEARTBEAT_FREEZE_SECONDS = HEARTBEAT_INTERVAL_SECONDS * 4;
+export const HEARTBEAT_MAX_DELTA_SECONDS = HEARTBEAT_INTERVAL_SECONDS;
 
 export type WorkMode = "work" | "interval" | "field" | "frozen";
 export type WorkDayStatus = "active" | "paused_interval" | "field_mode" | "safety_frozen" | "closed";

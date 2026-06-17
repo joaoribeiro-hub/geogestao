@@ -42,7 +42,6 @@ export const serviceWorkflowDefinitions: Record<
   Array<{ name: string; slug: string; position: number }>
 > = {
   georreferenciamento: [
-    { name: "Aguardando documentos", slug: serviceFlowSlugs.awaitingDocuments, position: 1 },
     { name: "Geo em Andamento", slug: "geo-em-andamento", position: 2 },
     { name: "Prioridade máxima", slug: serviceFlowSlugs.priorityMax, position: 3 },
     { name: "Prioridade", slug: serviceFlowSlugs.priority, position: 4 },
@@ -55,7 +54,6 @@ export const serviceWorkflowDefinitions: Record<
     { name: "Servico perdido", slug: serviceFlowSlugs.lost, position: 11 },
   ],
   car: [
-    { name: "Aguardando documentos", slug: serviceFlowSlugs.awaitingDocuments, position: 1 },
     { name: "CAR em Retificacao", slug: "car-em-retificacao", position: 2 },
     { name: "CAR em Andamento", slug: "car-em-andamento", position: 3 },
     { name: "Prioridade máxima", slug: serviceFlowSlugs.priorityMax, position: 4 },
@@ -66,7 +64,6 @@ export const serviceWorkflowDefinitions: Record<
     { name: "CAR Concluido", slug: "car-concluido", position: 9 },
   ],
   itr_ccir: [
-    { name: "Aguardando documentos", slug: serviceFlowSlugs.awaitingDocuments, position: 1 },
     { name: "Proposta/Contrato", slug: serviceFlowSlugs.proposalContract, position: 2 },
     { name: "ITR/CCIR em Andamento", slug: "itr-ccir-em-andamento", position: 3 },
     { name: "Prioridade máxima", slug: serviceFlowSlugs.priorityMax, position: 4 },
@@ -78,7 +75,6 @@ export const serviceWorkflowDefinitions: Record<
     { name: "Servico perdido", slug: serviceFlowSlugs.lost, position: 10 },
   ],
   outros_servicos: [
-    { name: "Aguardando documentos", slug: serviceFlowSlugs.awaitingDocuments, position: 1 },
     { name: "Proposta/Contrato", slug: serviceFlowSlugs.proposalContract, position: 2 },
     { name: "Em Andamento", slug: "em-andamento", position: 3 },
     { name: "Prioridade máxima", slug: serviceFlowSlugs.priorityMax, position: 4 },
@@ -143,7 +139,11 @@ export function sortServiceColumns(columns: ServiceColumn[]) {
 export function getInitialServiceColumn(columns: ServiceColumn[]) {
   const sorted = sortServiceColumns(columns);
   return (
-    sorted.find((column) => column.slug === serviceFlowSlugs.awaitingDocuments) ??
+    sorted.find(
+      (column) =>
+        column.slug !== serviceFlowSlugs.awaitingDocuments &&
+        column.slug !== serviceFlowSlugs.lost,
+    ) ??
     sorted[0] ??
     null
   );
