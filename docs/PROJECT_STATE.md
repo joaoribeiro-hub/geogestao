@@ -1,5 +1,70 @@
 # GeoGestao - Estado Atual do Projeto
 
+## MODULE-HUB-EXTERNAL-APPS-1
+
+Implementado:
+
+- seletor de modulos no topo esquerdo do app;
+- rotas internas `/modulos`, `/modulos/meu-imovel-car`, `/modulos/buscageo`, `/modulos/app-2026-06-25` e `/modulos/app-2026-05-29`;
+- telas iniciais de migracao para os apps antigos auditados;
+- tabela `app_modules` para catalogo global;
+- tabela `organization_modules` para habilitacao por organizacao;
+- tabela `module_activity_logs` para auditoria por modulo;
+- tabela `user_preferences` para aparencia persistida por usuario;
+- fonte padrao de novos usuarios ajustada para `120%`.
+
+Migration: `044_module_hub_external_apps.sql`.
+
+## MODULE-HUB-MIGRATION-2
+
+Implementado:
+
+- MeuIMOVEL-CAR deixou de ser placeholder e passou a buscar em `car_properties`, `properties` e historico `property_searches`;
+- Corretor RTK/PPP criado como modulo web beta em `/modulos/corretor-rtk-ppp`;
+- Gerador RW5 criado como modulo web beta em `/modulos/gerador-rw5`;
+- APIs internas server-side para parse/correcao/geracao, sem servidor local antigo;
+- migration `045_module_hub_migration_2.sql` com jobs por `organization_id`.
+
+Limites:
+
+- BuscaGEO continua em migracao por depender de processamento pesado FastAPI/GDAL;
+- App 2026-05-29 continua sem auditoria porque a pasta/zip nao foi encontrado;
+- Gerador RW5 gera RW5 inicial, ainda sem todo o writer Python avancado.
+
+## MODULE-HUB-REAL-PORT-1
+
+Implementado:
+
+- Corretor RTK/PPP deixou a tela reduzida e passou a reproduzir o fluxo do app local com blocos de arquivo, base levantada, base corrigida PPP/IBGE, correcao, configuracoes e resultado;
+- parser RTK alinhado ao ZIP auditado (`ID`, descricao, Norte, Este, Altitude), com calculo de delta e exportacao TXT;
+- Gerador RW5 recebeu campos do app original: nome de saida, CRS, equipamento, antena e offset HR;
+- Gerador RW5 porta a normalizacao de MC 19, PTS 24, exportacao 37 colunas e legado, com writer RW5 mais completo;
+- BuscaGEO saiu do placeholder e ganhou tela operacional com upload de poligono, parametros CBERS, job persistido e areas de preview/cenas/historico;
+- Hub remove o modulo duplicado `app-2026-06-25` do seletor e trata o app real como `gerador-rw5`;
+- migration `046_module_hub_real_port.sql` complementa RW5, cria `module_buscageo_jobs`, `module_meu_imovel_queries` e `module_meu_imovel_alerts`.
+
+Limites:
+
+- BuscaGEO ainda depende de worker/API FastAPI/GDAL para busca STAC, preview e GeoTIFF final;
+- MeuIMOVEL-CAR segue beta com busca inicial real e ainda precisa evoluir vinculos/salvamento de analises;
+- App 2026-05-29 nao foi encontrado em `C:\Users\srlan\Documents\Codex\2026-05-29`.
+
+## BUSCAGEO-REAL-INTEGRATION-1
+
+Implementado:
+
+- BuscaGEO passou de contrato pendente para fluxo operacional beta em `/modulos/buscageo`;
+- upload de KML, KMZ e Shapefile ZIP usa Storage privado por `organization_id`;
+- APIs internas criam jobs, leem historico, acionam worker, cancelam e baixam GeoTIFF por signed URL;
+- worker FastAPI em `workers/buscageo` reaproveita a logica auditada de GDAL/OGR, STAC CBERS, previews e mosaico;
+- callback protegido por `BUSCAGEO_WORKER_SECRET` atualiza `module_buscageo_jobs`;
+- migration `047_buscageo_real_integration.sql` completa schema, bucket e RLS.
+
+Limites:
+
+- o processamento real exige worker Python com GDAL configurado;
+- OCR ou classificacao inteligente de cenas ficam para fase futura.
+
 ## KANBAN-UX-THEME-SOPHIA-TIME-1
 
 Implementado:

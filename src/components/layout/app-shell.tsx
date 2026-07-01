@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { headers } from "next/headers";
 import {
-  Archive,
   BarChart3,
   BookOpen,
   BriefcaseBusiness,
@@ -22,6 +21,7 @@ import { NotificationBell } from "@/components/notifications/notification-bell";
 import { SidebarToggleButton } from "@/components/layout/sidebar-toggle-button";
 import { UserAccountMenu } from "@/components/layout/user-account-menu";
 import { WorkTimerTopbar } from "@/components/work-time/work-timer-topbar";
+import { ModuleSwitcher } from "@/components/modules/module-switcher";
 
 const mainNav = [
   { href: "/rotina", label: "Rotina", icon: CalendarRange },
@@ -71,12 +71,8 @@ export async function AppShell({
   return (
     <div className="min-h-screen bg-background" data-testid="app-shell">
       <aside className="app-sidebar fixed inset-y-0 left-0 z-20 hidden w-64 border-r bg-card lg:block">
-        <div className="flex h-16 items-center gap-2 border-b px-5">
-          <Archive className="size-6 text-primary" aria-hidden="true" />
-          <div>
-            <p className="text-sm font-semibold">{ptBR.appName}</p>
-            <p className="text-xs text-muted-foreground">Agrimensura</p>
-          </div>
+        <div className="flex h-16 items-center border-b px-4">
+          <ModuleSwitcher />
         </div>
         <nav className="space-y-5 p-3">
           {!limitedMode ? (

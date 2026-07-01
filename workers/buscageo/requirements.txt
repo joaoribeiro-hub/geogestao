@@ -1,0 +1,16 @@
+fastapi==0.115.6
+uvicorn[standard]==0.32.1
+supabase==2.10.0
+pydantic==2.10.3
+
+numpy==2.1.3
+Pillow==11.0.0
+requests==2.32.3
+
+# Alinhado ao GDAL do Debian bookworm usado no Dockerfile.
+GDAL==3.6.2
+rasterio==1.4.3
+geopandas==1.0.1
+shapely==2.0.6
+fiona==1.10.1
+pyproj==3.7.0

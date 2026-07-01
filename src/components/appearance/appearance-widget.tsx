@@ -23,7 +23,7 @@ const LEGACY_FONT_KEY = "fontSize";
 const THEME_KEY = "geogestao:appearance-theme";
 const PALETTE_KEY = "geogestao:appearance-palette";
 const MIN_FONT_SCALE = 0.6;
-const DEFAULT_FONT_SCALE = 1;
+const DEFAULT_FONT_SCALE = 1.2;
 const MAX_FONT_SCALE = 1.75;
 const FONT_SCALE_STEP = 0.05;
 
@@ -114,7 +114,7 @@ export function AppearanceWidget() {
               <div className="rounded-md border bg-background p-3">
                 <div className="mb-2 flex items-center justify-between text-xs text-muted-foreground">
                   <Minus className="size-4" aria-hidden="true" />
-                  <span>Padrao</span>
+                  <span>Padrao 120%</span>
                   <Plus className="size-4" aria-hidden="true" />
                 </div>
                 <input
@@ -129,7 +129,7 @@ export function AppearanceWidget() {
                 />
                 <div className="mt-1 flex justify-between text-[10px] text-muted-foreground">
                   <span>60%</span>
-                  <span>100%</span>
+                  <span>120%</span>
                   <span>175%</span>
                 </div>
               </div>

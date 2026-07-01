@@ -1,5 +1,82 @@
 # GeoGestao - Testes Automatizados
 
+## MODULE-HUB-EXTERNAL-APPS-1
+
+Testes automatizados adicionados:
+
+- `tests/unit/module-hub.test.ts`
+
+Testes manuais recomendados:
+
+- Abrir o app autenticado e clicar no topo esquerdo `GeoGestao`.
+- Confirmar que o menu lista GeoGestao, MeuIMOVEL-CAR, BuscaGEO, App 2026-06-25 e App 2026-05-29.
+- Abrir cada rota `/modulos/...` e confirmar que a tela mostra o status de migracao.
+- Alterar fonte/tema/paleta em Aparencia, recarregar e confirmar persistencia.
+- Conferir no Supabase que `user_preferences` possui uma linha do usuario com `font_scale`.
+- Entrar com usuario de outra organizacao e confirmar que nao ha leitura cruzada de `organization_modules` ou `module_activity_logs`.
+
+## MODULE-HUB-MIGRATION-2
+
+Testes automatizados adicionados:
+
+- `tests/unit/module-migration-2.test.ts`
+
+Testes manuais recomendados:
+
+- Abrir `/modulos/meu-imovel-car`, buscar um CAR/municipio importado e conferir resultados reais ou vazio claro.
+- Abrir `/modulos/corretor-rtk-ppp`, enviar TXT com base e pontos numericos, calcular delta e baixar TXT corrigido.
+- Abrir `/modulos/gerador-rw5`, enviar TXT/PTS/MC, pre-visualizar pontos, gerar e baixar RW5.
+- Conferir em Supabase que `module_rtk_ppp_jobs` e `module_rw5_jobs` respeitam `organization_id`.
+- Validar que nenhum modulo usa `.bat`, `127.0.0.1:8765`, `ThreadingHTTPServer` ou `webbrowser.open`.
+
+## MODULE-HUB-REAL-PORT-1
+
+Testes automatizados atualizados:
+
+- `tests/unit/module-hub.test.ts`
+- `tests/unit/module-migration-2.test.ts`
+
+Validacao automatizada:
+
+- `npm run typecheck`
+- `npm run test`
+
+Testes manuais recomendados:
+
+- Abrir o seletor de modulos e conferir GeoGestao, MeuIMOVEL-CAR, BuscaGEO, Corretor RTK/PPP, Gerador RW5 e App 2026-05-29.
+- Confirmar que `app-2026-06-25` nao aparece no seletor.
+- Abrir `/modulos/corretor-rtk-ppp`, ler TXT, conferir blocos 1 a 6, calcular delta e baixar TXT.
+- Abrir `/modulos/gerador-rw5`, enviar MC/PTS/legado, ajustar CRS/equipamento/antena/offset, gerar e baixar RW5.
+- Abrir `/modulos/buscageo`, enviar KML/KMZ/ZIP, criar job e confirmar mensagem de worker pendente.
+- Conferir no Supabase que `module_buscageo_jobs`, `module_rw5_jobs` e `module_rtk_ppp_jobs` respeitam `organization_id`.
+
+## BUSCAGEO-REAL-INTEGRATION-1
+
+Testes automatizados adicionados:
+
+- `tests/unit/buscageo-real-integration.test.ts`
+
+Testes manuais recomendados:
+
+- Aplicar `supabase/migrations/047_buscageo_real_integration.sql`.
+- Configurar `BUSCAGEO_WORKER_URL`, `BUSCAGEO_WORKER_SECRET` e `BUSCAGEO_STORAGE_BUCKET` no Next.
+- Configurar `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `BUSCAGEO_WORKER_SECRET` e `BUSCAGEO_STORAGE_BUCKET` no worker.
+- Subir o worker com `uvicorn main:app --host 127.0.0.1 --port 8010`.
+- Abrir `/modulos/buscageo`.
+- Enviar KML, KMZ ou Shapefile ZIP.
+- Clicar em `Ler area` e conferir BBOX/area.
+- Clicar em `Buscar imagens` e conferir previews CBERS.
+- Selecionar 1 ou 2 cenas e clicar em `Gerar GeoTIFF`.
+- Baixar o GeoTIFF final.
+- Entrar com usuario de outra organizacao e confirmar que nao lista nem baixa jobs da primeira organizacao.
+
+Validacoes:
+
+- `npm run typecheck`
+- `npm run build`
+- `npm run test`
+- `python -m py_compile workers/buscageo/main.py workers/buscageo/app/*.py`
+
 ## KANBAN-UX-THEME-SOPHIA-TIME-1
 
 Validacao automatizada executada:

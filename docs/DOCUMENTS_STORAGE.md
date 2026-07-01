@@ -28,9 +28,14 @@ organizations/{organization_id}/clients/sem_cliente/properties/sem_imovel/docume
 organizations/{organization_id}/services/{service_id}/documents/{document_id}/{safe_filename}
 organizations/{organization_id}/documents/{document_id}/{safe_filename}
 organizations/{organization_id}/hr/{employee_id}/documents/{document_id}/{safe_filename}
+organizations/{organization_id}/modules/buscageo/{job_id}/input/{safe_filename}
+organizations/{organization_id}/modules/buscageo/{job_id}/preview/{safe_filename}
+organizations/{organization_id}/modules/buscageo/{job_id}/output/{safe_filename}
 ```
 
 O frontend nunca envia path arbitrario. O servidor gera `document_id`, sanitiza o nome e monta o path.
+
+Para BuscaGEO, a migration `047_buscageo_real_integration.sql` amplia os MIME types do bucket `documentos` para KML, KMZ, ZIP, TIFF/GeoTIFF e `application/octet-stream`, mantendo o bucket privado.
 
 ## Upload
 
@@ -95,4 +100,3 @@ O sistema legado continua existindo:
 - `property_documents`: base GeoQuery, sem alteracao.
 
 A migracao automatica desses registros para `documents` fica para fase futura e deve ser feita sob demanda.
-

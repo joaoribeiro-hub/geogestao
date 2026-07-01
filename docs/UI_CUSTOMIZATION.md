@@ -6,13 +6,13 @@ Fase `KANBAN-UX-THEME-SOPHIA-TIME-1`.
 
 A engrenagem global controla:
 
-- tamanho de fonte por slider, de `60%` a `175%`, com `100%` como padrao atual;
+- tamanho de fonte por slider, de `60%` a `175%`, com `120%` como padrao real para novos usuarios;
 - modo claro/escuro;
 - paletas: Agrimensura Verde, Azul Tecnico, Cerrado Terra, Grafite Profissional e Noite Atlantica.
 
 O tamanho de fonte usa a variavel CSS `--app-font-scale`. Nao ha `zoom`, `transform: scale` nem escala global de layout.
 
-Valores antigos salvos como `grande`, `muito_grande` ou `maximo` sao tratados como legado e voltam para `100%` para evitar quebra de layout. Valores numericos sao limitados entre `0.6` e `1.75`.
+Valores antigos salvos como `grande`, `muito_grande` ou `maximo` sao tratados como legado e voltam para `120%` para evitar quebra de layout. Valores numericos sao limitados entre `0.6` e `1.75`.
 
 ## Sidebar
 
@@ -30,4 +30,4 @@ A migration `043_kanban_ux_theme_sophia_time.sql` cria:
 - `organization_page_visual_settings`;
 - `assistant_feedback_examples`.
 
-As preferencias visuais ainda usam localStorage na interface atual; as tabelas ficam preparadas para persistencia server-side e fundos por menu por organizacao.
+A migration `044_module_hub_external_apps.sql` cria `user_preferences`, que passa a ser a tabela canonica de preferencias visuais por usuario. A API `/api/ui-preferences` usa essa tabela e mantem fallback para `user_ui_preferences` enquanto a migration nova nao estiver aplicada.

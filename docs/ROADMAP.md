@@ -1,5 +1,80 @@
 # GeoGestao - Roadmap
 
+## MODULE-HUB-EXTERNAL-APPS-1
+
+Status: implementado no codigo com migration `044_module_hub_external_apps.sql`, pendente aplicar no Supabase de teste.
+
+Concluido nesta fase:
+
+- hub/seletor de modulos no topo esquerdo;
+- catalogo de modulos por banco;
+- preferencias visuais por usuario em `user_preferences`;
+- auditoria dos apps MeuIMOVEL-CAR, BuscaGEO e Gerador RW5 Local;
+- rota indisponivel/documentada para App 2026-05-29 porque a pasta nao foi encontrada.
+
+Proximos incrementos:
+
+- migrar MeuIMOVEL-CAR reaproveitando a base GeoQuery existente;
+- converter BuscaGEO para jobs por `organization_id` e Storage por organizacao;
+- converter Gerador RW5 Local para fluxo web com upload/download seguro;
+- localizar a pasta real do App 2026-05-29 antes de qualquer implementacao.
+
+## MODULE-HUB-MIGRATION-2
+
+Status: implementado no codigo com migration `045_module_hub_migration_2.sql`, pendente aplicar no Supabase de teste.
+
+Concluido:
+
+- MeuIMOVEL-CAR com busca inicial real;
+- Corretor RTK/PPP funcional inicial;
+- Gerador RW5 funcional inicial;
+- tabelas de jobs para RTK/PPP e RW5;
+- documentacao dedicada dos modulos.
+
+Proximos incrementos:
+
+- salvar/vincular resultados MeuIMOVEL-CAR a cliente/servico;
+- portar writer RW5 completo com conversao UTM/lat-long e blocos de equipamento;
+- persistir downloads com signed URL dedicada;
+- transformar BuscaGEO em worker seguro por organizacao.
+
+## MODULE-HUB-REAL-PORT-1
+
+Status: implementado no codigo com migration `046_module_hub_real_port.sql`, pendente aplicar no Supabase de teste.
+
+Concluido:
+
+- Corretor RTK/PPP funcional com tela completa baseada no app local;
+- Gerador RW5 beta com parser/normalizador e writer RW5 portados dos arquivos Python auditados;
+- BuscaGEO com tela operacional e jobs por `organization_id`, aguardando worker GDAL/CBERS;
+- catalogo do hub ajustado para remover `app-2026-06-25` e exibir status reais.
+
+Proximos incrementos:
+
+- ligar o worker BuscaGEO ao contrato `module_buscageo_jobs`;
+- validar RW5 com arquivos reais de campo e comparar com o app Python;
+- implementar acoes de salvar/vincular resultados do MeuIMOVEL-CAR.
+
+## BUSCAGEO-REAL-INTEGRATION-1
+
+Status: implementado no codigo com migration `047_buscageo_real_integration.sql`, pendente aplicar no Supabase de teste e subir o worker Python.
+
+Concluido:
+
+- UI real em etapas para upload, leitura de area, busca de cenas, selecao e GeoTIFF final;
+- Storage privado no bucket `documentos`;
+- tabela `module_buscageo_jobs` completa com RLS por `organization_id`;
+- worker FastAPI em `workers/buscageo`;
+- callback server-side protegido;
+- documentacao `docs/BUSCAGEO_MODULE.md` e `docs/BUSCAGEO_WORKER.md`.
+
+Proximos incrementos:
+
+- deploy gerenciado do worker com GDAL;
+- validacao com KML/KMZ/SHP reais de producao;
+- refinamento de selecao automatica de cenas e mascaramento de nuvens;
+- vincular resultado final a documentos/servicos quando o usuario solicitar.
+
 ## KANBAN-UX-THEME-SOPHIA-TIME-1
 
 Status: implementado no codigo com migration `043_kanban_ux_theme_sophia_time.sql`, pendente aplicar no Supabase de teste.

@@ -1,5 +1,38 @@
 # GeoGestao - Decisoes do Projeto
 
+## MODULE-HUB-EXTERNAL-APPS-1
+
+- O topo esquerdo do app passa a ser seletor de modulos, nao apenas marca estatica.
+- Apps antigos entram primeiro como rotas internas seguras com status de migracao.
+- Nenhum app antigo sera copiado cegamente sem isolamento por `organization_id`.
+- `user_preferences` passa a ser a tabela canonica de preferencias visuais por usuario.
+- A fonte padrao real para novo usuario e `font_scale = 1.2`.
+- `user_ui_preferences` permanece apenas como compatibilidade legada.
+
+## MODULE-HUB-MIGRATION-2
+
+- MeuIMOVEL-CAR deve reaproveitar as tabelas GeoQuery existentes em vez de duplicar CAR/SIGEF/INCRA.
+- Corretor RTK/PPP e Gerador RW5 rodam como APIs internas Next.js, nao como servidores locais antigos.
+- Jobs de modulos operacionais devem ter `organization_id` e usar Storage em `organizations/{organization_id}/modules/...`.
+- Se o Storage/tabela ainda nao estiver aplicado, o modulo pode entregar download imediato, mas deve avisar que o historico depende da migration.
+
+## MODULE-HUB-REAL-PORT-1
+
+- A rota duplicada `app-2026-06-25` nao fica mais no seletor; o app real e `Gerador RW5`.
+- Corretor RTK/PPP e Gerador RW5 devem portar a logica leve para TypeScript/Next sempre que isso evitar servidor local antigo.
+- BuscaGEO nao deve rodar GDAL pesado em server action/Vercel; a tela cria jobs e o processamento fica para worker/API separada.
+- `worker_pendente` e um status explicito do hub, diferente de `em_migracao`.
+- A pasta `C:\Users\srlan\Documents\Codex\2026-05-29` so vira modulo quando existir e for auditada.
+
+## BUSCAGEO-REAL-INTEGRATION-1
+
+- BuscaGEO usa Supabase Storage privado no bucket `documentos` e paths em `organizations/{organization_id}/modules/buscageo/...`.
+- A interface do GeoGestao controla o fluxo; o processamento pesado fica em worker FastAPI separado.
+- O worker pode usar `SUPABASE_SERVICE_ROLE_KEY`, mas somente fora do frontend.
+- O app Next aciona o worker com `BUSCAGEO_WORKER_SECRET` e recebe atualizacoes por callback protegido.
+- O catalogo local passa a marcar BuscaGEO como `beta`; se o worker nao estiver configurado, o job entra em `worker_pending`.
+- Arquivos `.bat`, servidor local antigo e storage local do app antigo nao sao executados dentro do GeoGestao.
+
 ## UI-SOPHIA-ROUTINE-TASKS-1
 
 93. A ordenacao manual de tarefas usa `sort_order` e define o primeiro item aberto como trabalho provavel atual.

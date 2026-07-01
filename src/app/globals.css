@@ -22,7 +22,7 @@
     --input: 214 24% 88%;
     --ring: 169 60% 25%;
     --radius: 0.5rem;
-    --app-font-scale: 1;
+    --app-font-scale: 1.2;
     --card-title-font-size: calc(1.35rem * var(--app-font-scale));
     --card-subtitle-font-size: calc(1.12rem * var(--app-font-scale));
   }
