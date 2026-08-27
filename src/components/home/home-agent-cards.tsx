@@ -22,16 +22,17 @@ export function HomeAgentCards({ cards }: { cards: HomeAgentCardData[] }) {
     setRunning(slug);
     const response = await fetch(`/api/ai-agents/${slug}/run`, { method: "POST" });
     const data = (await response.json().catch(() => null)) as {
-      run?: { summary?: string | null; status?: string; created_at?: string };
+      run?: { summary?: string | null; status?: string; created_at?: string; output?: unknown };
       error?: string;
     } | null;
     setRunning(null);
+    const runSummary = data?.run?.summary || readRunSummary(data?.run?.output);
     setItems((current) =>
       current.map((item) =>
         item.slug === slug
           ? {
               ...item,
-              summary: data?.run?.summary ?? data?.error ?? "Nao foi possivel atualizar agora.",
+              summary: runSummary ?? data?.error ?? "Nao foi possivel atualizar agora.",
               status: data?.run?.status ?? (data?.error ? "error" : item.status),
               createdAt: data?.run?.created_at ?? new Date().toISOString(),
             }
@@ -74,4 +75,12 @@ export function HomeAgentCards({ cards }: { cards: HomeAgentCardData[] }) {
       ))}
     </div>
   );
+}
+
+function readRunSummary(output: unknown) {
+  if (!output || typeof output !== "object" || Array.isArray(output)) return null;
+  const value = output as Record<string, unknown>;
+  if (typeof value.summary === "string" && value.summary.trim()) return value.summary;
+  if (typeof value.message === "string" && value.message.trim()) return value.message;
+  return null;
 }

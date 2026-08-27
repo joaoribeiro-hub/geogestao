@@ -74,3 +74,7 @@ O pacote `GDAL` pode exigir instalacao nativa ou Conda, especialmente em Windows
 - O worker usa `service_role` apenas fora do frontend.
 - O app Next valida usuario e `organization_id` antes de acionar o worker.
 - O callback tambem exige segredo e atualiza somente o `job_id` da `organization_id` informada.
+
+## Render Free
+
+O container em `workers/buscageo` usa `PORT` fornecida pelo Render, com fallback local `8010`, e expõe `GET /health` com `service: buscageo`. O app Next chama o worker pelo servidor usando `BUSCAGEO_WORKER_URL` e `BUSCAGEO_WORKER_SECRET`; o navegador não recebe o segredo. Consulte `docs/RENDER_FREE_WORKERS.md` para blueprint, health check e troubleshooting de cold start.

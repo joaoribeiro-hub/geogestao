@@ -4,9 +4,9 @@ Fases: `MODULE-HUB-EXTERNAL-APPS-1`, `MODULE-HUB-MIGRATION-2`, `MODULE-HUB-REAL-
 
 ## Objetivo
 
-O GeoGestao funciona como hub principal. O seletor no topo esquerdo lista os modulos internos sem sair do AppShell, mantendo login, empresa atual e isolamento por `organization_id`.
+O GeoGestao continua preservando as rotas de modulos internos, mas a UX principal de abertura de ferramentas passou para `/ferramentas` na fase `FERRAMENTAS-HUB-1`. O topo esquerdo agora funciona como identidade do app e link para `/inicio`, mantendo login, empresa atual e isolamento por `organization_id`.
 
-## Modulos no seletor
+## Modulos legados preservados
 
 - GeoGestao Principal: `/inicio`, status ativo.
 - MeuIMOVEL-CAR: `/modulos/meu-imovel-car`, status beta.
@@ -17,6 +17,16 @@ O GeoGestao funciona como hub principal. O seletor no topo esquerdo lista os mod
 
 A rota duplicada `app-2026-06-25` nao aparece mais no seletor; o app real correspondente e o `Gerador RW5`.
 
+## Hub de Ferramentas
+
+Ver `docs/FERRAMENTAS_HUB.md`.
+
+`/ferramentas` lista:
+
+- ferramentas antigas em `/modulos/...`;
+- novas entradas `Portal do Cliente`, `Desenhar GEO` e `Analise Ambiental`;
+- area `Mais ferramentas` preparada para marketplace futuro.
+
 ## Banco
 
 Migrations:
@@ -25,6 +35,7 @@ Migrations:
 - `045_module_hub_migration_2.sql`: jobs iniciais de RTK/RW5 e tabelas de apoio MeuIMOVEL.
 - `046_module_hub_real_port.sql`: complementa RW5, cria `module_buscageo_jobs`, `module_meu_imovel_queries` e `module_meu_imovel_alerts`.
 - `047_buscageo_real_integration.sql`: completa BuscaGEO, bucket privado, statuses, RLS update e contrato do worker.
+- `048_ferramentas_hub.sql`: metadados de marketplace, entitlement futuro e seed das ferramentas no hub.
 
 ## Seguranca
 

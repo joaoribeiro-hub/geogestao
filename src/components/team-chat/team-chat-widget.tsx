@@ -297,8 +297,9 @@ export function TeamChatWidget({
       <Button
         type="button"
         size="icon"
-        className="relative size-11 rounded-full shadow-lg"
+        className="floating-action-small relative rounded-full shadow-lg"
         aria-label={open ? "Minimizar Chat da equipe" : "Abrir Chat da equipe"}
+        title={open ? "Minimizar Chat da equipe" : "Abrir Chat da equipe"}
         onClick={() => setOpen((current) => !current)}
         data-testid="team-chat-button"
       >

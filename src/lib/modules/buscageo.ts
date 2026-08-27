@@ -1,4 +1,5 @@
 import type { createServerSupabase } from "@/lib/supabase/server";
+import { callWorkerWithRetry } from "@/lib/workers/worker-client";
 
 type ServerSupabase = Awaited<ReturnType<typeof createServerSupabase>>;
 
@@ -221,16 +222,26 @@ export async function callBuscaGeoWorker(path: string, payload: Record<string, u
     };
   }
 
-  const response = await fetch(`${workerUrl}${path}`, {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      authorization: `Bearer ${workerSecret}`,
-    },
-    body: JSON.stringify(payload),
+  const result = await callWorkerWithRetry({
+    url: workerUrl,
+    secret: workerSecret,
+    path,
+    body: payload,
   });
-  const data = await response.json().catch(() => null);
-  return { ok: response.ok, status: response.status, data };
+  return {
+    ok: result.ok,
+    status: result.status,
+    data: result.data,
+    workerStatus: result.workerStatus,
+    message: result.message,
+  };
+}
+
+export function getBuscaGeoWorkerError(
+  result: { data?: Record<string, unknown> | null; message?: string },
+  fallback = "Worker BuscaGEO indisponivel.",
+) {
+  return typeof result.data?.error === "string" ? result.data.error : result.message ?? fallback;
 }
 
 export async function loadBuscaGeoJobForUser(

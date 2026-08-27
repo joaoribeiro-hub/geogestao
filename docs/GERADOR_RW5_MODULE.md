@@ -1,69 +1,66 @@
 # Modulo Gerador RW5
 
-Fase: `MODULE-HUB-REAL-PORT-1`.
+Fase atual: logica final por arquivo isolado, baseada em `PROMPT_CODEX_RW5_LOGICA_FINAL.md`.
 
-## Origem Auditada
+## Rota e fluxo
 
-ZIP auditado:
+- Rota: `/modulos/gerador-rw5`.
+- Entrada: um arquivo TXT, PTS, MC, CSV ou XLSX por conversao.
+- A tela exige nome da obra, data/hora de criacao, software version, CRS e perfil de equipamento.
+- A previa mostra formato, modo de base, ID preservado, pontos, equipamento sugerido, coordenadas e TDOP calculados.
+- A geracao devolve o RW5 e um relatorio estruturado de validacao.
+- Apos gerar, `Baixar latitude / longitude` baixa um TXT tabulado com `Nome`, `latitude` e `longitude`. Os valores sao exatamente os mesmos `LA`/`LN` usados no RW5, incluindo a conversao UTM quando a entrada nao fornece coordenadas validas.
 
-`Gerador_RW5_Local.zip`
+## Parser
 
-Arquivos usados como referencia:
+O parser reconhece os layouts TXT auditados e o XLSX final de 24 colunas. A leitura XLSX respeita referencias de celula, inclusive celulas vazias autocontidas, para impedir deslocamento entre Codigo, metricas, RECPTOR, HR e horarios.
 
-- `app/converter/detect.py`
-- `app/converter/input_normalizer.py`
-- `app/converter/parse_pts.py`
-- `app/converter/parse_mc.py`
-- `app/converter/parse_legacy.py`
-- `app/converter/equipment.py`
-- `app/converter/metrics.py`
-- `app/converter/rw5_writer.py`
+A primeira base valida decide o modo:
 
-## Rota
+- `B_...`: `registered_base`, com `--Base Configuration by Local Coordinate`;
+- `base_...`: `linked_base`, sem o bloco de configuracao da base.
 
-- `/modulos/gerador-rw5`
+O ID e preservado exatamente. Pontos e metadados nunca sao completados a partir de outro arquivo.
 
-## Funcional
+## Coordenadas e qualidade
 
-- Upload de TXT/PTS/MC/CSV.
-- Nome do RW5 de saida.
-- CRS UTM de origem, com padrao `EPSG:31982`.
-- Equipamento: Auto/detectar, CHC i93, CHC i83, CHC i50 ou manual.
-- Tipo de antena RW5.
-- Offset HR/antena.
-- Previa com formato, encoding, delimitador, bases, pontos, antena e equipamento sugerido.
-- Geracao e download `.rw5`.
-- Historico por `module_rw5_jobs` quando migrations 045/046 estao aplicadas.
+- Entrada padrao: `EPSG:31982`; `EPSG:31983` tambem pode ser selecionado.
+- Latitude/longitude ausentes sao calculadas da UTM e escritas como DMS compacto RW5 com 12 casas.
+- `GPS EL` usa 6 casas; `--GS` usa N/E/H com 4 casas.
+- HDOP, VDOP, PDOP e AGE Avg usam 4 casas e nao incluem SD.
+- TDOP e calculado por `sqrt(GDOP^2 - PDOP^2)` somente quando nao veio no arquivo.
+- AGE ausente so recebe valor quando o usuario informa o padrao; nunca e preenchido silenciosamente com zero.
 
-## Logica Portada
+## Equipamentos
 
-A versao TypeScript porta a normalizacao central do app Python:
+Os perfis ficam em `src/lib/modules/rw5/equipment_profiles.json` e sao selecionados por chave unica com modelo e serial. SN e firmware nao sao deduzidos do ID da base.
 
-- MC 19 colunas.
-- PTS 24 colunas.
-- Exportacao com 37 colunas.
-- Layout legado com latitude/longitude.
-- Deteccao de antena CHC.
-- Metricas GNSS padrao quando o arquivo nao informa tudo.
-- Writer com linhas `JB`, `MO`, `BP`, `GPS`, `G0`, `G1`, `G2`, `G3` e comentarios de qualidade.
+Perfis confirmados e completos:
 
-Quando o arquivo nao traz latitude/longitude, o modulo converte UTM SIRGAS para coordenadas RW5 para EPSG:31982/31983 usando formula interna. Nao depende de `pyproj` dentro do Next.
+- i83 / SN 4005499 / FW 1.3.8;
+- i93 / SN 3247131 / FW 2.2.2.1;
+- i93 / SN 3905877 / FW 1.3.8.2.
 
-## Limites
+O laudo confirma os seriais i50 3399386 e 3400353, mas nao informa firmware. Esses perfis permanecem bloqueados para writer ate o FW ser cadastrado. O perfil i90/SN 3781866 vindo do RW5 de referencia exige selecao explicita porque o laudo associa o mesmo serial ao i93.
 
-- A conversao cobre os layouts auditados, mas ainda deve ser validada com bases reais de campo antes de ser tratada como conversor definitivo.
-- OCR, leitura binaria proprietaria e validadores de equipamento muito especificos ficam fora desta fase.
+## Validacao
+
+O relatorio inclui arquivo, modo, base, linhas lidas/ignoradas, pontos, perfis, data da obra, primeira medicao, quantidade de LA/LN e TDOP calculados, AGE padrao, avisos e erros bloqueantes.
+
+Bloqueiam a geracao: base ausente, ponto invalido, campos obrigatorios da obra ausentes, perfil ambiguo/inexistente ou perfil sem SN/FW e parametros de antena.
 
 ## Storage
 
 - `organizations/{organization_id}/modules/gerador-rw5/{job_id}/original`
 - `organizations/{organization_id}/modules/gerador-rw5/{job_id}/resultado.rw5`
 
-## Como Testar
+## Como testar
 
-1. Abrir `/modulos/gerador-rw5`.
-2. Enviar TXT/PTS/MC.
-3. Conferir formato, base, pontos e antena detectados.
-4. Ajustar CRS/equipamento/antena/offset se necessario.
-5. Clicar `Gerar RW5`.
-6. Baixar o arquivo `.rw5`.
+1. Abra `/modulos/gerador-rw5` e envie apenas um arquivo.
+2. Clique em `Pre-visualizar` e confira `registered_base`/`linked_base`, ID, receptor e pontos.
+3. Informe nome e data/hora da obra e selecione o perfil exato do rover e, em `B_`, da base.
+4. Gere e baixe o RW5.
+5. Em `B_`, confirme Base Configuration e ID original em G0/G1; em `base_`, confirme que o bloco nao existe.
+6. Para i50 sem firmware, confirme o bloqueio de validacao em vez de `SN/FW` inventado.
+
+Nao houve alteracao de banco nesta fase.

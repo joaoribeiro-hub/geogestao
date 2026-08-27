@@ -1,11 +1,13 @@
 "use client";
 
-import { FormEvent, useState, useTransition } from "react";
+import { FormEvent, useRef, useState, useTransition } from "react";
+import { usePathname } from "next/navigation";
 import { Bot, Check, Loader2, Send, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import type { Json } from "@/types/database";
+import { SophiaAttachmentInput, type SophiaChatAttachment } from "@/components/sophia/sophia-attachment-input";
 
 type AssistantResponse = {
   conversationId?: string;
@@ -40,9 +42,11 @@ const examples = [
 ];
 
 export function AssistantChat() {
+  const pathname = usePathname();
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [input, setInput] = useState("");
   const [pendingConfirmation, setPendingConfirmation] = useState<AssistantResponse["confirmation"]>(null);
+  const [attachment, setAttachment] = useState<SophiaChatAttachment | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       id: "welcome",
@@ -51,6 +55,7 @@ export function AssistantChat() {
         "Sou a Sophia, assistente do GeoGestao. Posso consultar servicos, clientes, tarefas, propostas/contratos e registrar tarefas ou interacoes sem usar SQL livre.",
     },
   ]);
+  const watchedInboxItems = useRef(new Set<string>());
   const [pending, startTransition] = useTransition();
 
   function submit(event: FormEvent<HTMLFormElement>) {
@@ -65,16 +70,18 @@ export function AssistantChat() {
     },
   ) {
     const message = content.trim();
-    if (!message || pending) return;
+    if ((!message && !attachment) || pending) return;
     const confirmationToSend =
       confirmation ?? (pendingConfirmation && isAffirmative(message) ? pendingConfirmation : undefined);
     const userMessage: ChatMessage = {
       id: crypto.randomUUID(),
       role: "user",
-      content: message,
+      content: message || `Arquivo anexado: ${attachment?.fileName}`,
     };
     setMessages((current) => [...current, userMessage]);
     setInput("");
+    const selectedAttachment = attachment;
+    setAttachment(null);
 
     if (!confirmation && pendingConfirmation && isNegative(message)) {
       setPendingConfirmation(null);
@@ -93,13 +100,15 @@ export function AssistantChat() {
     startTransition(() => {
       void (async () => {
         try {
-          const response = await fetch("/api/assistant", {
+          const response = await fetch("/api/sophia/chat", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             cache: "no-store",
             body: JSON.stringify({
-              message,
+              message: message || "Arquivo anexado para a Sophia.",
+              attachments: selectedAttachment ? [selectedAttachment] : [],
               conversationId,
+              context: { pathname },
               confirmation: confirmationToSend
                 ? {
                     actionName: confirmationToSend.actionName,
@@ -133,6 +142,18 @@ export function AssistantChat() {
               confirmation: data?.confirmation ?? null,
             },
           ]);
+          const inboxItemId = getInboxItemId(data?.data);
+          if (inboxItemId && !watchedInboxItems.current.has(inboxItemId)) {
+            watchedInboxItems.current.add(inboxItemId);
+            void waitForDocumentProcessing(inboxItemId, (statusMessage) => {
+              setMessages((current) => [...current, {
+                id: crypto.randomUUID(),
+                role: "assistant",
+                content: statusMessage,
+                provider: "local",
+              }]);
+            });
+          }
         } catch {
           setMessages((current) => [
             ...current,
@@ -254,7 +275,13 @@ export function AssistantChat() {
             ) : null}
           </div>
 
-          <form className="flex gap-2 border-t p-3" onSubmit={submit}>
+          <form className="flex items-center gap-2 border-t p-3" onSubmit={submit}>
+            <SophiaAttachmentInput
+              attachment={attachment}
+              onUploaded={setAttachment}
+              onClear={() => setAttachment(null)}
+              disabled={pending}
+            />
             <input
               value={input}
               onChange={(event) => setInput(event.target.value)}
@@ -263,7 +290,7 @@ export function AssistantChat() {
               maxLength={1200}
               data-testid="assistant-input"
             />
-            <Button type="submit" disabled={pending || !input.trim()} data-testid="assistant-send">
+            <Button type="submit" disabled={pending || (!input.trim() && !attachment)} data-testid="assistant-send">
               {pending ? <Loader2 className="animate-spin" aria-hidden="true" /> : <Send aria-hidden="true" />}
               Enviar
             </Button>
@@ -307,6 +334,36 @@ function isAffirmative(value: string) {
 
 function isNegative(value: string) {
   return /^(nao|não|cancelar|cancela|deixa|melhor nao|melhor não)$/i.test(value.trim());
+}
+
+function getInboxItemId(data?: Json) {
+  if (!data || typeof data !== "object" || Array.isArray(data)) return null;
+  return typeof data.inbox_item_id === "string" ? data.inbox_item_id : null;
+}
+
+async function waitForDocumentProcessing(inboxItemId: string, onFinished: (message: string) => void) {
+  for (let attempt = 0; attempt < 40; attempt += 1) {
+    await new Promise((resolve) => window.setTimeout(resolve, 1500));
+    const response = await fetch(`/api/sophia/inbox/${inboxItemId}`, { cache: "no-store" }).catch(() => null);
+    if (!response?.ok) continue;
+        const data = await response.json().catch(() => null) as {
+          item?: { status?: string; error_message?: string | null };
+          document?: { processing_status?: string; processing_error?: string | null } | null;
+          chunks?: unknown[];
+          summary?: { summary?: string | null } | null;
+        } | null;
+        const status = data?.item?.status ?? data?.document?.processing_status;
+        if (status === "processed" || status === "concluido") {
+          const summary = data?.summary?.summary?.trim();
+          onFinished(`Documento processado. ${data?.chunks?.length ?? 0} trecho(s) foram indexados.${summary ? `\n\n${summary}` : " Agora você pode perguntar à Sophia sobre o conteúdo."}`);
+          return;
+    }
+    if (["failed", "error", "erro"].includes(status ?? "")) {
+      onFinished(`A leitura documental falhou: ${data?.item?.error_message ?? data?.document?.processing_error ?? "verifique os detalhes na Caixa de entrada da Sophia."}`);
+      return;
+    }
+  }
+  onFinished("O processamento ainda está demorando. Abra a Caixa de entrada da Sophia para acompanhar o resultado.");
 }
 
 function ResultPreview({ data }: { data?: Json }) {

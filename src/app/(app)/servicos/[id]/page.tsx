@@ -4,6 +4,7 @@ import {
   ChecklistItemForm,
   ChecklistToggle,
 } from "@/components/forms/checklist-forms";
+import { ServiceClientPortalPanel } from "@/components/client-portal/service-client-portal-panel";
 import { ProfessionalDocumentsPanel } from "@/components/documents/professional-documents-panel";
 import { AttachmentUploader } from "@/components/forms/attachment-uploader";
 import {
@@ -30,6 +31,7 @@ import {
 } from "@/lib/services/service-flow";
 import { getServiceEstimatedValue } from "@/lib/services/service-finance";
 import { createServerSupabase } from "@/lib/supabase/server";
+import { asUntypedSupabase } from "@/lib/supabase/untyped";
 import { formatDate } from "@/lib/utils";
 import type { Json } from "@/types/database";
 
@@ -44,6 +46,7 @@ export default async function ServiceDetailPage({
   const context = await getCurrentOrganizationContext(supabase, user.id);
   const organization = context.organization;
   if (!organization || !context.membership) notFound();
+  const untypedSupabase = asUntypedSupabase(supabase);
   const { data: card } = await supabase
     .from("service_cards")
     .select("*")
@@ -66,6 +69,7 @@ export default async function ServiceDetailPage({
     propertyInfosResult,
     revenuesResult,
     clientsResult,
+    portalResult,
   ] = await Promise.all([
     card.client_id
       ? supabase
@@ -149,6 +153,12 @@ export default async function ServiceDetailPage({
       .select("*")
       .eq("organization_id", organization.id)
       .order("name"),
+    untypedSupabase
+      .from("client_portals")
+      .select("id,is_active,last_published_at")
+      .eq("organization_id", organization.id)
+      .eq("service_card_id", card.id)
+      .maybeSingle(),
   ]);
 
   const checklists = checklistsResult.data ?? [];
@@ -162,6 +172,7 @@ export default async function ServiceDetailPage({
   const propertyInfos = propertyInfosResult.data ?? [];
   const revenues = revenuesResult.data ?? [];
   const clients = clientsResult.data ?? [];
+  const clientPortal = portalResult.data ?? null;
   const boardColumns = column
     ? (
         await supabase
@@ -325,6 +336,13 @@ export default async function ServiceDetailPage({
           ) : null}
 
           <ServicePropertyInfoPanel serviceCardId={card.id} items={propertyInfos} />
+
+          <ServiceClientPortalPanel
+            serviceCardId={card.id}
+            hasPortal={Boolean(clientPortal)}
+            lastPublishedAt={typeof clientPortal?.last_published_at === "string" ? clientPortal.last_published_at : null}
+            canEdit={canEditService}
+          />
 
           <Card>
             <CardHeader>

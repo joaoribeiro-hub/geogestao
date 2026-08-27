@@ -7,6 +7,7 @@ const preferenceSchema = z.object({
   fontScale: z.string().optional(),
   theme: z.enum(["light", "dark"]).optional(),
   palette: z.string().optional(),
+  lightweightMode: z.boolean().optional(),
 });
 
 type PreferencesClient = {
@@ -18,6 +19,7 @@ type PreferencesClient = {
             font_scale: string | number | null;
             theme_mode?: string | null;
             palette_key?: string | null;
+            lightweight_mode?: boolean | null;
             dark_mode: boolean | null;
             color_palette: string | null;
           } | null;
@@ -38,7 +40,7 @@ export async function GET() {
   const preferencesClient = supabase as unknown as PreferencesClient;
   const table = preferencesClient.from("user_preferences");
   const { data, error } = await table
-    .select("font_scale,theme_mode,palette_key")
+    .select("font_scale,theme_mode,palette_key,lightweight_mode")
     .eq("user_id", user.id)
     .maybeSingle();
 
@@ -53,6 +55,7 @@ export async function GET() {
     fontScale: data?.font_scale ?? null,
     theme: data?.theme_mode === "dark" ? "dark" : "light",
     palette: data?.palette_key ?? null,
+    lightweightMode: data?.lightweight_mode === true,
   });
 }
 
@@ -67,16 +70,16 @@ export async function PATCH(request: Request) {
 
   const preferencesClient = supabase as unknown as PreferencesClient;
   const table = preferencesClient.from("user_preferences");
-  const { error } = await table.upsert(
-    {
-      user_id: user.id,
-      font_scale: normalizeFontScale(parsed.data.fontScale),
-      theme_mode: parsed.data.theme ?? "light",
-      palette_key: parsed.data.palette ?? "agrimensura_verde",
-      updated_at: new Date().toISOString(),
-    },
-    { onConflict: "user_id" },
-  );
+  const values: Record<string, unknown> = {
+    user_id: user.id,
+    updated_at: new Date().toISOString(),
+  };
+  if (parsed.data.fontScale !== undefined) values.font_scale = normalizeFontScale(parsed.data.fontScale);
+  if (parsed.data.theme !== undefined) values.theme_mode = parsed.data.theme;
+  if (parsed.data.palette !== undefined) values.palette_key = parsed.data.palette;
+  if (parsed.data.lightweightMode !== undefined) values.lightweight_mode = parsed.data.lightweightMode;
+
+  const { error } = await table.upsert(values, { onConflict: "user_id" });
 
   if (error && isMissingPreferencesTable(error.message)) {
     return saveLegacyPreferences(preferencesClient, {
@@ -109,6 +112,7 @@ async function loadLegacyPreferences(preferencesClient: PreferencesClient, userI
       fontScale: "1.2",
       theme: "light",
       palette: "agrimensura_verde",
+      lightweightMode: false,
     });
   }
   if (error) {
@@ -119,6 +123,7 @@ async function loadLegacyPreferences(preferencesClient: PreferencesClient, userI
     fontScale: normalizeFontScale(data?.font_scale),
     theme: data?.dark_mode ? "dark" : "light",
     palette: data?.color_palette ?? "agrimensura_verde",
+    lightweightMode: false,
   });
 }
 
@@ -157,7 +162,7 @@ function normalizeFontScale(value: string | number | null | undefined) {
     typeof value === "number"
       ? value
       : Number(String(value ?? "1.2").replace(",", ".").replace("x", ""));
-  if (!Number.isFinite(parsed)) return "1.2";
-  const clamped = Math.min(1.75, Math.max(0.6, parsed));
+  if (!Number.isFinite(parsed) || parsed < 0.6) return "1.2";
+  const clamped = Math.min(1.75, parsed);
   return String(Math.round(clamped * 20) / 20);
 }

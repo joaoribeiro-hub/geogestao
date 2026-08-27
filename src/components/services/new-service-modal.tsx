@@ -13,14 +13,16 @@ export function NewServiceModal({
   columns,
   columnByServiceType,
   members,
+  autoOpen = false,
 }: {
   clients: Client[];
   columns: ServiceColumn[];
   columnByServiceType: Partial<Record<ProposalServiceType, string>>;
   members?: Array<{ id: string; label: string }>;
+  autoOpen?: boolean;
 }) {
   const router = useRouter();
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(autoOpen);
   const [feedback, setFeedback] = useState<string | null>(null);
 
   return (

@@ -1,0 +1,93 @@
+services:
+  - type: web
+    name: geogestao-buscageo-worker
+    runtime: docker
+    plan: free
+    rootDir: workers/buscageo
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /health
+    envVars:
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: BUSCAGEO_WORKER_SECRET
+        sync: false
+      - key: BUSCAGEO_STORAGE_BUCKET
+        value: documentos
+      - key: BUSCAGEO_TMP_DIR
+        value: /tmp/buscageo
+
+  - type: web
+    name: geogestao-analise-ambiental-worker
+    runtime: docker
+    plan: free
+    rootDir: workers/analise-ambiental
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /health
+    envVars:
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: ANALISE_AMBIENTAL_WORKER_SECRET
+        sync: false
+      - key: ANALISE_AMBIENTAL_STORAGE_BUCKET
+        value: documentos
+      - key: ANALISE_AMBIENTAL_PROVIDER
+        value: mapbiomas_gee
+      - key: ANALISE_AMBIENTAL_LOCAL_FIXTURE_ENABLED
+        value: "false"
+      - key: GEE_PROJECT_ID
+        sync: false
+      - key: GEE_SERVICE_ACCOUNT_EMAIL
+        sync: false
+      - key: GEE_PRIVATE_KEY
+        sync: false
+      - key: GEE_SERVICE_ACCOUNT_JSON_BASE64
+        sync: false
+      - key: MAPBIOMAS_10M_ASSET_ID
+        sync: false
+      - key: MAPBIOMAS_YEAR
+        value: "2025"
+      - key: MAPBIOMAS_COLLECTION
+        value: coverage_10m
+      - key: ANALISE_AMBIENTAL_HIDRO_PROVIDER
+        value: ana_bho6_gpkg
+      - key: ANA_BHO6_TRECHO_DRENAGEM_URL
+        sync: false
+      - key: ANA_BHO6_TRECHO_DRENAGEM_PATH
+        sync: false
+      - key: ANA_HIDRO_CACHE_DIR
+        value: /tmp/ana
+      - key: ANA_HIDRO_ENABLE_ARCGIS_FALLBACK
+        value: "false"
+
+  - type: web
+    name: geogestao-sophia-documents-worker
+    runtime: docker
+    plan: free
+    rootDir: workers/sophia-documents
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /health
+    envVars:
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: SOPHIA_DOCUMENT_WORKER_SECRET
+        sync: false
+      - key: SOPHIA_DOCUMENT_STORAGE_BUCKET
+        value: documentos
+      - key: SOPHIA_DOCUMENT_OCR_PROVIDER
+        value: tesseract
+      - key: SOPHIA_DOCUMENT_OCR_LANGS
+        value: por+eng
+      - key: SOPHIA_DOCUMENT_MAX_FILE_MB
+        value: "50"
+      - key: SOPHIA_DOCUMENT_ENABLE_GEMINI
+        value: "false"
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GEMINI_AGENT_MODEL
+        value: gemini-2.5-flash

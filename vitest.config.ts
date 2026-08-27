@@ -10,6 +10,8 @@ export default defineConfig({
   test: {
     environment: "jsdom",
     globals: true,
+    pool: "vmThreads",
+    maxWorkers: 4,
     include: [
       "tests/unit/**/*.test.ts",
       "tests/unit/**/*.test.tsx",

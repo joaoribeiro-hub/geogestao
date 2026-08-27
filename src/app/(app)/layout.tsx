@@ -3,6 +3,7 @@ import { headers } from "next/headers";
 import { AppShell } from "@/components/layout/app-shell";
 import { getCurrentOrganizationContext } from "@/lib/organization";
 import { createServerSupabase } from "@/lib/supabase/server";
+import { normalizeOperationalProfile } from "@/lib/operational-profile";
 
 export default async function AuthenticatedLayout({
   children,
@@ -35,10 +36,13 @@ export default async function AuthenticatedLayout({
 
   return (
     <AppShell
+      userId={user.id}
       userEmail={user.email}
       userName={profile?.full_name ?? null}
       limitedMode={needsOrganization}
       membershipRole={context.membership?.role ?? null}
+      operationalProfile={normalizeOperationalProfile(context.organization?.operational_profile)}
+      organizationId={context.organization?.id ?? null}
     >
       {children}
     </AppShell>

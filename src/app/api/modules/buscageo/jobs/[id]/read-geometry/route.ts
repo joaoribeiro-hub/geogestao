@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireUser } from "@/lib/auth";
-import { appendBuscaGeoLog, buscaGeoJobsTable, callBuscaGeoWorker, loadBuscaGeoJobForUser, mapBuscaGeoJob, type BuscaGeoJobRow } from "@/lib/modules/buscageo";
+import { appendBuscaGeoLog, buscaGeoJobsTable, callBuscaGeoWorker, getBuscaGeoWorkerError, loadBuscaGeoJobForUser, mapBuscaGeoJob, type BuscaGeoJobRow } from "@/lib/modules/buscageo";
 import { requireOrganization } from "@/lib/organization";
 import { createServerSupabase } from "@/lib/supabase/server";
 
@@ -31,10 +31,11 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     callback_url: new URL("/api/modules/buscageo/worker/callback", request.url).toString(),
   });
   if (!worker.ok) {
+    const workerError = getBuscaGeoWorkerError(worker, "Worker BuscaGEO nao configurado.");
     const updated = await updateJob(supabase, context.organization.id, id, {
       status: "worker_pending",
-      parameters: { ...(job.parameters ?? {}), progress: 10, message: worker.data?.error ?? "Worker nao configurado." },
-      logs: appendBuscaGeoLog(pending, worker.data?.error ?? "Worker BuscaGEO nao configurado."),
+      parameters: { ...(job.parameters ?? {}), progress: 10, message: workerError },
+      logs: appendBuscaGeoLog(pending, workerError),
     });
     return NextResponse.json(await mapBuscaGeoJob(supabase, updated), { status: worker.status === 503 ? 200 : worker.status });
   }

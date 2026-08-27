@@ -63,4 +63,10 @@ Sem cron real nesta entrega. Recomendacoes futuras:
 - liberar reservas antigas;
 - processar jobs pendentes em intervalo curto;
 - retentar jobs com erro controlado.
+# Processamento documental da Sophia
 
+O pipeline atual usa `workers/sophia-documents` na porta 8030. A extração local é determinística e o OCR só é aplicado em páginas/imagens que precisam. O estado fica em `documents.processing_status`, `sophia_inbox_items.status`, `document_processing_jobs`, `document_extracted_pages` e `document_chunks`.
+
+O processamento é explícito pelo endpoint autenticado `POST /api/sophia/inbox/{id}/process`. Sem as variáveis do worker, o upload não é perdido: a tela informa que a leitura ainda não está configurada.
+
+PDF textual usa PyMuPDF; DOCX usa python-docx; TXT/CSV/MD usam leitura local; imagens e páginas com pouco texto tentam Tesseract. Embeddings/pgvector e PaddleOCR são fases posteriores. A busca inicial usa Postgres/trechos textuais e citações de página.

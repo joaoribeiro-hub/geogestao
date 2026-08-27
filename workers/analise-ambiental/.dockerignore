@@ -1,0 +1,12 @@
+__pycache__/
+.pytest_cache/
+.venv/
+tmp/
+data/dev/*.tif
+data/
+outputs/
+*.zip
+*.log
+*.json
+.env
+.env.local

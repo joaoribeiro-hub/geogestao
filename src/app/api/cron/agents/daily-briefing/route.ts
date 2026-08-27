@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { runAiAgent } from "@/lib/ai-agents/runner";
 import { createAdminSupabase } from "@/lib/supabase/admin";
+import { runSophiaAgentPipeline } from "@/lib/sophia/v3/agent-orchestrator";
 
 const BRAZIL_TIME_ZONE = "America/Sao_Paulo";
 
@@ -41,33 +41,22 @@ export async function GET(request: Request) {
     for (const member of members ?? []) {
       const isOwner = member.role === "owner";
       try {
-        const briefing = await runAiAgent({
+        const pipeline = await runSophiaAgentPipeline({
           supabase,
           organizationId: organization.id,
           userId: member.user_id,
-          slug: "briefing-matinal",
           isOwner,
-          triggerType: "cron",
           runDate: today,
+          includeWeekly: weekday === 1,
         });
+        const briefing = pipeline.find((item) => item.slug === "briefing-matinal")?.run;
         const result: { organizationId: string; userId: string; briefing: string; weekly?: string } = {
           organizationId: organization.id,
           userId: member.user_id,
-          briefing: briefing.status,
+          briefing: briefing?.status ?? "completed",
         };
-
-        if (weekday === 1) {
-          const weekly = await runAiAgent({
-            supabase,
-            organizationId: organization.id,
-            userId: member.user_id,
-            slug: "revisao-semanal",
-            isOwner,
-            triggerType: "cron",
-            runDate: today,
-          });
-          result.weekly = weekly.status;
-        }
+        const weekly = pipeline.find((item) => item.slug === "revisao-semanal")?.run;
+        if (weekly) result.weekly = weekly.status;
 
         results.push(result);
       } catch (error) {

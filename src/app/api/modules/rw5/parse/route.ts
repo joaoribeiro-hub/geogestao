@@ -15,10 +15,23 @@ export async function POST(request: Request) {
   const formData = await request.formData();
   const file = formData.get("file");
   if (!(file instanceof File)) {
-    return NextResponse.json({ error: "Envie um arquivo TXT, PTS ou MC." }, { status: 400 });
+    return NextResponse.json({ error: "Envie um arquivo TXT, PTS, MC, CSV ou XLSX." }, { status: 400 });
   }
 
   const crs = String(formData.get("crs") ?? "EPSG:31982");
-  const { text, encoding } = await readUploadedText(file);
-  return NextResponse.json(parseRw5Text(text, { encoding, sourceName: file.name, crs }));
+  const defaultRoverHr = Number(String(formData.get("defaultRoverHr") ?? "1.700").replace(",", "."));
+  const defaultAgeText = String(formData.get("defaultAge") ?? "").trim();
+  const defaultAge = defaultAgeText ? Number(defaultAgeText.replace(",", ".")) : null;
+  try {
+    const { text, encoding } = await readUploadedText(file);
+    return NextResponse.json(parseRw5Text(text, {
+      encoding,
+      sourceName: file.name,
+      crs,
+      defaultRoverHr: Number.isFinite(defaultRoverHr) ? defaultRoverHr : 1.7,
+      defaultAge: Number.isFinite(defaultAge) ? defaultAge : null,
+    }));
+  } catch (error) {
+    return NextResponse.json({ error: error instanceof Error ? error.message : "Nao foi possivel ler o arquivo." }, { status: 400 });
+  }
 }

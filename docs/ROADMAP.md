@@ -1,5 +1,30 @@
 # GeoGestao - Roadmap
 
+## SOPHIA-3-COGNITIVE-CORE-DOCUMENT-INTELLIGENCE-1
+
+Status: implementado incrementalmente com migration `058_sophia_3_cognitive_core.sql`.
+
+Concluido: runtime cognitivo, FTS/Self-RAG, reflexoes com aprovacao do owner, skills, fila documental, trigger de eventos, pipeline de agentes e provider OpenAI-compatible preparado.
+
+Proximos incrementos: embeddings/pgvector opcional, OCR/layout avancado com Docling/OCRmyPDF, avaliacao automatica de casos, reacao de negocio por evento com confirmacao e providers locais.
+
+## ANALISE-AMBIENTAL-ANA-HIDRO-1
+
+Status: implementado no código, sem migration nova.
+
+Concluído:
+
+- provider `ana_hidrografia_oficial` no worker Python;
+- cache local da BHO 6 ANA/SNIRH;
+- recorte por AOI e outputs KML, GeoJSON e SHP.zip para `hidrografia_oficial`;
+- UI habilita a camada apenas quando o worker está configurado.
+
+Próximos incrementos:
+
+- configurar URL/caminho definitivo da BHO 6 em produção;
+- validar com propriedades reais em diferentes regiões;
+- avaliar massas d'água oficiais em polígono como camada complementar.
+
 ## MODULE-HUB-EXTERNAL-APPS-1
 
 Status: implementado no codigo com migration `044_module_hub_external_apps.sql`, pendente aplicar no Supabase de teste.
@@ -670,3 +695,139 @@ Status: implementado no código com migration `037_integrations_agents_tasks_imp
 - Agentes com execução manual inicial.
 - Widget Tarefa/Lembrete.
 - Importação Trello/planilha para Serviços.
+
+## FERRAMENTAS-HUB-1
+
+Status: implementado no código com migration `048_ferramentas_hub.sql`.
+
+Concluído:
+
+- `/ferramentas` como hub principal de ferramentas;
+- cards com busca, filtro por categoria, status, tags e botões `Abrir`/`Detalhes`;
+- novas entradas `Portal do Cliente`, `Desenhar GEO` e `Análise Ambiental`;
+- preparação de marketplace/entitlements sem cobrança real;
+- preservação das rotas antigas de módulos.
+
+Próximos incrementos:
+
+- implementar Portal do Cliente dentro do detalhe do serviço;
+- portar motor geométrico real do Desenhar GEO;
+- criar jobs/worker da Análise Ambiental;
+- conectar cobrança real quando a regra comercial estiver definida.
+
+## TOOLS-NEXT-PHASES-1
+
+Status: implementado no código com migration `049_tools_next_phases.sql`.
+
+Concluído:
+
+- Portal do Cliente com publicação inicial por serviço e link público seguro.
+- Desenhar GEO com cálculo local e DXF inicial.
+- Análise Ambiental com upload/job/histórico sem processamento raster no frontend.
+
+Próximos incrementos:
+
+- Portal: documentos publicados, PIN, QR Code e edição de textos públicos.
+- Desenhar GEO: importação em massa, KML georreferenciado e DWG via conversor externo.
+- Ambiental: provider GEE/MapBiomas real, hidrologia por DEM, SHP.zip e validação com bases reais.
+
+## ANALISE-AMBIENTAL-WORKER-1
+
+Status: implementado no código com migration `050_analise_ambiental_worker.sql`, pendente aplicar no Supabase de teste e subir o worker Python.
+
+Concluído:
+
+- Worker Python FastAPI separado do Next;
+- job completo com parser KML/KMZ/ZIP, área, bbox, CRS, outputs e relatório;
+- signed URLs de download pelo app;
+- fixture local marcada como `dev_fixture`;
+- provider GEE preparado e desativado.
+
+## ANALISE-AMBIENTAL-WORKER-2-CAMADAS-E-OUTPUTS
+
+Status: implementado no código com migration `051_analise_ambiental_layers_outputs.sql`, pendente aplicar no Supabase de teste.
+
+Concluído:
+
+- camada limite com KML, GeoJSON e SHP.zip;
+- camadas dev_fixture de vegetação, água/represa e drenagem/córrego;
+- pacote completo e relatório ambiental;
+- painel por camada na ferramenta.
+
+Próximos incrementos:
+
+- substituir `dev_fixture` por providers reais `mapbiomas_local`, `gee_mapbiomas`, `hidro_local` e `dem_drenagem`;
+- validar camadas com bases oficiais e arquivos reais.
+
+## ANALISE-AMBIENTAL-MAPBIOMAS-REAL-1
+
+Status: implementado no código com migration `052_analise_ambiental_mapbiomas_real.sql`, pendente aplicar no Supabase de teste e validar com GeoTIFF real.
+
+Concluído:
+
+- `mapbiomas_real` lê GeoTIFF, recorta pela propriedade e vetoriza classes reais por pixels;
+- camadas mínimas MapBiomas: vegetação nativa, floresta, agropecuária, água e área não vegetada;
+- `dev_fixture` fica explícito como simulado e não como conclusão real;
+- UI mostra fonte real/simulada, cores por camada, área e percentual.
+
+Próximos incrementos:
+
+- automatizar obtenção do raster via GEE/MapBiomas remoto;
+- validar legenda por coleção oficial usada em produção;
+- adicionar mapa interativo com renderização das camadas vetoriais;
+- integrar hidrologia real por DEM/base oficial.
+
+## ANALISE-AMBIENTAL-GEE-AUTO-1
+
+Status: implementado no código com migration `053_analise_ambiental_gee_auto.sql`, pendente configurar credenciais GEE e validar com asset real.
+
+Concluído:
+
+- KML/KMZ/ZIP é o input principal da Análise Ambiental;
+- `mapbiomas_gee` baixa recorte MapBiomas via Earth Engine e processa localmente;
+- GeoTIFF manual fica como modo avançado/developer;
+- `dev_fixture` não é fallback silencioso e permanece simulado;
+- UI distingue MapBiomas/GEE real, GeoTIFF manual, raster público e simulado.
+
+Próximos incrementos:
+
+- exportação assíncrona GEE para AOIs grandes;
+- configuração operacional dos assets MapBiomas por coleção;
+- mapa interativo com camadas vetoriais coloridas.
+# Sophia 2.0
+
+- Implementado núcleo inicial: orquestrador, tool registry, contexto, permissões, confirmação humana, auditoria e inbox universal.
+- Próximos passos: ampliar workers de leitura documental, embeddings/semântica avançada, automações recorrentes por eventos e UI dedicada para aprovar regras aprendidas.
+
+## Sophia 4.0
+
+- [x] Runtime em grafo e trace por no.
+- [x] Skills/SOPs reais, agentes internos e verificacao de tools.
+- [x] Reflexao estruturada, aprovacao do owner e evals por organizacao.
+- [x] Painel lateral responsivo e acessivel.
+- [ ] Embeddings/pgvector opcionais com estrategia de custo e isolamento definida.
+- [ ] Mais verificadores de banco para cada nova tool de escrita.
+- [ ] Processamento proativo amplo de eventos com fila e politicas configuraveis.
+
+## WORKERS-RENDER-FREE-DEPLOY-1
+
+Concluído nesta fase:
+
+- Dockerfiles dos três workers com `$PORT`, dependências nativas e health check.
+- Cliente server-side com despertar/retry para cold start do Render Free.
+- Monitoramento restrito em `/sistema/workers`.
+- Blueprint opcional em `render.yaml` e documentação de variáveis/deploy.
+
+Próximos incrementos:
+
+- volumes persistentes ou plano pago para caches grandes da Análise Ambiental;
+- observabilidade centralizada e métricas de fila;
+- autoscaling e workers assíncronos dedicados.
+## UI e perfis operacionais
+
+- [x] Perfis Padrão, Agrimensura e Arquitetura por organização.
+- [x] Filtro inicial de ferramentas por perfil.
+- [x] Edição de tipos e etapas do Kanban para owner.
+- [x] Base de acessibilidade, foco visível e command menu.
+- [ ] Catálogo completo de ferramentas e tipos específicos de Arquitetura.
+- Sophia Document Intelligence: worker local, OCR sob demanda, chunks com página e busca citável implementados na migration `057_sophia_document_intelligence.sql`; embeddings/pgvector e PaddleOCR ficam para etapa futura.

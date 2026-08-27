@@ -22,6 +22,14 @@
     --input: 214 24% 88%;
     --ring: 169 60% 25%;
     --radius: 0.5rem;
+    --space-control: 0.625rem;
+    --sidebar-width: 16rem;
+    --card-padding: 1rem;
+    --target-size: 2.75rem;
+    --focus-ring: 169 60% 25%;
+    --sidebar-bg: 0 0% 100%;
+    --sidebar-active: 210 30% 94%;
+    --floating-action-bg: 0 0% 100%;
     --app-font-scale: 1.2;
     --card-title-font-size: calc(1.35rem * var(--app-font-scale));
     --card-subtitle-font-size: calc(1.12rem * var(--app-font-scale));
@@ -98,6 +106,11 @@
 
   * {
     @apply border-border;
+  }
+
+  :where(a, button, input, textarea, select):focus-visible {
+    outline: 3px solid hsl(var(--focus-ring));
+    outline-offset: 2px;
   }
 
   html {
@@ -181,12 +194,98 @@
     z-index: 9999;
     display: flex;
     flex-direction: column;
-    gap: 14px;
+    gap: 16px;
     align-items: center;
   }
 
+  .floating-action-small {
+    width: 72px;
+    height: 72px;
+    min-width: 72px;
+    min-height: 72px;
+  }
+
+  .floating-action-small svg {
+    width: 32px !important;
+    height: 32px !important;
+  }
+
+  .floating-sophia-button {
+    width: 92px;
+    height: 92px;
+    min-width: 92px;
+    min-height: 92px;
+  }
+
+  .floating-sophia-button svg {
+    width: 42px !important;
+    height: 42px !important;
+  }
+
+  .sophia-panel-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 10000;
+    border: 0;
+    background: rgb(2 6 23 / 0.38);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 280ms ease;
+  }
+
+  .sophia-panel-overlay.is-open {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .sophia-side-panel {
+    position: fixed;
+    inset-block: 0;
+    right: 0;
+    z-index: 10001;
+    display: flex;
+    width: min(500px, 100vw);
+    height: 100dvh;
+    flex-direction: column;
+    border-left: 1px solid hsl(var(--border));
+    background: hsl(var(--background));
+    color: hsl(var(--foreground));
+    box-shadow: -18px 0 48px rgb(2 6 23 / 0.2);
+    opacity: 0;
+    pointer-events: none;
+    transform: translateX(100%);
+    transition: transform 280ms ease, opacity 280ms ease;
+  }
+
+  .sophia-side-panel[data-open="true"] {
+    opacity: 1;
+    pointer-events: auto;
+    transform: translateX(0);
+  }
+
+  [data-testid="app-shell"][data-lightweight="true"] [data-nav-group="main"] [data-nav-key="rotina"],
+  [data-testid="app-shell"][data-lightweight="true"] [data-nav-group="main"] [data-nav-key="clientes"],
+  [data-testid="app-shell"][data-lightweight="true"] [data-nav-group="main"] [data-nav-key="financeiro"],
+  [data-testid="app-shell"][data-lightweight="true"] [data-nav-group="main"] [data-nav-key="relatorios"],
+  [data-testid="app-shell"][data-lightweight="true"] [data-nav-group="main"] [data-nav-key="propostas"],
+  [data-testid="app-shell"][data-lightweight="true"] [data-nav-group="main"] [data-nav-key="contratos"],
+  [data-testid="app-shell"][data-lightweight="true"] [data-nav-group="mobile"] [data-nav-key="rotina"],
+  [data-testid="app-shell"][data-lightweight="true"] [data-nav-group="mobile"] [data-nav-key="clientes"],
+  [data-testid="app-shell"][data-lightweight="true"] [data-nav-group="mobile"] [data-nav-key="financeiro"],
+  [data-testid="app-shell"][data-lightweight="true"] [data-nav-group="mobile"] [data-nav-key="relatorios"],
+  [data-testid="app-shell"][data-lightweight="true"] [data-nav-group="mobile"] [data-nav-key="propostas"],
+  [data-testid="app-shell"][data-lightweight="true"] [data-nav-group="mobile"] [data-nav-key="contratos"] {
+    display: none;
+  }
+
   .app-sidebar {
+    width: var(--sidebar-width);
     transition: transform 180ms ease;
+  }
+
+  [data-nav-group="main"] a,
+  [data-nav-group="settings"] a {
+    min-height: 44px;
   }
 
   .app-content {
@@ -219,5 +318,38 @@
 
   body {
     background: white;
+  }
+}
+
+@media (max-width: 640px) {
+  .floating-action-small {
+    width: 56px;
+    height: 56px;
+    min-width: 56px;
+    min-height: 56px;
+  }
+
+  .floating-action-small svg {
+    width: 27px !important;
+    height: 27px !important;
+  }
+
+  .floating-sophia-button {
+    width: 68px;
+    height: 68px;
+    min-width: 68px;
+    min-height: 68px;
+  }
+
+  .floating-sophia-button svg {
+    width: 34px !important;
+    height: 34px !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sophia-panel-overlay,
+  .sophia-side-panel {
+    transition-duration: 1ms;
   }
 }

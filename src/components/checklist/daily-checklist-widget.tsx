@@ -503,8 +503,9 @@ export function DailyChecklistWidget({
       <Button
         type="button"
         size="icon"
-        className="relative size-11 rounded-full shadow-lg"
+        className="floating-action-small relative rounded-full shadow-lg"
         aria-label={open ? "Minimizar tarefa" : "Abrir tarefa"}
+        title={open ? "Minimizar tarefa" : "Abrir tarefa"}
         onClick={() => setOpen((current) => !current)}
         data-testid="daily-checklist-button"
       >

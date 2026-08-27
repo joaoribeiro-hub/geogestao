@@ -5,6 +5,7 @@ import { requireUser } from "@/lib/auth";
 import { getCurrentOrganizationForUser } from "@/lib/organization";
 import { createServerSupabase } from "@/lib/supabase/server";
 import type { Json } from "@/types/database";
+import { recordSophiaV4Feedback } from "@/lib/sophia/v4/reflexion-loop";
 
 const feedbackSchema = z.object({
   conversationId: z.string().uuid().optional().nullable(),
@@ -89,6 +90,23 @@ export async function POST(request: Request) {
       console.warn("[assistant:feedback] nao foi possivel salvar exemplo sanitizado", {
         message: sanitizedError.message,
       });
+    }
+  }
+
+  if (parsed.data.rating === "negative") {
+    try {
+      await recordSophiaV4Feedback({
+        context: { supabase, organizationId: organization.id, user, membership: null, isOwner: false },
+        messageId: parsed.data.messageId,
+        question: parsed.data.messageText,
+        answer: parsed.data.assistantResponse,
+        feedback: parsed.data.correctionText ?? "A resposta foi marcada como incorreta.",
+        correction: parsed.data.correctionText,
+      });
+    } catch (reflectionError) {
+      if (process.env.NODE_ENV !== "production") {
+        console.warn("[sophia:reflection] nao foi possivel registrar reflexao", reflectionError);
+      }
     }
   }
 

@@ -44,6 +44,8 @@ export function makeServiceColumn(
     name: "A Fazer",
     slug: "a-fazer",
     position: 0,
+    is_active: true,
+    organization_id: null,
     ...overrides,
   };
 }

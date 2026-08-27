@@ -30,7 +30,14 @@ describe("MODULE-HUB-MIGRATION-2", () => {
       "base_1\tBASE\t7500000\t500000\t500\t-\t0\t0\t1.093\t26\t26\tAutonomo\t0.01\t0.01\t0.01\t0.014\t0.02\t2026-02-21 08:00:00\t2026-02-21 08:00:00",
       "1\tP1\t7500001\t500001\t501\tbase_1\t1.8\t1\t1.093\t26\t26\tFixo\t0.01\t0.01\t0.01\t0.014\t0.02\t2026-02-21 08:01:00\t2026-02-21 08:01:00",
     ].join("\n"));
-    const rw5 = buildBasicRw5({ points: parsed.points, filename: "teste.txt" });
+    const rw5 = buildBasicRw5({
+      points: parsed.points,
+      filename: "teste.txt",
+      jobName: "teste",
+      jobCreationDate: "2026-02-20",
+      jobCreationTime: "08:00:00",
+      equipment: "i93-3247131",
+    });
 
     expect(parsed.baseCount).toBe(1);
     expect(parsed.pointCount).toBe(1);

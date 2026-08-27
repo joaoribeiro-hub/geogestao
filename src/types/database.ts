@@ -220,6 +220,7 @@ export type Database = {
           storage_used_bytes: number;
           storage_reserved_bytes: number;
           status: OrganizationStatus;
+          operational_profile: "padrao" | "agrimensura" | "arquitetura";
         };
         Insert: {
           id?: string;
@@ -234,6 +235,7 @@ export type Database = {
           storage_used_bytes?: number;
           storage_reserved_bytes?: number;
           status?: OrganizationStatus;
+          operational_profile?: "padrao" | "agrimensura" | "arquitetura";
           created_at?: string;
           updated_at?: string;
         };
@@ -249,6 +251,7 @@ export type Database = {
           storage_used_bytes?: number;
           storage_reserved_bytes?: number;
           status?: OrganizationStatus;
+          operational_profile?: "padrao" | "agrimensura" | "arquitetura";
           updated_at?: string;
         };
         Relationships: [];
@@ -275,6 +278,65 @@ export type Database = {
           user_id?: string;
           role?: OrganizationRole;
           status?: OrganizationMemberStatus;
+        };
+        Relationships: [];
+      };
+      organization_service_board_settings: {
+        Row: {
+          id: string;
+          organization_id: string;
+          board_id: string;
+          is_visible: boolean;
+          position: number;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          organization_id: string;
+          board_id: string;
+          is_visible?: boolean;
+          position?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          organization_id?: string;
+          board_id?: string;
+          is_visible?: boolean;
+          position?: number;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      organization_service_column_settings: {
+        Row: {
+          id: string;
+          organization_id: string;
+          column_id: string;
+          is_visible: boolean;
+          position: number;
+          custom_name: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          organization_id: string;
+          column_id: string;
+          is_visible?: boolean;
+          position?: number;
+          custom_name?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          organization_id?: string;
+          column_id?: string;
+          is_visible?: boolean;
+          position?: number;
+          custom_name?: string | null;
+          updated_at?: string;
         };
         Relationships: [];
       };
@@ -1148,6 +1210,9 @@ export type Database = {
           slug: string;
           description: string | null;
           position: number;
+          organization_id: string | null;
+          operational_profile: "padrao" | "agrimensura" | "arquitetura";
+          is_active: boolean;
         };
         Insert: {
           id?: string;
@@ -1155,6 +1220,9 @@ export type Database = {
           slug: string;
           description?: string | null;
           position?: number;
+          organization_id?: string | null;
+          operational_profile?: "padrao" | "agrimensura" | "arquitetura";
+          is_active?: boolean;
           created_at?: string;
           updated_at?: string;
         };
@@ -1163,6 +1231,9 @@ export type Database = {
           slug?: string;
           description?: string | null;
           position?: number;
+          organization_id?: string | null;
+          operational_profile?: "padrao" | "agrimensura" | "arquitetura";
+          is_active?: boolean;
           updated_at?: string;
         };
         Relationships: [];
@@ -1173,6 +1244,8 @@ export type Database = {
           name: string;
           slug: string;
           position: number;
+          is_active: boolean;
+          organization_id: string | null;
         };
         Insert: {
           id?: string;
@@ -1180,6 +1253,8 @@ export type Database = {
           name: string;
           slug: string;
           position?: number;
+          is_active?: boolean;
+          organization_id?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -1188,6 +1263,8 @@ export type Database = {
           name?: string;
           slug?: string;
           position?: number;
+          is_active?: boolean;
+          organization_id?: string | null;
           updated_at?: string;
         };
         Relationships: [];

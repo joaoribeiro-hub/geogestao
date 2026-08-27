@@ -1,5 +1,22 @@
 # GeoGestao - Decisoes do Projeto
 
+## SOPHIA-3-COGNITIVE-CORE-DOCUMENT-INTELLIGENCE-1
+
+- `document_chunks` existente e reaproveitado; a migration adiciona FTS em vez de criar uma tabela paralela de chunks.
+- pgvector nao e obrigatorio: FTS e fallback textual continuam sendo a base funcional.
+- Feedback negativo gera reflexao por organizacao/usuario; regra candidata exige evidencia e aprovacao do owner.
+- Eventos de `organization_activity_log` entram em fila por trigger e sao processados por cron protegido.
+- Planos multi-etapas ficam restritos a leituras; escrita, exclusao, financeiro e documento sensivel continuam exigindo confirmacao.
+- Gemini permanece padrao. Provider OpenAI-compatible e apenas uma interface server-side para uso futuro/local.
+
+## ANALISE-AMBIENTAL-ANA-HIDRO-1
+
+- `Água` e `Hidrografia oficial` são camadas diferentes: `Água` vem da classificação raster MapBiomas; `Hidrografia oficial` vem da base vetorial ANA/SNIRH BHO 6.
+- A BHO 6 não deve ser baixada a cada job. O worker usa cache local em `ANA_HIDRO_CACHE_DIR`.
+- A fonte principal da hidrografia oficial é `GEOFT_BHO_TRECHO_DRENAGEM.gpkg`, versão 6.2.4.
+- A UI só habilita `Hidrografia oficial` quando o worker informa que o provider ANA/BHO6 está configurado.
+- O fallback ArcGIS fica apenas preparado por variável e não substitui o GPKG como fonte principal nesta fase.
+
 ## MODULE-HUB-EXTERNAL-APPS-1
 
 - O topo esquerdo do app passa a ser seletor de modulos, nao apenas marca estatica.
@@ -266,6 +283,39 @@ Data do checkpoint: 2026-05-11
 91. Formularios grandes de criacao pontual devem abrir por botao + modal. Minha Empresa > Informacoes e excecao: permanece na pagina em modo visualizacao com botao Editar.
 
 92. A navegacao padrao autenticada abre em `/inicio`; deep links especificos continuam respeitados.
+
+93. Ferramentas passam a ser abertas pelo menu lateral em `/ferramentas`. O topo esquerdo volta a ser identidade do GeoGestao e link para `/inicio`; rotas antigas em `/modulos/...` continuam preservadas.
+
+94. Marketplace/cobrança por ferramenta fica preparado em `app_modules` e `organization_modules`, mas todas as ferramentas visiveis ficam liberadas no ambiente de teste.
+
+95. Portal do Cliente, Desenhar GEO e Analise Ambiental entram como rotas iniciais beta. Motores pesados, portal publico real e worker ambiental ficam para fases especificas.
+
+96. O MapBiomas User Toolkit anexado e referencia conceitual para GEE/assets/classes; nao foi copiado nem usado como dependencia funcional do GeoGestao.
+
+97. Portal do Cliente usa link público com token aleatório e guarda apenas `token_hash`. A rota pública recebe um DTO via função `security definer`, sem liberar SELECT direto nas tabelas internas.
+
+98. Desenhar GEO executa cálculo local em TypeScript e permite DXF local. KML continua bloqueado até existir georreferenciamento real com CRS informado.
+
+99. Análise Ambiental cria jobs e salva KML/KMZ/ZIP em Storage privado, mas processamento raster/vetorial fica obrigatoriamente em worker Python separado.
+
+100. Análise Ambiental passa a usar worker Python em `workers/analise-ambiental`; o Next.js não processa raster pesado e apenas cria jobs, aciona o worker e assina downloads.
+
+101. Resultados ambientais de desenvolvimento precisam declarar `source = dev_fixture`; dados oficiais/GEE ficam desativados até configuração explícita futura.
+
+102. Job ambiental só deve ser considerado completo quando as camadas ambientais solicitadas foram geradas ou quando a pendência de provider ficou explícita em `provider_pendente`.
+
+103. Shapefile de Análise Ambiental sempre é entregue como `.shp.zip`, nunca como `.shp` isolado.
+104. Análise Ambiental só pode tratar `dev_fixture` como resultado simulado. O status deve ser `simulado`, o relatório deve trazer `provider = dev_fixture` e `official_data = false`, com aviso visível na UI.
+
+105. O provider real inicial da Análise Ambiental é `mapbiomas_real`, alimentado por GeoTIFF local/URL/uploadado. Ele recorta o raster pela AOI e vetoriza classes por pixels; sem raster configurado, o worker não inventa geometria ambiental.
+
+106. A legenda MapBiomas usada pelo worker fica centralizada em `workers/analise-ambiental/app/mapbiomas_classes.py` para ajuste por coleção sem espalhar códigos no processamento.
+
+107. O fluxo principal da Análise Ambiental deve usar `mapbiomas_gee`: o usuário envia apenas KML/KMZ/ZIP e o worker consulta Earth Engine. GeoTIFF manual é modo avançado/developer.
+
+108. Credenciais GEE e service account ficam exclusivamente no worker. Nenhuma variável GEE deve usar `NEXT_PUBLIC` ou ser enviada ao frontend.
+
+109. `MAPBIOMAS_10M_ASSET_ID` é obrigatório para `mapbiomas_gee` e não deve ser hardcoded no código, pois asset/coleção/ano podem mudar.
 ## INTEGRATIONS-AGENTS-TASKS-IMPORT-1
 
 - Google Drive é armazenamento opcional por usuário e não substitui o Supabase Storage como padrão.
@@ -274,3 +324,44 @@ Data do checkpoint: 2026-05-11
 - Sophia é o nome de interface do Assistente IA; as intents e a action registry permanecem iguais.
 - Agentes executam server-side, salvam `ai_agent_runs` e não executam ações diretas sem validação backend.
 - Importação Trello usa dry-run antes da confirmação e pula duplicados por `Card ID`.
+# Sophia 2.0
+
+- Sophia 2.0 evolui a rota conversacional sem remover `/api/assistant`.
+- Toda tool da Sophia precisa apontar para funcionalidade real do GeoGestao; funcionalidades futuras não entram como mock.
+- Escritas passam por confirmação humana e por validação server-side.
+- `access_state`/`billing_mode` controlam acesso comercial futuro de módulos sem substituir o status operacional do módulo.
+# GERADOR-RW5-LOGICA-FINAL
+
+- O modo do RW5 e decidido pela primeira base valida do proprio arquivo: `B_` e registrado; `base_` e vinculado.
+- Arquivos sao processados isoladamente; nenhum ponto, base ou equipamento de outro arquivo completa a conversao atual.
+- Perfis de equipamento sem SN/FW confirmado bloqueiam a geracao.
+- Celulas XLSX vazias sao preservadas pela referencia de coluna para evitar deslocamento de dados.
+## Fase UI-PERFIS-ACESSIBILIDADE-SERVICOS-1
+
+- O perfil operacional é uma configuração da organização e fica em `organizations.operational_profile`.
+- Tipos personalizados de serviço ficam vinculados à organização; os boards históricos globais de Agrimensura são preservados para compatibilidade.
+- Desativação de tipo ou etapa é soft delete e nunca pode deixar cards órfãos.
+- O command menu inicial usa Ctrl/Cmd+K e navega por rotas seguras, ficando preparado para busca contextual.
+### Sophia Document Intelligence
+
+- A Sophia processa documentos primeiro localmente e só usa Gemini opcionalmente para interpretação de trechos, sem enviar o arquivo inteiro por padrão.
+- O worker documental é separado do Next.js e é o único componente autorizado a usar `SUPABASE_SERVICE_ROLE_KEY`.
+- Busca textual e citações por página são o caminho inicial; embeddings, pgvector e PaddleOCR ficam desacoplados para fase posterior.
+
+### Workers no Render Free
+
+- Os workers Python são serviços Docker independentes; o Next.js continua sendo o único proxy chamado pelo navegador.
+- O contrato mínimo de disponibilidade é `GET /health` sem autenticação, retornando `status: ok` e `service`; operações continuam protegidas pelo segredo server-side.
+- A porta de produção é sempre a variável `$PORT` do Render, com fallback local específico de cada worker.
+- Cold start é tratado no servidor com health check e espera limitada a 90 segundos; não há retry infinito nem exposição de segredos.
+- O armazenamento persistente de resultados permanece no Supabase Storage; cache local do plano Free é descartável.
+
+### Sophia 4.0
+
+- A Sophia 4 e uma camada incremental sobre Sophia 2/3; `/api/assistant` permanece compativel.
+- Regras locais, permissoes e tools reais precedem qualquer chamada de modelo.
+- Gemini recomendado e `gemini-2.5-flash-lite`; ausencia de Gemini usa `local_stub` e nao derruba as operacoes locais.
+- Supervisor apenas roteia. Agentes internos nao sao microservicos e nao executam varias chamadas caras por padrao.
+- Escrita so e sucesso depois de confirmacao humana e verificacao; falha de verificacao nunca vira mensagem de sucesso.
+- Aprendizado de empresa exige evidencia repetida e aprovacao do owner. Template global precisa ser sanitizado.
+- A Sophia abre em painel lateral de altura total; a UI nao altera worker, OCR ou RAG.

@@ -7,6 +7,7 @@ coverage
 playwright-report
 test-results
 dist
+/tmp/
 *.tsbuildinfo
 .next-dev.*.log
 .codex-dev-server.log
@@ -22,3 +23,6 @@ geogestao_assistente_frases_*.txt
 *.prj
 *.geojson
 *.zip
+workers/*service-account*.json
+workers/*credentials*.json
+workers/awesome-dogfish-*.json

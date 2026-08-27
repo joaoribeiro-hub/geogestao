@@ -1,5 +1,41 @@
 # GeoGestao - Testes Automatizados
 
+## SOPHIA-3-COGNITIVE-CORE-DOCUMENT-INTELLIGENCE-1
+
+Testes unitarios: `tests/unit/sophia-3-cognitive-core.test.ts`.
+
+Validar:
+
+- aplicar `058_sophia_3_cognitive_core.sql` depois de 057;
+- enviar TXT, PDF, DOCX e imagem pelo inbox;
+- conferir `sophia_document_ingestion_jobs`, chunks e FTS;
+- perguntar algo sem evidencia e confirmar recusa segura;
+- marcar resposta como dislike e repetir a correcao ate gerar candidato;
+- aprovar candidato em `/sophia/aprendizados` como owner;
+- inserir uma atividade e conferir evento pendente/processado pelo cron;
+- conferir que membro nao acessa reflexoes/candidatos de outra organizacao;
+- testar `SOPHIA_MODEL_PROVIDER=openai_compatible` somente com endpoint interno autorizado.
+
+## ANALISE-AMBIENTAL-ANA-HIDRO-1
+
+Testes automatizados adicionados:
+
+- `workers/analise-ambiental/tests/test_ana_hidrografia_provider.py`
+
+Validações executadas:
+
+- `python -m pytest workers/analise-ambiental/tests`
+
+Testes manuais recomendados:
+
+- Configurar `ANALISE_AMBIENTAL_HIDRO_PROVIDER=ana_bho6_gpkg`.
+- Configurar `ANA_BHO6_TRECHO_DRENAGEM_PATH` para o arquivo `GEOFT_BHO_TRECHO_DRENAGEM.gpkg` da ANA/BHO6, ou `ANA_BHO6_TRECHO_DRENAGEM_URL` para `.gpkg`/`.zip`.
+- Reiniciar o worker.
+- Abrir `/ferramentas/analise-ambiental` e confirmar que `Hidrografia oficial` fica habilitada.
+- Enviar um KML, selecionar `Hidrografia oficial` e processar.
+- Conferir outputs `hidrografia_oficial.kml`, `hidrografia_oficial.geojson` e `hidrografia_oficial.shp.zip`.
+- Abrir o relatório JSON e conferir provider `ana_hidrografia_oficial`, fonte `ANA/SNIRH BHO 6` e versão `6.2.4`.
+
 ## MODULE-HUB-EXTERNAL-APPS-1
 
 Testes automatizados adicionados:
@@ -27,6 +63,7 @@ Testes manuais recomendados:
 - Abrir `/modulos/corretor-rtk-ppp`, enviar TXT com base e pontos numericos, calcular delta e baixar TXT corrigido.
 - Abrir `/modulos/gerador-rw5`, enviar TXT/PTS/MC, pre-visualizar pontos, gerar e baixar RW5.
 - Conferir em Supabase que `module_rtk_ppp_jobs` e `module_rw5_jobs` respeitam `organization_id`.
+- Para MP-03/PTS_RTK, validar `tests/unit/rw5-mp03-autodetection.test.ts`: PTS20 CHCI50, PTS24 CHCI93, base registrada `B_`, CHCI83 e ponto alfanumerico `MP03`.
 - Validar que nenhum modulo usa `.bat`, `127.0.0.1:8765`, `ThreadingHTTPServer` ou `webbrowser.open`.
 
 ## MODULE-HUB-REAL-PORT-1
@@ -599,7 +636,205 @@ Testar:
 - Abrir widget `Tarefa`, criar tarefa e criar lembrete na aba `Lembrete`.
 - Importar planilha Trello em Serviços: primeiro dry-run, depois confirmar.
 
+## FERRAMENTAS-HUB-1
+
+Testes automatizados adicionados:
+
+- `tests/unit/ferramentas-hub.test.ts`
+- `tests/unit/module-hub.test.ts` atualizado para a nova UX.
+
+Testes manuais recomendados:
+
+- Abrir `/inicio` e confirmar que o topo esquerdo mostra a identidade do GeoGestao.
+- Confirmar que o menu lateral mostra `Ferramentas` abaixo de `Inicio`.
+- Abrir `/ferramentas`.
+- Buscar por `RW5`, `ambiental`, `cliente` e confirmar filtro dos cards.
+- Abrir `MeuIMOVEL-CAR`, `BuscaGEO`, `Corretor RTK/PPP` e `Gerador RW5` a partir dos cards.
+- Abrir `/ferramentas/portal-cliente`.
+- Abrir `/ferramentas/desenhar-geo`.
+- Abrir `/ferramentas/analise-ambiental`.
+- Confirmar que `/modulos`, `/modulos/buscageo`, `/modulos/meu-imovel-car`, `/modulos/corretor-rtk-ppp` e `/modulos/gerador-rw5` continuam acessiveis.
+
+Aplicar no Supabase de teste:
+
+- `supabase/migrations/048_ferramentas_hub.sql`
+
+## TOOLS-NEXT-PHASES-1
+
+Testes automatizados adicionados:
+
+- `tests/unit/tools-next-phases.test.ts`
+
+Testes manuais recomendados:
+
+- Aplicar `supabase/migrations/049_tools_next_phases.sql`.
+- Abrir um serviço e conferir o card `Portal do Cliente`.
+- Clicar em `Publicar portal`, copiar o link e abrir `/p/[token]`.
+- Conferir que a página pública mostra apenas dados públicos do serviço.
+- Abrir `/ferramentas/desenhar-geo`, calcular o exemplo quadrado e baixar DXF.
+- Testar rumo como `S 32°15'20" E`.
+- Confirmar que KML segue bloqueado no modo local.
+- Abrir `/ferramentas/analise-ambiental`, enviar KML/KMZ/ZIP e conferir o job no histórico.
+- Conferir no Supabase que `module_environmental_analysis_jobs.organization_id` é a organização atual.
+
 Comandos:
+
+- `npm run typecheck`
+- `npm run build`
+- `npm run test`
+
+## ANALISE-AMBIENTAL-WORKER-1
+
+Testes automatizados adicionados:
+
+- `tests/unit/analise-ambiental-worker.test.ts`
+- `workers/analise-ambiental/tests`
+
+Testes manuais recomendados:
+
+- Aplicar `supabase/migrations/050_analise_ambiental_worker.sql`.
+- Configurar `ANALISE_AMBIENTAL_WORKER_URL` e `ANALISE_AMBIENTAL_WORKER_SECRET` no Next.
+- Configurar `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` e `ANALISE_AMBIENTAL_WORKER_SECRET` no worker.
+- Rodar `setup-analise-ambiental-worker.bat`.
+- Rodar `iniciar-analise-ambiental-worker.bat`.
+- Abrir `/ferramentas/analise-ambiental`.
+- Enviar KML/KMZ/ZIP.
+- Clicar em `Processar agora`.
+- Atualizar histórico e baixar outputs.
+
+Validações:
+
+- `python -m pytest workers/analise-ambiental/tests`
+- `npm run typecheck`
+- `npm run build`
+- `npm run test`
+
+## ANALISE-AMBIENTAL-WORKER-2-CAMADAS-E-OUTPUTS
+
+Testes automatizados adicionados/atualizados:
+
+- `tests/unit/analise-ambiental-worker.test.ts`
+- `workers/analise-ambiental/tests/test_layers_outputs.py`
+
+Testes manuais recomendados:
+
+- Aplicar `supabase/migrations/051_analise_ambiental_layers_outputs.sql`.
+- Reprocessar um job em `/ferramentas/analise-ambiental`.
+- Confirmar cards de Limite, Vegetação existente, Água/represa e Drenagem/córrego.
+- Confirmar botões `Baixar KML`, `Baixar GeoJSON`, `Baixar SHP`.
+- Confirmar `Baixar pacote completo`.
+- Conferir no Supabase registros em `environmental_analysis_outputs`.
+
+## ANALISE-AMBIENTAL-MAPBIOMAS-REAL-1
+
+Testes automatizados adicionados:
+
+- `workers/analise-ambiental/tests/test_mapbiomas_real_provider.py`
+
+Testes manuais recomendados:
+
+- Aplicar `supabase/migrations/052_analise_ambiental_mapbiomas_real.sql`.
+- Configurar no worker `ANALISE_AMBIENTAL_PROVIDER=mapbiomas_real`.
+- Informar `MAPBIOMAS_RASTER_LOCAL_PATH` ou enviar um GeoTIFF no campo opcional da tela.
+- Abrir `/ferramentas/analise-ambiental`, enviar KML/KMZ/ZIP e GeoTIFF MapBiomas recortado.
+- Clicar em `Processar agora`.
+- Confirmar que a UI mostra `Resultado Real MapBiomas`.
+- Confirmar camadas separadas de vegetação nativa, floresta, agropecuária, água e área não vegetada.
+- Confirmar área e percentual por camada.
+- Baixar KML, GeoJSON e SHP.zip de cada camada.
+- Repetir com `ANALISE_AMBIENTAL_LOCAL_FIXTURE_ENABLED=true` e `ANALISE_AMBIENTAL_PROVIDER=dev_fixture` para confirmar aviso `Resultado simulado para teste`.
+
+Validações:
+
+- `python -m py_compile workers/analise-ambiental/main.py`
+- `python -m pytest workers/analise-ambiental/tests`
+- `npm run typecheck`
+- `npm run build`
+- `npm run test`
+
+## ANALISE-AMBIENTAL-GEE-AUTO-1
+
+Testes automatizados adicionados:
+
+- `workers/analise-ambiental/tests/test_mapbiomas_gee_provider.py`
+
+Testes manuais recomendados:
+
+- Aplicar `supabase/migrations/053_analise_ambiental_gee_auto.sql`.
+- Instalar dependências do worker com `pip install -r workers/analise-ambiental/requirements-base.txt`.
+- Configurar no worker:
+  - `ANALISE_AMBIENTAL_PROVIDER=mapbiomas_gee`;
+  - `GEE_PROJECT_ID`;
+  - `GEE_SERVICE_ACCOUNT_JSON_BASE64` ou `GEE_SERVICE_ACCOUNT_EMAIL` + `GEE_PRIVATE_KEY`;
+  - `MAPBIOMAS_10M_ASSET_ID`;
+  - `MAPBIOMAS_YEAR`.
+- Abrir `/ferramentas/analise-ambiental`.
+- Enviar apenas KML/KMZ/ZIP.
+- Confirmar que o campo GeoTIFF fica recolhido em modo avançado.
+- Processar o job.
+- Confirmar que a UI mostra `MapBiomas/GEE real`.
+- Se GEE não estiver configurado, confirmar mensagem amigável de provider pendente.
+- Para AOI grande, confirmar status `export_required` quando o download direto exceder limite.
+
+Validações:
+
+- `python -m py_compile workers/analise-ambiental/main.py`
+- `python -m pytest workers/analise-ambiental/tests`
+- `npm run typecheck`
+- `npm run build`
+- `npm run test`
+# Sophia 2.0
+
+- Rodar `npm run test -- tests/unit/sophia-2-architecture.test.ts` para validar migration, registry de tools, confirmação, endpoint novo e inbox.
+- Testar no app: abrir Sophia, pedir serviços/tarefas/clientes e confirmar que a resposta vem de `/api/sophia/chat`.
+- Testar escrita: pedir criação de tarefa ou conclusão de etapa e conferir a confirmação antes da action.
+- Testar inbox: abrir `/sophia/inbox`, enviar arquivo permitido e conferir registro em `sophia_inbox_items`.
+
+## GERADOR-RW5-LOGICA-FINAL
+
+- `tests/unit/rw5-mp03-autodetection.test.ts` cobre layouts TXT, XLSX final com celulas vazias, `B_`/`base_`, IDs alfanumericos, DOP/AGE, TDOP calculado, precisao do writer e bloqueio de equipamento incompleto.
+- Validacao local de referencia confirmou, isoladamente, Tiago XLSX e Josivaldo TXT como `registered_base`; Josivaldo/Rogerio XLSX e Rogerio/Tiago TXT como `linked_base`.
+- Conferir manualmente que a tela exige nome e data/hora da obra e permite selecionar o perfil exato por serial.
+- Confirmar que perfis i50 sem firmware sao bloqueados e nao geram `FW` ficticio.
+- Rodar `npm run typecheck`, `npm run build` e `npm run test`.
+## Validação da fase UI-PERFIS-ACESSIBILIDADE-SERVICOS-1
+
+1. Rodar `npm run typecheck`, `npm run build` e `npm run test`.
+2. Como owner, abrir **Temas**, alternar o perfil e recarregar; a escolha deve permanecer.
+3. Abrir Ferramentas em Agrimensura, Padrão e Arquitetura; apenas ferramentas permitidas pelo perfil devem aparecer.
+4. Em Serviços, abrir **Editar**, criar um tipo e uma etapa, arrastar a ordem, recarregar e confirmar a persistência.
+5. Tentar desativar uma etapa com cards; o sistema deve exigir destino e nunca apagar o card.
+6. Pressionar Ctrl/Cmd+K e executar um comando.
+7. Navegar apenas por teclado e confirmar foco visível em sidebar, menus, tabs e modal.
+- Sophia Document Intelligence: após aplicar `057_sophia_document_intelligence.sql`, subir o worker na porta 8030, enviar TXT/PDF/DOCX/imagem na Inbox, processar explicitamente e conferir status, páginas, chunks e isolamento por organização.
+
+## Validação da fase WORKERS-RENDER-FREE-DEPLOY-1
+
+- `npm run typecheck`
+- `npm run build`
+- `npm run test` (health, porta `$PORT`, retry de cold start e blueprint sem secrets)
+- `python -m py_compile workers/buscageo/main.py workers/analise-ambiental/main.py workers/sophia-documents/main.py`
+- `cd workers/analise-ambiental && .venv/Scripts/python.exe -m pytest tests`
+- `cd workers/sophia-documents && .venv/Scripts/python.exe -m pytest tests`
+
+Não há E2E destrutivo nesta fase. Para validação manual, confira `/health` de cada serviço no Render, depois `/sistema/workers` como owner/admin e uma operação real de cada módulo. O primeiro request pode demorar por causa do cold start do Render Free.
+
+## SOPHIA-4-ADAPTIVE-AGENT-CORE-1
+
+Testes automatizados:
+
+- `tests/unit/sophia-4-adaptive-agent-core.test.ts` valida a ordem dos 18 nós, as 13 skills, seleção local sem Gemini, bloqueio financeiro, verificação de tools, Self-RAG, sanitização, reflexões, suite inicial de 8 evals, migration 059 e o painel lateral acessível.
+- `npm run test -- tests/unit/sophia-4-adaptive-agent-core.test.ts` executa somente a fase.
+
+Validação manual:
+
+- Como membro, perguntar `O que a Natalia esta fazendo agora?` e confirmar que a Sophia consulta atividade real sem depender do Gemini.
+- Pedir uma escrita, como concluir etapa ou alterar prazo, e confirmar que a ação só executa depois da confirmação humana e aparece como verificada.
+- Perguntar sobre documento sem evidência e confirmar a recusa segura; com documento processado, conferir documento, página e indicação de OCR quando aplicável.
+- Como owner, abrir `/sophia/aprendizados`; como owner/admin, abrir `/sophia/evals` e executar os casos.
+- Abrir o painel da Sophia pelo botão flutuante; verificar X, ESC, overlay, foco no input, anexos e comportamento mobile.
+
+Validações finais:
 
 - `npm run typecheck`
 - `npm run build`

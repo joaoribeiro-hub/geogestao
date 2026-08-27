@@ -19,10 +19,12 @@ describe("module hub", () => {
     expect(getModuleByKey("app-2026-05-29")?.status).toBe("indisponivel");
   });
 
-  it("usa o switcher no topo do AppShell", () => {
+  it("mantem rotas antigas, mas usa Ferramentas como UX principal", () => {
     const appShell = readFileSync(join(process.cwd(), "src/components/layout/app-shell.tsx"), "utf8");
 
-    expect(appShell).toContain("ModuleSwitcher");
+    expect(appShell).toContain('href: "/ferramentas"');
+    expect(appShell).toContain('href="/inicio"');
+    expect(appShell).not.toContain("<ModuleSwitcher");
     expect(appShell).not.toContain("<Archive");
   });
 

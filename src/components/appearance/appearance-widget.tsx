@@ -176,8 +176,9 @@ export function AppearanceWidget() {
         type="button"
         size="icon"
         variant="outline"
-        className="size-11 rounded-full bg-card shadow-lg"
+        className="floating-action-small rounded-full bg-card shadow-lg"
         aria-label={open ? "Fechar aparencia" : "Abrir aparencia"}
+        title={open ? "Fechar aparencia" : "Abrir aparencia"}
         onClick={() => setOpen((current) => !current)}
       >
         <Settings aria-hidden="true" />
@@ -226,7 +227,8 @@ function resolveFontScale(value: string | number | null | undefined) {
     return DEFAULT_FONT_SCALE;
   }
   const parsed = typeof value === "number" ? value : Number(String(value ?? "").replace(",", ".").replace("x", ""));
-  return clampFontScale(Number.isFinite(parsed) ? parsed : DEFAULT_FONT_SCALE);
+  if (!Number.isFinite(parsed) || parsed < MIN_FONT_SCALE) return DEFAULT_FONT_SCALE;
+  return clampFontScale(parsed);
 }
 
 function clampFontScale(value: number) {

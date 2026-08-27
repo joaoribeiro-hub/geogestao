@@ -40,3 +40,8 @@ Nesta fase a execução é manual em Minha Conta > Agentes. O resultado fica em 
 Se `GEMINI_API_KEY` estiver configurada, o backend usa Gemini para redigir o resumo. Sem chave, gera resumo operacional local.
 
 Cron automático fica preparado para fase futura.
+# Sophia 2.0
+
+Sophia passa a ter uma camada operacional acima dos agentes salvos em `ai_agents`: `/api/sophia/chat` resolve contexto, escolhe tools reais registradas, valida permissões, exige confirmação para escrita e registra auditoria em `sophia_runs`/`sophia_tool_calls`.
+
+Os agentes recorrentes continuam em `ai_agents` e `ai_agent_runs`. Sophia 2.0 não substitui Briefing/Revisão; ela os consulta e prepara a expansão multiagente.

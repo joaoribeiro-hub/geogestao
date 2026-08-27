@@ -1,5 +1,47 @@
 # GeoGestao - Estado Atual do Projeto
 
+## SOPHIA-3-COGNITIVE-CORE-DOCUMENT-INTELLIGENCE-1
+
+Implementado incrementalmente:
+
+- runtime cognitivo tipado em `src/lib/sophia/v3`;
+- plano multi-step limitado a ate tres tools somente leitura;
+- memoria separada por tipo e filtro de usuario/organizacao;
+- FTS em `document_chunks` com fallback textual e respostas Self-RAG citaveis;
+- reflexoes, candidatos de regra e tela owner `/sophia/aprendizados`;
+- skills catalogadas e provider OpenAI-compatible preparado, sem modelo local embutido;
+- trigger de eventos a partir de `organization_activity_log` e cron protegido de processamento;
+- fila de ingestao documental ligada ao inbox e atualizacao pelo worker.
+
+Migration: `058_sophia_3_cognitive_core.sql`.
+
+Limites: OCR continua local, pgvector e modelos open-source ficam opcionais; eventos proativos processam memoria episodica, mas nao executam acoes sensiveis sem confirmacao.
+
+## GERADOR-RW5-LOGICA-FINAL
+
+- parser final aceita TXT/XLSX isolado e reconhece o cabecalho padrao de 24 colunas sem deslocar celulas vazias;
+- primeira base `B_` ou `base_` define, respectivamente, writer registrado ou vinculado, preservando o ID original;
+- latitude/longitude RW5 sao calculadas da UTM com 12 casas quando ausentes;
+- writer usa campos obrigatorios da obra, precisao final de coordenadas/altitude e metricas reais sem zeros artificiais;
+- perfis de equipamentos sao separados por serial; geracao bloqueia SN/FW ausente ou perfil ambiguo;
+- relatorio de validacao acompanha previa/geracao;
+- nenhuma migration nova foi necessaria.
+
+## ANALISE-AMBIENTAL-ANA-HIDRO-1
+
+Implementado:
+
+- provider real `ana_hidrografia_oficial` no worker Python;
+- suporte à BHO 6 da ANA/SNIRH, versão 6.2.4, usando `GEOFT_BHO_TRECHO_DRENAGEM.gpkg`;
+- cache local da base ANA via `ANA_HIDRO_CACHE_DIR`, com download único por URL quando configurado;
+- recorte vetorial por AOI com CRS `EPSG:4674`, filtro por bbox e interseção;
+- outputs `hidrografia_oficial.kml`, `hidrografia_oficial.geojson` e `hidrografia_oficial.shp.zip`;
+- relatório JSON com provider, fonte, versão, CRS, quantidade de trechos e nomes encontrados;
+- UI diferencia `Água` MapBiomas raster de `Hidrografia oficial` ANA vetorial;
+- `Hidrografia oficial` só fica selecionável quando o worker indica provider ANA configurado.
+
+Migration: não criada.
+
 ## MODULE-HUB-EXTERNAL-APPS-1
 
 Implementado:
@@ -39,6 +81,7 @@ Implementado:
 - parser RTK alinhado ao ZIP auditado (`ID`, descricao, Norte, Este, Altitude), com calculo de delta e exportacao TXT;
 - Gerador RW5 recebeu campos do app original: nome de saida, CRS, equipamento, antena e offset HR;
 - Gerador RW5 porta a normalizacao de MC 19, PTS 24, exportacao 37 colunas e legado, com writer RW5 mais completo;
+- Gerador RW5 agora detecta layouts MP-03/PTS_RTK reais, base registrada `B_`, CHCI50/CHCI83/CHCI90/CHCI93, preserva IDs alfanumericos e usa perfis de equipamento editaveis em JSON.
 - BuscaGEO saiu do placeholder e ganhou tela operacional com upload de poligono, parametros CBERS, job persistido e areas de preview/cenas/historico;
 - Hub remove o modulo duplicado `app-2026-06-25` do seletor e trata o app real como `gerador-rw5`;
 - migration `046_module_hub_real_port.sql` complementa RW5, cria `module_buscageo_jobs`, `module_meu_imovel_queries` e `module_meu_imovel_alerts`.
@@ -1044,3 +1087,125 @@ Migration: `036_ux_clean_company_knowledge.sql`.
 - O widget flutuante de checklist passa a se chamar Tarefa e ganha aba Lembrete.
 - Início mostra indicadores quantitativos apenas para owner.
 - Serviços ganhou importação de planilhas Trello com dry-run e prevenção de duplicados por Card ID.
+
+## FERRAMENTAS-HUB-1
+
+Implementado:
+
+- nova página `/ferramentas` como hub/marketplace interno;
+- menu lateral ganhou `Ferramentas` abaixo de `Inicio`;
+- topo esquerdo deixou de ser seletor principal de módulos e virou identidade/link para `/inicio`;
+- rotas antigas `/modulos/...` continuam preservadas;
+- ferramentas antigas aparecem em `Minhas ferramentas`;
+- novas rotas iniciais criadas para `Portal do Cliente`, `Desenhar GEO` e `Análise Ambiental`;
+- camada central `src/lib/tools/tool-access.ts` preparada para entitlement/cobrança futura;
+- `app_modules`, `organization_modules` e `module_activity_logs` foram reaproveitadas.
+
+Migration: `048_ferramentas_hub.sql`.
+
+## TOOLS-NEXT-PHASES-1
+
+Implementado:
+
+- Portal do Cliente ganhou painel no detalhe do serviço, geração de link privado com token hash, rota pública `/p/[token]` e DTO público seguro.
+- Desenhar GEO ganhou motor local para azimute, rumo e deflexão, cálculo de vértices, fechamento, visualização SVG e download DXF.
+- Análise Ambiental ganhou upload KML/KMZ/ZIP, criação de job persistido, Storage privado e histórico por organização.
+
+Migration: `049_tools_next_phases.sql`.
+
+## ANALISE-AMBIENTAL-WORKER-1
+
+Implementado:
+
+- worker Python FastAPI em `workers/analise-ambiental`;
+- endpoints `GET /health`, `POST /jobs/{job_id}/process` e `POST /jobs/poll`;
+- rotas Next para listar job, ver detalhe, acionar worker e gerar signed URLs dos outputs;
+- leitura de KML/KMZ/ZIP, validação de AOI, bbox, área e CRS métrico estimado;
+- exportação de `limite.geojson`, `limite.kml` e `relatorio.json`;
+- provider local `dev_fixture` para validar vegetação/água sem dados externos;
+- provider GEE preparado e desativado por padrão;
+- scripts Windows para setup e início do worker.
+
+Migration: `050_analise_ambiental_worker.sql`.
+
+## ANALISE-AMBIENTAL-WORKER-2-CAMADAS-E-OUTPUTS
+
+Implementado:
+
+- outputs ambientais por camada em `environmental_analysis_outputs`;
+- status mais claros: `limite_extraido`, `provider_pendente` e `gerando_outputs`;
+- geração de `limite`, `vegetacao_existente`, `agua_represa` e `drenagem_corrego`;
+- cada camada gera KML, GeoJSON e SHP.zip;
+- pacote completo `pacote_resultados.zip`;
+- relatório `relatorio_ambiental.json` com provider, camadas, warnings e arquivos;
+- frontend lista resultados por camada com botões KML/GeoJSON/SHP e pacote completo.
+
+Migration: `051_analise_ambiental_layers_outputs.sql`.
+
+## ANALISE-AMBIENTAL-MAPBIOMAS-REAL-1
+
+Implementado:
+
+- provider Python `mapbiomas_real` para ler GeoTIFF MapBiomas local/URL/uploadado;
+- recorte do raster pela AOI, preservando apenas pixels dentro da propriedade;
+- vetoriza classes por `polygonize` e gera camadas `vegetacao_nativa`, `floresta`, `agropecuaria`, `agua` e `area_nao_vegetada`;
+- `dev_fixture` passa a ser marcado como `simulado`, `official_data=false` e com aviso explícito para não usar como análise ambiental real;
+- relatório ambiental inclui provider, ano/coleção MapBiomas, classes encontradas, área e percentual por classe;
+- tela `/ferramentas/analise-ambiental` permite anexar GeoTIFF opcional e mostra `Real MapBiomas` ou `Simulado`;
+- outputs continuam por camada com KML, GeoJSON, SHP.zip e pacote completo.
+
+Migration: `052_analise_ambiental_mapbiomas_real.sql`.
+
+## ANALISE-AMBIENTAL-GEE-AUTO-1
+
+Implementado:
+
+- provider `mapbiomas_gee` para buscar automaticamente MapBiomas no Google Earth Engine a partir apenas do KML/KMZ/ZIP;
+- credenciais GEE ficam apenas no worker (`GEE_PROJECT_ID`, service account e `MAPBIOMAS_10M_ASSET_ID`);
+- `MAPBIOMAS_10M_ASSET_ID` é configurável e não fica hardcoded;
+- fluxo principal da UI usa botão `Enviar KML e processar com MapBiomas`;
+- GeoTIFF manual foi movido para `Modo avançado: usar GeoTIFF próprio`;
+- prioridade de providers: GEE, raster manual, raster público/configurado, fixture simulado;
+- status `export_required` fica preparado para AOIs que excedam download direto por `ee.Image.getDownloadURL`.
+
+Migration: `053_analise_ambiental_gee_auto.sql`.
+
+## SOPHIA-4-ADAPTIVE-AGENT-CORE-1
+
+Implementado no codigo:
+
+- runtime V4 em grafo com trace resumido;
+- 13 skills ligadas apenas a tools reais;
+- agentes internos com supervisor e bloqueio financeiro para nao-owner;
+- verificacao de etapa, tarefa e prazo antes de afirmar sucesso;
+- memoria expandida, sanitizacao, reflexao, candidatas e eval de regressao;
+- Self-RAG V4 com citacoes e recusa sem evidencia;
+- providers Gemini, openai-compatible e local-stub;
+- telas `/sophia/aprendizados` e `/sophia/evals`;
+- painel lateral da Sophia e botoes flutuantes acessiveis maiores.
+
+Migration: `059_sophia_4_adaptive_agent_core.sql`.
+# Sophia 2.0
+
+- Sophia passa a ter camada operacional em `/api/sophia/chat`, preservando `/api/assistant`.
+- A nova arquitetura adiciona registry de tools reais, resolução de contexto, gate de permissões, confirmação humana, auditoria, eventos e caixa de entrada universal.
+- Tools atuais reaproveitam actions existentes de serviços, clientes, tarefas, documentos, BuscaGEO e Análise Ambiental.
+- Módulos existentes continuam livres; `organization_modules.access_state` e `billing_mode` preparam controle comercial futuro sem misturar com status operacional.
+## Fase GEOGESTAO-UI-PERFIS-ACESSIBILIDADE-SERVICOS-1
+
+Em andamento nesta árvore: perfis operacionais persistidos por organização (`padrao`, `agrimensura`, `arquitetura`), filtro de ferramentas, placeholder de logo na sidebar, command menu Ctrl/Cmd+K e editor de tipos/etapas de serviço para owner. A migration incremental é `056_ui_profiles_service_editor.sql`.
+### Fase SOPHIA-DOCUMENT-INTELLIGENCE-OCR-RAG-1
+
+- Worker documental Python criado em `workers/sophia-documents`, com PDF/DOCX/TXT e imagens via OCR sob demanda.
+- Inbox da Sophia agora permite processar explicitamente o arquivo e exibe status, erro, páginas e chunks.
+- A migration `057_sophia_document_intelligence.sql` adiciona páginas extraídas, metadados ricos de chunks, resumos, vínculos e RPC de busca.
+- A Sophia ganhou tools reais de ingestão, busca citável, resposta baseada em trechos e resumo local.
+- Gemini permanece opcional e server-side; OCR e extração local não dependem dele.
+
+## WORKERS-RENDER-FREE-DEPLOY-1
+
+- Os workers BuscaGEO, Análise Ambiental e Documentos da Sophia ganharam containers próprios compatíveis com a porta `$PORT` do Render e health checks identificáveis.
+- O cliente server-side `src/lib/workers/worker-client.ts` centraliza health check, cold start, timeout inicial de 20 segundos e espera total de até 90 segundos.
+- O Next chama os workers por rotas server-side; nenhum segredo é enviado ao navegador.
+- A página restrita `/sistema/workers` permite a owners/admins testar URLs e health sem exibir segredos.
+- O blueprint opcional `render.yaml` declara os três serviços Free sem valores secretos.

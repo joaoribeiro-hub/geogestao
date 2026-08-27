@@ -1,0 +1,4 @@
+# Dependencias opcionais para fases futuras.
+# A Fase 1 nao ativa OCR pesado nem processamento inteligente externo.
+google-api-python-client==2.154.0
+google-auth==2.36.0

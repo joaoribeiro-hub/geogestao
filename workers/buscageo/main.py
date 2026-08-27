@@ -11,7 +11,7 @@ app = FastAPI(title="GeoGestao BuscaGEO Worker", version="1.0.0")
 
 @app.get("/health")
 def health() -> dict[str, str]:
-    return {"status": "ok"}
+    return {"status": "ok", "service": "buscageo"}
 
 
 @app.post("/jobs/{job_id}/read-geometry", response_model=AcceptedResponse)

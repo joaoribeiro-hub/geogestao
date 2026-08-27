@@ -5,6 +5,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { NewServiceModal } from "@/components/services/new-service-modal";
 import { ServiceImportModal } from "@/components/services/service-import-modal";
 import { ServiceSchedule } from "@/components/services/service-schedule";
+import { ServiceBoardEditor } from "@/components/services/service-board-editor";
 import { monthBounds, parseMonthParam } from "@/lib/agenda/calendar";
 import { requireUser } from "@/lib/auth";
 import { resolvePeriodRange } from "@/lib/period";
@@ -16,10 +17,11 @@ import {
   isServiceOverdue,
 } from "@/lib/services/service-period";
 import { isServiceLostColumn } from "@/lib/services/service-finance";
-import { getCurrentOrganizationForUser } from "@/lib/organization";
+import { getCurrentOrganizationContext } from "@/lib/organization";
+import { isBoardVisibleForProfile, normalizeOperationalProfile } from "@/lib/operational-profile";
 import { createServerSupabase } from "@/lib/supabase/server";
 import { cn } from "@/lib/utils";
-import type { ProposalServiceType, ServiceCard } from "@/types/database";
+import type { ProposalServiceType, ServiceCard, ServiceColumn } from "@/types/database";
 
 export default async function ServicesPage({
   searchParams,
@@ -28,6 +30,7 @@ export default async function ServicesPage({
 }) {
   const params = await searchParams;
   const board = Array.isArray(params.board) ? params.board[0] : params.board;
+  const openNewService = params.new === "1";
   const scheduleMonth = Array.isArray(params.scheduleMonth)
     ? params.scheduleMonth[0]
     : params.scheduleMonth;
@@ -36,9 +39,13 @@ export default async function ServicesPage({
   const scheduleBounds = monthBounds(scheduleMonthData.year, scheduleMonthData.monthIndex);
   const supabase = await createServerSupabase();
   const user = await requireUser(supabase);
-  const organization = await getCurrentOrganizationForUser(supabase, user.id);
-  const [boardsResult, clientsResult, orgMembersResult] = await Promise.all([
-    supabase.from("service_boards").select("*").order("position"),
+  const context = await getCurrentOrganizationContext(supabase, user.id);
+  if (!context.organization || !context.membership) throw new Error("Usuário sem organização ativa.");
+  const organization = context.organization;
+  const operationalProfile = normalizeOperationalProfile(organization.operational_profile);
+  const [boardsResult, boardSettingsResult, clientsResult, orgMembersResult] = await Promise.all([
+    supabase.from("service_boards").select("*").or(`organization_id.is.null,organization_id.eq.${organization.id}`).eq("is_active", true).order("position"),
+    supabase.from("organization_service_board_settings").select("board_id,is_visible,position").eq("organization_id", organization.id),
     supabase.from("clients").select("*").eq("organization_id", organization.id).order("name"),
     supabase
       .from("organization_members")
@@ -46,7 +53,11 @@ export default async function ServicesPage({
       .eq("organization_id", organization.id)
       .eq("status", "active"),
   ]);
-  const boards = boardsResult.data ?? [];
+  const settingsMap = new Map((boardSettingsResult.data ?? []).map((item) => [item.board_id, item]));
+  const boards = (boardsResult.data ?? [])
+    .filter((item) => isBoardVisibleForProfile(item, operationalProfile, organization.id))
+    .filter((item) => settingsMap.get(item.id)?.is_visible !== false)
+    .sort((a, b) => (settingsMap.get(a.id)?.position ?? a.position) - (settingsMap.get(b.id)?.position ?? b.position));
   const clients = clientsResult.data ?? [];
   const orgMembers = orgMembersResult.data ?? [];
   const { data: profiles } = orgMembers.length
@@ -60,14 +71,23 @@ export default async function ServicesPage({
 
   const selectedBoard = boards.find((item) => item.slug === board) ?? boards[0];
   const boardIds = boards.map((item) => item.id);
-  const allColumnsResult = boardIds.length
+  const [allColumnsResult, columnSettingsResult] = boardIds.length
     ? await supabase
         .from("service_columns")
         .select("*")
         .in("board_id", boardIds)
+        .or(`organization_id.is.null,organization_id.eq.${organization.id}`)
+        .eq("is_active", true)
         .order("position")
-    : { data: [] };
-  const allColumns = allColumnsResult.data ?? [];
+        .then(async (result) => [result, await supabase.from("organization_service_column_settings").select("column_id,is_visible,position,custom_name").eq("organization_id", organization.id)] as const)
+    : [{ data: [] }, { data: [] }];
+  const columnSettingsMap = new Map((columnSettingsResult.data ?? []).map((item) => [item.column_id, item]));
+  const allColumns = ((allColumnsResult.data ?? []) as ServiceColumn[])
+    .filter((column) => columnSettingsMap.get(column.id)?.is_visible !== false)
+    .map((column) => {
+      const setting = columnSettingsMap.get(column.id);
+      return setting ? { ...column, name: setting.custom_name ?? column.name, position: setting.position } : column;
+    });
   const selectedBoardColumns = selectedBoard
     ? allColumns.filter((column) => column.board_id === selectedBoard.id)
     : [];
@@ -203,8 +223,18 @@ export default async function ServicesPage({
             columns={allColumns}
             columnByServiceType={columnByServiceType}
             members={memberOptions}
+            autoOpen={openNewService}
           />
         </div>
+      </div>
+
+      <div className="mb-4">
+        <ServiceBoardEditor
+          boards={boards}
+          columns={allColumns}
+          selectedBoardId={selectedBoard?.id ?? ""}
+          canEdit={context.membership.role === "owner"}
+        />
       </div>
 
       {!selectedBoard ? (
@@ -255,7 +285,7 @@ function serviceTypeFromBoardSlug(slug: string): ProposalServiceType | null {
 
 function buildInitialColumnByServiceType(
   boards: Array<{ id: string; slug: string }>,
-  columns: Array<{ id: string; board_id: string; slug: string; position: number; name: string; created_at: string; updated_at?: string | null }>,
+  columns: ServiceColumn[],
 ) {
   const map: Partial<Record<ProposalServiceType, string>> = {};
   (Object.entries(serviceTypeToBoardSlug) as Array<[ProposalServiceType, string]>).forEach(

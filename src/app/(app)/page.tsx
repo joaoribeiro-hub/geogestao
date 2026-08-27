@@ -151,22 +151,34 @@ export default async function DashboardPage({
     const agent = agentBySlug.get(slug);
     return (agentRunsResult.data ?? []).find((run) => run.agent_id === agent?.id) ?? null;
   };
+  const summaryForRun = (run: { summary?: string | null; output?: unknown } | null) => {
+    if (typeof run?.summary === "string" && run.summary.trim()) return run.summary;
+    if (!run?.output || typeof run.output !== "object" || Array.isArray(run.output)) return null;
+    const output = run.output as Record<string, unknown>;
+    return typeof output.summary === "string" && output.summary.trim()
+      ? output.summary
+      : typeof output.message === "string" && output.message.trim()
+        ? output.message
+        : null;
+  };
+  const briefingRun = latestRunFor("briefing-matinal");
+  const weeklyRun = latestRunFor("revisao-semanal");
   const homeAgentCards: HomeAgentCardData[] = [
     {
       slug: "briefing-matinal",
       title: agentBySlug.get("briefing-matinal")?.name ?? "Briefing da manha",
       helperText: "Quer ajuda para saber o que tem para hoje? Aperte o botao.",
-      summary: latestRunFor("briefing-matinal")?.summary ?? null,
-      status: latestRunFor("briefing-matinal")?.status ?? null,
-      createdAt: latestRunFor("briefing-matinal")?.created_at ?? null,
+      summary: summaryForRun(briefingRun),
+      status: briefingRun?.status ?? null,
+      createdAt: briefingRun?.created_at ?? null,
     },
     {
       slug: "revisao-semanal",
       title: agentBySlug.get("revisao-semanal")?.name ?? "Revisao semanal",
       helperText: "Quer revisar sua semana e ver pendencias? Aperte o botao.",
-      summary: latestRunFor("revisao-semanal")?.summary ?? null,
-      status: latestRunFor("revisao-semanal")?.status ?? null,
-      createdAt: latestRunFor("revisao-semanal")?.created_at ?? null,
+      summary: summaryForRun(weeklyRun),
+      status: weeklyRun?.status ?? null,
+      createdAt: weeklyRun?.created_at ?? null,
     },
   ];
   const normalizedQuery = q.trim().toLowerCase();
