@@ -48,12 +48,12 @@ const mainNav = [
 const settingsNav = [
   { href: "/minha-empresa", label: ptBR.nav.company, icon: Building2 },
   { href: "/minha-conta", label: "Minha Conta", icon: UserCircle },
-  { href: "/sistema/workers", label: "Workers", icon: ServerCog, adminOnly: true },
+  { href: "/sistema/workers", label: "Workers", icon: ServerCog, platformOnly: true },
   { href: "/documentos", label: ptBR.nav.documents, icon: FileText },
   { href: "/legislacao", label: ptBR.nav.legislation, icon: BookOpen },
   { href: "/anexos", label: ptBR.nav.attachments, icon: Paperclip },
-  { href: "/sophia/aprendizados", label: "Aprendizados Sophia", icon: BrainCircuit, ownerOnly: true },
-  { href: "/sophia/evals", label: "Avaliacoes Sophia", icon: FlaskConical, adminOnly: true },
+  { href: "/sophia/aprendizados", label: "Aprendizados Sophia", icon: BrainCircuit, platformOnly: true },
+  { href: "/sophia/evals", label: "Avaliacoes Sophia", icon: FlaskConical, platformOnly: true },
 ] as const;
 
 export async function AppShell({
@@ -64,6 +64,7 @@ export async function AppShell({
   limitedMode = false,
   membershipRole = null,
   operationalProfile = "agrimensura",
+  isPlatformDeveloper = false,
 }: {
   children: React.ReactNode;
   userEmail?: string | null;
@@ -73,6 +74,7 @@ export async function AppShell({
   membershipRole?: string | null;
   operationalProfile?: OperationalProfile;
   organizationId?: string | null;
+  isPlatformDeveloper?: boolean;
 }) {
   const pathname = (await headers()).get("x-pathname") ?? "/";
   const isOwner = membershipRole === "owner";
@@ -107,7 +109,7 @@ export async function AppShell({
     ? settingsNav.filter((item) => item.href === "/minha-conta")
     : settingsNav
         .filter((item) => !("ownerOnly" in item) || !item.ownerOnly || isOwner)
-        .filter((item) => !("adminOnly" in item) || !item.adminOnly || isOwner || membershipRole === "admin");
+        .filter((item) => !("platformOnly" in item) || !item.platformOnly || isPlatformDeveloper);
   const lightweightMobileMain = visibleMainNav.filter((item) =>
     ["/inicio", "/ferramentas", "/servicos", "/agenda"].includes(item.href),
   );
@@ -149,7 +151,7 @@ export async function AppShell({
             {!limitedMode ? <CommandMenu /> : null}
             {!limitedMode ? <LightweightModeToggle initialEnabled={lightweightMode} /> : null}
             {timeTrackingEnabled && !limitedMode ? <WorkTimerTopbar /> : null}
-            {!limitedMode ? <NotificationBell /> : null}
+            {!limitedMode ? <NotificationBell isPlatformDeveloper={isPlatformDeveloper} /> : null}
             <UserAccountMenu name={userName} email={userEmail} />
           </div>
         </header>

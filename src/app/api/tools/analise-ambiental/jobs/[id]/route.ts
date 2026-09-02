@@ -5,7 +5,7 @@ import { createServerSupabase } from "@/lib/supabase/server";
 import { asUntypedSupabase } from "@/lib/supabase/untyped";
 
 const jobSelect =
-  "id,status,original_filename,created_at,input_size_bytes,requested_layers,area_ha,bbox,result_summary,warnings,output_storage_paths,error_message,finished_at,progress";
+  "id,status,original_filename,created_at,input_size_bytes,requested_layers,requested_sources,source_options,current_image_source,current_image_storage_path,area_ha,bbox,result_summary,fusion_summary,training_summary,warnings,output_storage_paths,error_message,finished_at,progress";
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;

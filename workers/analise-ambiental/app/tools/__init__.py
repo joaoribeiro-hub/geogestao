@@ -1,1 +1,1 @@
-"""Ferramentas locais de desenvolvimento do worker ambiental."""
+"""Command-line preparation tools for external environmental sources."""

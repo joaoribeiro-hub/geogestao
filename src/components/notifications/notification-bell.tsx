@@ -2,7 +2,9 @@
 
 import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Bell, Loader2, X } from "lucide-react";
+import { Bell, Download, Loader2, Trash2, X } from "lucide-react";
+import { UniversalAnnouncementModal } from "@/components/platform/universal-announcement-modal";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { formatDate } from "@/lib/utils";
 
@@ -13,9 +15,11 @@ type NotificationItem = {
   created_at: string;
   read_at: string | null;
   action_url: string | null;
+  source?: "organization" | "universal";
+  attachment_file_name?: string | null;
 };
 
-export function NotificationBell() {
+export function NotificationBell({ isPlatformDeveloper = false }: { isPlatformDeveloper?: boolean }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
@@ -66,6 +70,7 @@ export function NotificationBell() {
             <p className="text-sm font-semibold">Notificacoes</p>
             {pending ? <Loader2 className="size-4 animate-spin" aria-hidden="true" /> : null}
           </div>
+          {isPlatformDeveloper ? <div className="mb-3"><UniversalAnnouncementModal /></div> : null}
           <div className="max-h-96 space-y-2 overflow-y-auto">
             {items.length ? (
               items.map((item) => (
@@ -87,10 +92,16 @@ export function NotificationBell() {
                       })
                     }
                   >
-                    <p className="font-medium">{item.title}</p>
+                    <div className="flex flex-wrap items-center gap-2"><p className="font-medium">{item.title}</p>{item.source === "universal" ? <Badge variant="outline">Aviso da plataforma</Badge> : null}</div>
                     <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{item.message}</p>
                     <p className="mt-1 text-[11px] text-muted-foreground">{formatDate(item.created_at)}</p>
                   </button>
+                  {item.source === "universal" && item.attachment_file_name ? (
+                    <Button type="button" variant="ghost" size="icon" className="size-7 shrink-0" aria-label={`Baixar ${item.attachment_file_name}`} onClick={(event) => { event.stopPropagation(); void downloadUniversalAttachment(item.id); }}><Download className="size-4" aria-hidden="true" /></Button>
+                  ) : null}
+                  {isPlatformDeveloper && item.source === "universal" ? (
+                    <Button type="button" variant="ghost" size="icon" className="size-7 shrink-0" aria-label="Remover aviso universal" onClick={(event) => { event.stopPropagation(); if (!window.confirm(`Remover o aviso "${item.title}" para todos os usuarios?`)) return; startTransition(() => { void (async () => { await fetch(`/api/universal-announcements/${item.id.replace(/^universal:/, "")}`, { method: "DELETE" }); await load(); })(); }); }}><Trash2 className="size-4" aria-hidden="true" /></Button>
+                  ) : null}
                   <Button
                     type="button"
                     variant="ghost"
@@ -122,4 +133,11 @@ export function NotificationBell() {
       ) : null}
     </div>
   );
+}
+
+async function downloadUniversalAttachment(notificationId: string) {
+  const id = notificationId.replace(/^universal:/, "");
+  const response = await fetch(`/api/universal-announcements/${id}/download`, { cache: "no-store" });
+  const body = await response.json().catch(() => null) as { url?: string } | null;
+  if (response.ok && body?.url) window.location.assign(body.url);
 }

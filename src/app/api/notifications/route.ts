@@ -37,12 +37,61 @@ export async function GET(request: Request) {
     return NextResponse.json({ notifications: [], error: error.message }, { status: 500 });
   }
 
+  const universal = await loadUniversalAnnouncements(supabase, user.id, nowIso, includeRead);
+  const organizationNotifications = (data ?? []).map((item) => ({
+    ...item,
+    source: "organization" as const,
+    group: classifyNotification(item),
+  }));
+  const notifications = [...organizationNotifications, ...universal]
+    .sort((left, right) => new Date(right.created_at).getTime() - new Date(left.created_at).getTime())
+    .slice(0, includeRead ? 60 : 30);
+
   return NextResponse.json({
-    notifications: (data ?? []).map((item) => ({
-      ...item,
-      group: classifyNotification(item),
-    })),
+    notifications,
   });
+}
+
+async function loadUniversalAnnouncements(
+  supabase: Awaited<ReturnType<typeof createServerSupabase>>,
+  userId: string,
+  nowIso: string,
+  includeRead: boolean,
+) {
+  const database = supabase as unknown as UniversalNotificationDatabase;
+  const announcements = await database
+    .from("universal_announcements")
+    .select("id,title,body,attachment_file_name,created_at,starts_at")
+    .eq("is_active", true)
+    .lte("starts_at", nowIso)
+    .or(`ends_at.is.null,ends_at.gt.${nowIso}`)
+    .order("created_at", { ascending: false })
+    .limit(30);
+  if (announcements.error || !announcements.data?.length) return [];
+  const ids = announcements.data.map((item) => item.id);
+  const reads = await database
+    .from("universal_announcement_reads")
+    .select("announcement_id,read_at")
+    .eq("user_id", userId)
+    .in("announcement_id", ids);
+  const readMap = new Map((reads.data ?? []).map((read) => [read.announcement_id, read.read_at]));
+  return announcements.data
+    .map((item) => ({
+      id: `universal:${item.id}`,
+      title: item.title,
+      message: item.body,
+      type: "universal_announcement",
+      entity_type: "universal_announcement",
+      entity_id: item.id,
+      metadata: { category: "notas", universal: true },
+      created_at: item.created_at,
+      read_at: readMap.get(item.id) ?? null,
+      action_url: null,
+      group: "notes" as const,
+      source: "universal" as const,
+      attachment_file_name: item.attachment_file_name,
+    }))
+    .filter((item) => includeRead || !item.read_at);
 }
 
 function classifyNotification(notification: {
@@ -131,3 +180,21 @@ async function createDueServiceNotifications(
     await supabase.from("notifications").upsert(notifications, { onConflict: NOTIFICATION_ON_CONFLICT });
   }
 }
+
+type UniversalAnnouncementRow = { id: string; title: string; body: string; attachment_file_name: string | null; created_at: string; starts_at: string };
+type UniversalReadRow = { announcement_id: string; read_at: string };
+type UniversalAnnouncementQuery = PromiseLike<{ data: UniversalAnnouncementRow[] | null; error: { message: string } | null }> & {
+  eq(column: string, value: string | boolean): UniversalAnnouncementQuery;
+  lte(column: string, value: string): UniversalAnnouncementQuery;
+  or(filter: string): UniversalAnnouncementQuery;
+  order(column: string, options: { ascending: boolean }): UniversalAnnouncementQuery;
+  limit(value: number): UniversalAnnouncementQuery;
+};
+type UniversalReadQuery = PromiseLike<{ data: UniversalReadRow[] | null; error: { message: string } | null }> & {
+  eq(column: string, value: string): UniversalReadQuery;
+  in(column: string, values: string[]): UniversalReadQuery;
+};
+type UniversalNotificationDatabase = {
+  from(table: "universal_announcements"): { select(columns: string): UniversalAnnouncementQuery };
+  from(table: "universal_announcement_reads"): { select(columns: string): UniversalReadQuery };
+};

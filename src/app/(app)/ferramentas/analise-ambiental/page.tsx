@@ -40,7 +40,7 @@ export default async function AnaliseAmbientalToolPage() {
     ? await untypedSupabase
         .from("module_environmental_analysis_jobs")
         .select(
-          "id,status,original_filename,created_at,input_size_bytes,requested_layers,area_ha,bbox,result_summary,warnings,output_storage_paths,error_message,finished_at,progress",
+          "id,status,original_filename,created_at,input_size_bytes,requested_layers,requested_sources,source_options,current_image_source,current_image_storage_path,area_ha,bbox,result_summary,fusion_summary,training_summary,warnings,output_storage_paths,error_message,finished_at,progress",
         )
         .eq("organization_id", organization.id)
         .order("created_at", { ascending: false })
@@ -48,6 +48,8 @@ export default async function AnaliseAmbientalToolPage() {
     : { data: [] };
   const workerHealth = await getEnvironmentalWorkerHealth();
   const hidroProvider = workerHealth.providers?.hidrografia_oficial;
+  const carProvider = workerHealth.providers?.car;
+  const currentImageProvider = workerHealth.providers?.current_image;
 
   return (
     <div className="space-y-5">
@@ -82,6 +84,11 @@ export default async function AnaliseAmbientalToolPage() {
           configured: Boolean(hidroProvider?.configured),
           source: hidroProvider?.source ?? "ANA/SNIRH BHO 6",
           version: hidroProvider?.version ?? "6.2.4",
+        }}
+        sourceProviders={{
+          carConfigured: Boolean(carProvider?.configured),
+          currentImageConfigured: Boolean(currentImageProvider?.configured),
+          dynamicWorldConfigured: Boolean(currentImageProvider?.dynamic_world),
         }}
       />
 

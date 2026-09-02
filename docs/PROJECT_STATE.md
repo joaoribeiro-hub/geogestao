@@ -1,5 +1,15 @@
 # GeoGestao - Estado Atual do Projeto
 
+## GEOGESTAO-PLATFORM-DEVELOPER-UNIVERSAL-CONTENT-1
+
+- papel global `platform_developers` separado de owner/admin de organizacao;
+- Workers, Aprendizados Sophia e Avaliacoes Sophia protegidos no menu, pagina, API e RLS;
+- documentos universais ativos em Legislacao e Anexos, com Storage privado e URL assinada;
+- avisos universais integrados ao sino e ao Inicio, com leitura individual sem fanout;
+- candidatos globais da Sophia sanitizados e revisados somente pela plataforma;
+- botoes flutuantes reduzidos, com alvo minimo de 44 px e Sophia ainda em destaque;
+- migration incremental `060_platform_developer_universal_content.sql`.
+
 ## SOPHIA-3-COGNITIVE-CORE-DOCUMENT-INTELLIGENCE-1
 
 Implementado incrementalmente:

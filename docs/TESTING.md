@@ -1,5 +1,21 @@
 # GeoGestao - Testes Automatizados
 
+## GEOGESTAO-PLATFORM-DEVELOPER-UNIVERSAL-CONTENT-1
+
+Teste unitario principal: `tests/unit/platform-developer-universal-content.test.ts`.
+
+Cobertura:
+
+- deteccao true/false do platform developer;
+- navegacao e APIs tecnicas usando `requirePlatformDeveloper`;
+- paths globais sanitizados e limite de 50 MB;
+- RLS de escrita universal;
+- anuncios ativos sem fanout e leitura por usuario;
+- sanitizacao de candidatos globais da Sophia;
+- tokens de tamanho dos botoes flutuantes.
+
+Depois de aplicar a migration, validar manualmente com tres contas: membro, owner e platform developer. Repetir publicacao/leitura em duas organizacoes e confirmar que nenhum documento privado empresarial aparece fora da organizacao de origem.
+
 ## SOPHIA-3-COGNITIVE-CORE-DOCUMENT-INTELLIGENCE-1
 
 Testes unitarios: `tests/unit/sophia-3-cognitive-core.test.ts`.

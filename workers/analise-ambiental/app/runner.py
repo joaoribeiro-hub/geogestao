@@ -6,7 +6,10 @@ from typing import Any
 import tempfile
 import traceback
 
+from shapely.geometry import mapping
+
 from .config import get_settings
+from .fusion.fusion_engine import FusionResult, fuse_environmental_sources
 from .processing.aoi import parse_aoi_file
 from .processing.exporters import write_geojson, write_json, write_kml, write_shapefile_zip, write_zip_package
 from .processing.layers import EnvironmentalLayer, generate_dev_fixture_layers, layer_to_report
@@ -21,6 +24,8 @@ from .providers.ana_hidrografia import (
 )
 from .providers.mapbiomas_gee import MapBiomasGeeProvider
 from .providers.mapbiomas_real import MapBiomasRealProvider
+from .providers.car_provider import CarProvider
+from .providers.current_image_provider import CurrentImageProvider, DynamicWorldProvider
 from .supabase_repo import SupabaseJobRepository
 
 
@@ -35,6 +40,23 @@ LAYER_NAMES = {
     "area_nao_vegetada": "Área não vegetada",
     "drenagem_corrego": "Drenagem/córrego",
     "hidrografia_oficial": "Hidrografia oficial",
+    "hidrografia_ana_oficial": "Hidrografia ANA oficial",
+    "vegetacao_mapbiomas": "Vegetação MapBiomas",
+    "agropecuaria_mapbiomas": "Agropecuária MapBiomas",
+    "agua_mapbiomas": "Água MapBiomas",
+    "area_nao_vegetada_mapbiomas": "Área não vegetada MapBiomas",
+    "vegetacao_car_declarada": "Vegetação declarada no CAR",
+    "area_consolidada_car": "Área consolidada declarada no CAR",
+    "reserva_legal_car": "Reserva Legal declarada no CAR",
+    "app_hidrica_car": "APP hídrica declarada no CAR",
+    "vegetacao_imagem_atual": "Vegetação na imagem atual",
+    "solo_exposto_imagem_atual": "Solo exposto na imagem atual",
+    "vegetacao_final": "Vegetação final",
+    "vegetacao_alta_confianca": "Vegetação de alta confiança",
+    "vegetacao_media_confianca": "Vegetação de média confiança",
+    "vegetacao_divergencia": "Divergência de vegetação",
+    "conflito_ambiental": "Conflito ambiental",
+    "possivel_app_hidrica_ausente": "Possível APP hídrica ausente",
     "pacote": "Pacote completo",
 }
 
@@ -108,16 +130,35 @@ def process_job(job_id: str) -> None:
             generated_files.update(limit_outputs)
 
             requested_layers = [str(item) for item in (job.get("requested_layers") or [])]
+            requested_sources = [str(item).strip().lower() for item in (job.get("requested_sources") or ["mapbiomas"])]
+            source_options = job.get("source_options") if isinstance(job.get("source_options"), dict) else {}
             repo.update_job(job_id, {"status": "processando_vegetacao", "progress": 40, "updated_at": _now()})
             raster_source, raster_provider_key = _resolve_mapbiomas_raster_source(repo, job, organization_id, tmp_path)
+            current_raster_source, current_image_source, current_image_warning = _resolve_current_image_source(
+                repo, job, organization_id, aoi.bbox, tmp_path, requested_sources,
+            )
             environmental_layers, provider_warnings, provider_key = _generate_environmental_layers(
                 aoi,
                 requested_layers,
+                requested_sources,
+                source_options,
                 raster_source,
                 raster_provider_key,
+                current_raster_source,
+                current_image_source,
                 tmp_path,
             )
+            if current_image_warning:
+                provider_warnings.append(current_image_warning)
+            environmental_layers = _source_specific_layers(environmental_layers)
             warnings.extend(provider_warnings)
+
+            fusion_result = FusionResult(layers=[], candidates=[], summary={}, warnings=[])
+            if len(_present_source_groups(environmental_layers)) >= 2:
+                repo.update_job(job_id, {"status": "fundindo_fontes", "progress": 72, "updated_at": _now()})
+                fusion_result = fuse_environmental_sources(environmental_layers, metric_crs=aoi.metric_crs)
+                environmental_layers.extend(fusion_result.layers)
+                warnings.extend(fusion_result.warnings)
 
             if not environmental_layers:
                 if not warnings:
@@ -183,6 +224,7 @@ def process_job(job_id: str) -> None:
                         "provider": layer.provider,
                         "official": layer.official_data,
                         "confidence": layer.confidence,
+                        **(layer.metadata or {}),
                     },
                 )
                 generated_files.update(layer_outputs)
@@ -198,7 +240,12 @@ def process_job(job_id: str) -> None:
                     **(layer.metadata or {}),
                 }
 
+            training_summary = _persist_training_candidates(
+                repo, job, fusion_result, raster_storage_path=job.get("current_image_storage_path") or job.get("input_raster_storage_path")
+            )
+
             is_simulated = provider_key == "dev_fixture"
+            all_sources_official = bool(environmental_layers) and all(layer.official_data for layer in environmental_layers if layer.provider != "fusion_engine")
             report_payload = _build_report_payload(
                 job,
                 aoi,
@@ -206,15 +253,22 @@ def process_job(job_id: str) -> None:
                 {},
                 sorted(set(warnings)),
                 provider=provider_key,
-                official_data=not is_simulated,
+                official_data=all_sources_official,
                 mapbiomas_year=get_settings().mapbiomas_year if provider_key.startswith("mapbiomas_") else None,
                 mapbiomas_collection=get_settings().mapbiomas_collection if provider_key.startswith("mapbiomas_") else None,
             )
+            report_payload["fusion"] = fusion_result.summary
+            report_payload["training"] = training_summary
+            report_payload.update(_source_report_sections(environmental_layers))
+            report_payload["methodology"] = _multisource_methodology()
+            report_payload["limitations"] = _multisource_limitations(requested_sources, _present_source_groups(environmental_layers))
             report_payload["files"] = sorted(_package_entries(generated_files).keys())
             if is_simulated:
                 report_payload["warning"] = "Resultado simulado para teste. Não usar como análise ambiental real."
             report_path = write_json(outputs_dir / "relatorio_ambiental.json", report_payload)
             generated_files["relatorio_ambiental_json"] = report_path
+            multifonte_report_path = write_json(outputs_dir / "relatorio_multifonte.json", report_payload)
+            generated_files["relatorio_multifonte_json"] = multifonte_report_path
 
             repo.update_job(
                 job_id,
@@ -235,11 +289,14 @@ def process_job(job_id: str) -> None:
                     "output_storage_paths": uploaded_outputs,
                     "result_storage_path": uploaded_outputs.get("relatorio_ambiental_json"),
                     "result_summary": report_payload,
+                    "fusion_summary": fusion_result.summary,
+                    "training_summary": training_summary,
+                    "current_image_source": current_image_source,
                     "confidence_summary": {
                         "geometry": "alta",
                         "providers": sorted({layer.provider for layer in environmental_layers}),
                         "fixture": is_simulated,
-                        "official_data": not is_simulated,
+                        "official_data": all_sources_official,
                     },
                     "warnings": sorted(set(warnings)),
                     "error_message": None,
@@ -283,8 +340,12 @@ def process_pending_jobs(limit: int | None = None) -> list[str]:
 def _generate_environmental_layers(
     aoi: Any,
     requested_layers: list[str],
+    requested_sources: list[str],
+    source_options: dict[str, Any],
     raster_source: str | None,
     raster_provider_key: str | None,
+    current_raster_source: str | None,
+    current_image_source: str | None,
     tmp_path: Path,
 ) -> tuple[list[EnvironmentalLayer], list[str], str]:
     settings = get_settings()
@@ -292,7 +353,9 @@ def _generate_environmental_layers(
     warnings: list[str] = []
     providers: list[str] = []
 
-    if _wants_mapbiomas_layers(requested_layers):
+    requested_source_set = set(requested_sources or ["mapbiomas"])
+
+    if "mapbiomas" in requested_source_set and _wants_mapbiomas_layers(requested_layers):
         mapbiomas_layers, mapbiomas_warnings, mapbiomas_provider = _generate_mapbiomas_layers(
             aoi,
             requested_layers,
@@ -305,12 +368,44 @@ def _generate_environmental_layers(
         if mapbiomas_provider:
             providers.append(mapbiomas_provider)
 
-    if wants_hidrografia_oficial(requested_layers):
+    if "ana" in requested_source_set or wants_hidrografia_oficial(requested_layers):
         hidro_provider = AnaHidrografiaOficialProvider(settings=settings)
-        hidro_layers, hidro_warnings = hidro_provider.analyze(aoi, requested_layers)
+        hidro_requested_layers = requested_layers if wants_hidrografia_oficial(requested_layers) else [*requested_layers, "hidrografia_oficial"]
+        hidro_layers, hidro_warnings = hidro_provider.analyze(aoi, hidro_requested_layers)
         layers.extend(hidro_layers)
         warnings.extend(hidro_warnings)
         providers.append(ANA_HIDRO_PROVIDER_KEY)
+
+    if "car" in requested_source_set:
+        car_provider = CarProvider(settings=settings)
+        car_layers, car_warnings, manifest_version = car_provider.analyze(aoi, requested_layers, source_options)
+        layers.extend(car_layers)
+        warnings.extend(car_warnings)
+        if car_layers:
+            providers.append(car_provider.provider_key)
+        if manifest_version:
+            for layer in car_layers:
+                if layer.metadata is not None:
+                    layer.metadata.setdefault("manifest_version", manifest_version)
+
+    if "current_image" in requested_source_set:
+        if current_raster_source:
+            current_provider = CurrentImageProvider(settings=settings)
+            current_options = {**source_options, "current_image_source": current_image_source or "geotiff"}
+            current_layers, current_warnings = current_provider.analyze(aoi, current_raster_source, current_options)
+            layers.extend(current_layers)
+            warnings.extend(current_warnings)
+            if current_layers:
+                providers.append(current_provider.provider_key)
+        elif source_options.get("current_image_mode") == "dynamic_world":
+            dynamic_provider = DynamicWorldProvider(settings=settings, tmp_dir=tmp_path / "dynamic-world")
+            current_layers, current_warnings = dynamic_provider.analyze(aoi)
+            layers.extend(current_layers)
+            warnings.extend(current_warnings)
+            if current_layers:
+                providers.append(dynamic_provider.provider_key)
+        else:
+            warnings.append("Imagem atual solicitada, mas nenhum GeoTIFF compatível foi encontrado ou enviado.")
 
     provider_key = _combined_provider_key(providers)
     return layers, warnings, provider_key
@@ -410,6 +505,170 @@ def _resolve_mapbiomas_raster_source(
     return None, None
 
 
+def _resolve_current_image_source(
+    repo: SupabaseJobRepository,
+    job: dict[str, Any],
+    organization_id: str,
+    bbox: list[float],
+    tmp_path: Path,
+    requested_sources: list[str],
+) -> tuple[str | None, str | None, str | None]:
+    if "current_image" not in set(requested_sources):
+        return None, None, None
+    storage_path = str(job.get("current_image_storage_path") or "")
+    source = str(job.get("current_image_source") or "manual")
+    if storage_path:
+        if not storage_path.startswith(f"organizations/{organization_id}/"):
+            raise ValueError("Imagem atual fora do path da organização.")
+        local = repo.download_to_path(storage_path, tmp_path / "current-image" / Path(storage_path).name)
+        return str(local), source, None
+
+    options = job.get("source_options") if isinstance(job.get("source_options"), dict) else {}
+    if options.get("current_image_mode") not in {"recent", "auto", None, ""}:
+        return None, source, None
+    recent = repo.find_recent_geotiff_for_aoi(organization_id, bbox)
+    if not recent:
+        return None, None, "Nenhum GeoTIFF recente do BuscaGEO intersectando a AOI foi encontrado."
+    recent_path = str(recent["storage_path"])
+    local = repo.download_to_path(recent_path, tmp_path / "current-image" / Path(recent_path).name)
+    return str(local), str(recent.get("module_key") or "buscageo"), None
+
+
+def _source_specific_layers(layers: list[EnvironmentalLayer]) -> list[EnvironmentalLayer]:
+    """Keep legacy keys and add explicit source keys required by the multifonte report."""
+    result = list(layers)
+    aliases = {
+        "vegetacao_nativa": "vegetacao_mapbiomas",
+        "floresta": "floresta_mapbiomas",
+        "agropecuaria": "agropecuaria_mapbiomas",
+        "agua": "agua_mapbiomas",
+        "area_nao_vegetada": "area_nao_vegetada_mapbiomas",
+        "hidrografia_oficial": "hidrografia_ana_oficial",
+    }
+    existing = {layer.key for layer in result}
+    for layer in layers:
+        alias = aliases.get(layer.key)
+        if not alias or alias in existing:
+            continue
+        if alias.endswith("_mapbiomas") and "mapbiomas" not in layer.provider:
+            continue
+        if alias == "hidrografia_ana_oficial" and "ana" not in layer.provider:
+            continue
+        result.append(EnvironmentalLayer(
+            key=alias,
+            name=LAYER_NAMES.get(alias, layer.name),
+            geometry=layer.geometry,
+            provider=layer.provider,
+            confidence=layer.confidence,
+            official_data=layer.official_data,
+            warning=layer.warning,
+            area_ha=layer.area_ha,
+            length_m=layer.length_m,
+            metadata={**(layer.metadata or {}), "source_layer_key": layer.key},
+        ))
+        existing.add(alias)
+    return result
+
+
+def _present_source_groups(layers: list[EnvironmentalLayer]) -> set[str]:
+    groups: set[str] = set()
+    for layer in layers:
+        provider = layer.provider.lower()
+        if "mapbiomas" in provider:
+            groups.add("mapbiomas")
+        elif provider.startswith("car"):
+            groups.add("car")
+        elif "ana" in provider:
+            groups.add("ana")
+        elif provider in {"rule_based_ndvi", "dynamic_world", "current_image"}:
+            groups.add("current_image")
+    return groups
+
+
+def _persist_training_candidates(
+    repo: SupabaseJobRepository,
+    job: dict[str, Any],
+    fusion: FusionResult,
+    *,
+    raster_storage_path: Any,
+) -> dict[str, Any]:
+    organization_id = str(job.get("organization_id") or "")
+    user_id = str(job.get("user_id") or "")
+    rows = [
+        {
+            "organization_id": organization_id,
+            "job_id": str(job.get("id") or ""),
+            "source_layer": candidate.source_layer,
+            "final_class": candidate.final_class,
+            "geometry": mapping(candidate.geometry),
+            "raster_storage_path": raster_storage_path or None,
+            "aoi_storage_path": job.get("input_storage_path"),
+            "label_source": candidate.label_source,
+            "confidence_score": candidate.confidence_score,
+            "confidence_tier": candidate.confidence_tier,
+            "validation_status": candidate.validation_status,
+            "fingerprint": candidate.fingerprint,
+            "created_by": user_id,
+            "metadata": candidate.metadata,
+        }
+        for candidate in fusion.candidates
+    ]
+    repo.upsert_training_samples(rows)
+    return {
+        "eligible_samples": len(rows),
+        "gold_samples_created": sum(1 for item in rows if item["confidence_tier"] == "GOLD"),
+        "silver_samples_created": sum(1 for item in rows if item["confidence_tier"] == "SILVER"),
+        "bronze_samples_created": sum(1 for item in rows if item["confidence_tier"] == "BRONZE"),
+        "disputed_samples": sum(1 for item in rows if item["confidence_tier"] == "DISPUTED"),
+        "user_validated_count": 0,
+        "user_corrected_count": 0,
+        "observation": "As amostras validadas podem ser usadas futuramente para treinar um modelo próprio de vegetação do GeoGestão.",
+    }
+
+
+def _multisource_methodology() -> dict[str, Any]:
+    return {
+        "mapbiomas": "Classificação de cobertura e uso observada por sensoriamento remoto; peso base 0.75.",
+        "car": "Dado cadastral declaratório; peso base 0.65 e nunca tratado como verdade absoluta.",
+        "ana": "Hidrografia vetorial oficial ANA/BHO6; peso base 0.95.",
+        "current_image": "Observação atual por NDVI inicial; peso 0.65, dependente de bandas NIR/Red.",
+        "fusion": "Interseções e diferenças espaciais determinísticas preservam consenso e divergência em camadas separadas.",
+    }
+
+
+def _multisource_limitations(requested_sources: list[str], present_sources: set[str]) -> list[str]:
+    missing = sorted(set(requested_sources) - present_sources)
+    result = ["Resultado indicativo; divergências exigem revisão técnica e não são ocultadas."]
+    if missing:
+        result.append(f"Fontes solicitadas sem evidência gerada: {', '.join(missing)}.")
+    return result
+
+
+def _source_report_sections(layers: list[EnvironmentalLayer]) -> dict[str, Any]:
+    sections: dict[str, dict[str, Any]] = {
+        "mapbiomas": {"layers": [], "area_by_class": {}},
+        "car": {"layers": [], "area_by_class": {}, "declaratory": True},
+        "current_image": {"layers": [], "area_by_class": {}, "method": None},
+        "ana": {"layers": [], "feature_count": 0, "length_m": 0},
+    }
+    for layer in layers:
+        provider = layer.provider.lower()
+        if provider == "fusion_engine":
+            continue
+        source = "mapbiomas" if "mapbiomas" in provider else "car" if provider.startswith("car") else "ana" if "ana" in provider else "current_image" if provider in {"rule_based_ndvi", "dynamic_world", "current_image"} else None
+        if not source:
+            continue
+        sections[source]["layers"].append(layer.key)
+        if layer.area_ha is not None:
+            sections[source]["area_by_class"][layer.key] = layer.area_ha
+        if source == "current_image":
+            sections[source]["method"] = (layer.metadata or {}).get("method") or layer.provider
+        if source == "ana":
+            sections[source]["feature_count"] += int((layer.metadata or {}).get("feature_count") or 0)
+            sections[source]["length_m"] += float(layer.length_m or 0)
+    return sections
+
+
 def _write_layer_outputs(
     outputs_dir: Path,
     *,
@@ -495,6 +754,8 @@ def _parse_output_key(key: str) -> tuple[str, str]:
         return "pacote", "zip"
     if key == "relatorio_ambiental_json":
         return "relatorio", "json"
+    if key == "relatorio_multifonte_json":
+        return "relatorio_multifonte", "json"
     if key.endswith("_shp_zip"):
         return key.removesuffix("_shp_zip"), "shp_zip"
     if key.endswith("_geojson"):
@@ -509,7 +770,7 @@ def _package_entries(outputs: dict[str, Path]) -> dict[str, Path]:
     for key, path in outputs.items():
         if key == "pacote_resultados_zip":
             continue
-        if key == "relatorio_ambiental_json":
+        if key in {"relatorio_ambiental_json", "relatorio_multifonte_json"}:
             entries[path.name] = path
             continue
         layer_key, _format = _parse_output_key(key)

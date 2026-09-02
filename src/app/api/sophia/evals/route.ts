@@ -5,6 +5,7 @@ import { requireOrganization } from "@/lib/organization";
 import { createServerSupabase } from "@/lib/supabase/server";
 import { getAvailableSophiaTools } from "@/lib/sophia/permissions";
 import { runSophiaEvalCase, SOPHIA_V4_DEFAULT_EVAL_CASES } from "@/lib/sophia/v4/evals";
+import { requirePlatformDeveloper } from "@/lib/platform/platform-auth";
 
 const postSchema = z.object({ caseId: z.string().uuid() });
 
@@ -54,10 +55,13 @@ export async function POST(request: Request) {
 async function requireEvalAccess() {
   const supabase = await createServerSupabase();
   const user = await requireUser(supabase);
-  const { organization, membership } = await requireOrganization(supabase, user.id);
-  if (!organization || !membership || !["owner", "admin"].includes(membership.role)) {
-    return { response: NextResponse.json({ error: "Apenas owner ou admin tecnico pode acessar avaliacoes." }, { status: 403 }) } as const;
+  try {
+    await requirePlatformDeveloper(supabase, user);
+  } catch (error) {
+    return { response: NextResponse.json({ error: error instanceof Error ? error.message : "Acesso negado." }, { status: 403 }) } as const;
   }
+  const { organization, membership } = await requireOrganization(supabase, user.id);
+  if (!organization || !membership) return { response: NextResponse.json({ error: "Organizacao necessaria para executar o caso." }, { status: 403 }) } as const;
   return { response: null, supabase, user, organization, membership } as const;
 }
 

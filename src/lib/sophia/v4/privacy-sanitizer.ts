@@ -3,6 +3,8 @@ const PHONE = /(?<!\d)(?:\+?55\s*)?(?:\(?\d{2}\)?\s*)?\d{4,5}[-\s]?\d{4}(?!\d)/g
 const CPF_CNPJ = /(?<!\d)(?:\d{3}\.?\d{3}\.?\d{3}-?\d{2}|\d{2}\.?\d{3}\.?\d{3}\/?\d{4}-?\d{2})(?!\d)/g;
 const CAR = /\b[A-Z]{2}-\d{7}-[A-F0-9]{32}\b/gi;
 const MONEY = /\bR\$\s*\d[\d.,]*|\b\d[\d.,]*\s*(?:reais|real)\b/gi;
+const REGISTRATION = /\b(?:matricula|registro)\s*(?:n[ºo.]?\s*)?[A-Z0-9./-]+\b/gi;
+const NAMED_ENTITY = /\b(cliente|fazenda|propriedade|imovel|servico)\s+["']?[^,.;:\n"']{3,80}["']?/gi;
 
 export function sanitizeSophiaPrivateText(
   value: string,
@@ -13,7 +15,9 @@ export function sanitizeSophiaPrivateText(
     .replace(PHONE, "[TELEFONE]")
     .replace(CPF_CNPJ, "[DOCUMENTO]")
     .replace(CAR, "[CODIGO_CAR]")
-    .replace(MONEY, "[VALOR]");
+    .replace(MONEY, "[VALOR]")
+    .replace(REGISTRATION, "[MATRICULA]")
+    .replace(NAMED_ENTITY, (_match, type: string) => `${type} [ENTIDADE_PRIVADA]`);
   const contextual = [
     ...(context.clientNames ?? []),
     ...(context.serviceNames ?? []),

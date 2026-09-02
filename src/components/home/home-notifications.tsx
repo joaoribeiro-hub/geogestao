@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
-import { X } from "lucide-react";
+import { Download, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -18,6 +18,8 @@ type HomeNotification = {
   created_at: string;
   read_at: string | null;
   action_url: string | null;
+  source?: "organization" | "universal";
+  attachment_file_name?: string | null;
 };
 
 const tabs: Array<{ id: Group; label: string }> = [
@@ -113,15 +115,22 @@ export function HomeNotifications() {
               <Link
                 href={notification.action_url ?? "#"}
                 className="min-w-0 flex-1 hover:text-primary"
-                onClick={() => markAsRead(notification.id)}
+                onClick={(event) => {
+                  if (!notification.action_url) event.preventDefault();
+                  markAsRead(notification.id);
+                }}
               >
                 <div className="flex flex-wrap items-center gap-2">
                   <p className="font-medium">{notification.title}</p>
                   <Badge variant="outline">{groupLabel(notification.group)}</Badge>
+                  {notification.source === "universal" ? <Badge variant="secondary">Aviso da plataforma</Badge> : null}
                 </div>
                 <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{notification.message}</p>
                 <p className="mt-1 text-[11px] text-muted-foreground">{formatDate(notification.created_at)}</p>
               </Link>
+              {notification.source === "universal" && notification.attachment_file_name ? (
+                <Button type="button" size="icon" variant="ghost" className="size-7 shrink-0" aria-label={`Baixar ${notification.attachment_file_name}`} onClick={(event) => { event.preventDefault(); event.stopPropagation(); void downloadUniversalAttachment(notification.id); }}><Download className="size-4" aria-hidden="true" /></Button>
+              ) : null}
               <Button
                 type="button"
                 size="icon"
@@ -152,6 +161,13 @@ export function HomeNotifications() {
       )}
     </div>
   );
+}
+
+async function downloadUniversalAttachment(notificationId: string) {
+  const id = notificationId.replace(/^universal:/, "");
+  const response = await fetch(`/api/universal-announcements/${id}/download`, { cache: "no-store" });
+  const body = await response.json().catch(() => null) as { url?: string } | null;
+  if (response.ok && body?.url) window.location.assign(body.url);
 }
 
 function groupLabel(group: Exclude<Group, "all">) {

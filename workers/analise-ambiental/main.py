@@ -8,6 +8,9 @@ from fastapi import BackgroundTasks, Depends, FastAPI, Query
 from app.config import get_settings
 from app.models import AcceptedResponse, PollResponse
 from app.providers.ana_hidrografia import AnaHidrografiaOficialProvider
+from app.providers.car_provider import CarProvider
+from app.providers.vegetation_model_provider import vegetation_model_catalog
+from app.providers.current_image_provider import DynamicWorldProvider
 from app.security import require_worker_secret
 
 app = FastAPI(title="GeoGestao Analise Ambiental Worker", version="1.0.0")
@@ -35,6 +38,18 @@ def health() -> dict[str, object]:
                 "configured": AnaHidrografiaOficialProvider(settings=settings).is_configured(),
                 "source": "ANA/SNIRH BHO 6",
                 "version": "6.2.4",
+            },
+            "car": {
+                "provider": "car_manifest",
+                "configured": CarProvider(settings=settings).is_configured(),
+                "mode": settings.car_provider_mode,
+                "manifest": bool(settings.car_source_manifest_url),
+            },
+            "current_image": {
+                "provider": settings.vegetation_model_provider,
+                "configured": settings.current_image_provider_enabled,
+                "dynamic_world": DynamicWorldProvider(settings=settings, tmp_dir=settings.tmp_dir / "dynamic-world").is_configured(),
+                "models": vegetation_model_catalog(settings),
             },
         },
     }

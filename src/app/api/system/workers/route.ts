@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireUser } from "@/lib/auth";
-import { getCurrentOrganizationContext, requireOrganizationAdminOrOwner } from "@/lib/organization";
+import { requirePlatformDeveloper } from "@/lib/platform/platform-auth";
 import { createServerSupabase } from "@/lib/supabase/server";
 import { inspectWorker, WORKER_DEFINITIONS } from "@/lib/workers/worker-registry";
 
@@ -9,10 +9,8 @@ export const runtime = "nodejs";
 export async function GET(request: Request) {
   const supabase = await createServerSupabase();
   const user = await requireUser(supabase);
-  const { organization } = await getCurrentOrganizationContext(supabase, user.id);
-  if (!organization) return NextResponse.json({ error: "Organizacao nao encontrada." }, { status: 403 });
   try {
-    await requireOrganizationAdminOrOwner(supabase, organization.id, user.id);
+    await requirePlatformDeveloper(supabase, user);
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : "Acesso negado." }, { status: 403 });
   }

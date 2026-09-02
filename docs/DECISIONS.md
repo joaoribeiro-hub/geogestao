@@ -1,5 +1,15 @@
 # GeoGestao - Decisoes do Projeto
 
+## GEOGESTAO-PLATFORM-DEVELOPER-UNIVERSAL-CONTENT-1
+
+- Owner administra uma organizacao; `platform developer` administra infraestrutura e conteudo global. Os papeis nao se promovem entre si.
+- A tabela `platform_developers` e a fonte canonica. O fallback por env fica limitado a desenvolvimento local.
+- Conteudo universal usa tabelas separadas para nao misturar ownership global com documentos privados de empresa.
+- Avisos nao sao copiados para cada usuario: a publicacao e unica e somente as leituras sao individuais.
+- O bucket `attachments` permanece privado; caminhos globais possuem policies proprias e downloads usam URL assinada.
+- Feedback permanece privado na organizacao. Somente uma regra abstrata e sanitizada vira candidata global, e sua aprovacao exige platform developer.
+- O tamanho dos botoes foi arredondado com piso acessivel de 44 px; a reducao visual permanece proxima dos 40% solicitados.
+
 ## SOPHIA-3-COGNITIVE-CORE-DOCUMENT-INTELLIGENCE-1
 
 - `document_chunks` existente e reaproveitado; a migration adiciona FTS em vez de criar uma tabela paralela de chunks.

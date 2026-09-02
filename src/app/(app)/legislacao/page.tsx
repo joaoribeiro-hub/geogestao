@@ -6,8 +6,10 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
+import { UniversalDocumentsSection } from "@/components/platform/universal-documents-section";
 import { requireUser } from "@/lib/auth";
 import { getCurrentOrganizationForUser } from "@/lib/organization";
+import { getCurrentPlatformDeveloper } from "@/lib/platform/platform-auth";
 import { createServerSupabase } from "@/lib/supabase/server";
 
 export default async function LegislationPage({
@@ -19,6 +21,7 @@ export default async function LegislationPage({
   const supabase = await createServerSupabase();
   const user = await requireUser(supabase);
   const organization = await getCurrentOrganizationForUser(supabase, user.id);
+  const platform = await getCurrentPlatformDeveloper(supabase, user);
   const { data } = await supabase
     .from("legislation_items")
     .select("*")
@@ -90,6 +93,7 @@ export default async function LegislationPage({
             )}
           </CardContent>
         </Card>
+        <UniversalDocumentsSection category="legislacao" isPlatformDeveloper={platform.isPlatformDeveloper} />
       </div>
     </div>
   );

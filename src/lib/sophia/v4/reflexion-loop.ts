@@ -1,5 +1,5 @@
 import type { SophiaContext } from "@/lib/sophia/types";
-import { sanitizeSophiaPrivateText } from "@/lib/sophia/v4/privacy-sanitizer";
+import { sanitizeSophiaGlobalTemplate, sanitizeSophiaPrivateText } from "@/lib/sophia/v4/privacy-sanitizer";
 import { selectSophiaV4Skill } from "@/lib/sophia/v4/skill-library";
 
 export type SophiaV4ReflectionDraft = {
@@ -65,16 +65,15 @@ export async function recordSophiaV4Feedback(input: {
   let candidateId: string | null = null;
   if (evidenceCount >= threshold) {
     const ruleKey = `${draft.correct_skill ?? "unknown"}:${slug(draft.candidate_rule).slice(0, 80)}`;
-    const { data: candidate } = await database.from("sophia_rule_candidates").upsert({
-      organization_id: input.context.organizationId,
-      rule_key: ruleKey,
-      evidence_count: evidenceCount,
-      examples: (evidence ?? []).slice(0, 8).map((item) => item.id),
-      status: "pending",
-      created_by: input.context.user.id,
-      updated_at: new Date().toISOString(),
-    }, { onConflict: "organization_id,rule_key" }).select("id").maybeSingle();
-    candidateId = candidate?.id ?? null;
+    const candidate = await database.rpc("submit_sophia_global_candidate", {
+      p_organization_id: input.context.organizationId,
+      p_rule_key: ruleKey,
+      p_evidence_count: evidenceCount,
+      p_examples: (evidence ?? []).slice(0, 8).map((item) => item.id),
+      p_sanitized_rule: sanitizeSophiaGlobalTemplate(draft.candidate_rule),
+    });
+    if (candidate.error) throw new Error(candidate.error.message);
+    candidateId = candidate.data ?? null;
   }
   const { data: evalCase } = await database.from("sophia_eval_cases").insert({
     organization_id: input.context.organizationId,
@@ -118,4 +117,7 @@ type ReflectionTable = {
   insert(value: Record<string, unknown>): { select(columns: string): { maybeSingle(): Promise<{ data: { id?: string } | null; error: { message: string } | null }> } };
   upsert(value: Record<string, unknown>, options: { onConflict: string }): { select(columns: string): { maybeSingle(): Promise<{ data: { id?: string } | null; error: { message: string } | null }> } };
 };
-type ReflectionDatabase = { from(table: string): ReflectionTable };
+type ReflectionDatabase = {
+  from(table: string): ReflectionTable;
+  rpc(name: "submit_sophia_global_candidate", params: Record<string, unknown>): Promise<{ data: string | null; error: { message: string } | null }>;
+};

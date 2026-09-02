@@ -104,6 +104,7 @@ function legacyRowsFromOutputMap(outputPaths: OutputMap): OutputRecord[] {
 function parseLegacyKey(key: string) {
   if (key === "pacote_resultados_zip") return { layerKey: "pacote", format: "zip" };
   if (key === "relatorio_ambiental_json" || key === "relatorio_json") return { layerKey: "relatorio", format: "json" };
+  if (key === "relatorio_multifonte_json") return { layerKey: "relatorio_multifonte", format: "json" };
   if (key.endsWith("_shp_zip")) return { layerKey: key.replace(/_shp_zip$/, ""), format: "shp_zip" };
   if (key.endsWith("_geojson")) return { layerKey: key.replace(/_geojson$/, ""), format: "geojson" };
   if (key.endsWith("_kml")) return { layerKey: key.replace(/_kml$/, ""), format: "kml" };

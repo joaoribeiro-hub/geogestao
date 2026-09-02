@@ -4,6 +4,7 @@ import { AppShell } from "@/components/layout/app-shell";
 import { getCurrentOrganizationContext } from "@/lib/organization";
 import { createServerSupabase } from "@/lib/supabase/server";
 import { normalizeOperationalProfile } from "@/lib/operational-profile";
+import { getCurrentPlatformDeveloper } from "@/lib/platform/platform-auth";
 
 export default async function AuthenticatedLayout({
   children,
@@ -20,7 +21,10 @@ export default async function AuthenticatedLayout({
   }
 
   const pathname = (await headers()).get("x-pathname") ?? "/";
-  const context = await getCurrentOrganizationContext(supabase, user.id);
+  const [context, platform] = await Promise.all([
+    getCurrentOrganizationContext(supabase, user.id),
+    getCurrentPlatformDeveloper(supabase, user),
+  ]);
   const { data: profile } = await supabase
     .from("profiles")
     .select("full_name")
@@ -43,6 +47,7 @@ export default async function AuthenticatedLayout({
       membershipRole={context.membership?.role ?? null}
       operationalProfile={normalizeOperationalProfile(context.organization?.operational_profile)}
       organizationId={context.organization?.id ?? null}
+      isPlatformDeveloper={platform.isPlatformDeveloper}
     >
       {children}
     </AppShell>

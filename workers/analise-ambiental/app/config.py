@@ -41,6 +41,26 @@ class Settings:
     poll_interval_seconds: int
     poll_limit: int
     debug: bool
+    car_provider_enabled: bool = False
+    car_provider_mode: str = "manifest"
+    car_source_manifest_url: str = ""
+    car_cache_dir: Path = WORKER_DIR / "tmp" / "car"
+    car_max_download_mb: float = 300
+    car_max_aoi_ha: float = 50000
+    car_allow_full_state_download: bool = False
+    current_image_provider_enabled: bool = True
+    current_image_source_priority: tuple[str, ...] = ("meuimovel", "buscageo", "dynamic_world", "manual")
+    current_image_nir_band: int = 4
+    current_image_red_band: int = 3
+    dynamic_world_enabled: bool = False
+    dynamic_world_min_probability: float = 0.55
+    ndvi_vegetation_threshold: float = 0.35
+    vegetation_model_provider: str = "rule_based_ndvi"
+    vegetation_segmenter_provider: str = ""
+    geoai_enabled: bool = False
+    custom_vegetation_model_enabled: bool = False
+    custom_vegetation_model_path: str = ""
+    custom_vegetation_model_version: str = ""
 
 
 @lru_cache(maxsize=1)
@@ -48,9 +68,11 @@ def get_settings() -> Settings:
     tmp_dir = Path(os.environ.get("ANALISE_AMBIENTAL_TMP_DIR", WORKER_DIR / "tmp"))
     fixture_dir = Path(os.environ.get("ANALISE_AMBIENTAL_LOCAL_DATA_DIR", WORKER_DIR / "data" / "dev"))
     ana_hidro_cache_dir = Path(os.environ.get("ANA_HIDRO_CACHE_DIR", WORKER_DIR / "data" / "ana"))
+    car_cache_dir = Path(os.environ.get("CAR_CACHE_DIR", WORKER_DIR / "tmp" / "car"))
     tmp_dir.mkdir(parents=True, exist_ok=True)
     fixture_dir.mkdir(parents=True, exist_ok=True)
     ana_hidro_cache_dir.mkdir(parents=True, exist_ok=True)
+    car_cache_dir.mkdir(parents=True, exist_ok=True)
     return Settings(
         supabase_url=os.environ.get("SUPABASE_URL", ""),
         supabase_service_role_key=os.environ.get("SUPABASE_SERVICE_ROLE_KEY", ""),
@@ -78,6 +100,30 @@ def get_settings() -> Settings:
         ana_massas_dagua_url=os.environ.get("ANA_MASSAS_DAGUA_URL", "").strip(),
         ana_hidro_cache_dir=ana_hidro_cache_dir,
         ana_hidro_enable_arcgis_fallback=_env_bool("ANA_HIDRO_ENABLE_ARCGIS_FALLBACK", default=False),
+        car_provider_enabled=_env_bool("CAR_PROVIDER_ENABLED", default=False),
+        car_provider_mode=os.environ.get("CAR_PROVIDER_MODE", "manifest").strip().lower() or "manifest",
+        car_source_manifest_url=os.environ.get("CAR_SOURCE_MANIFEST_URL", "").strip(),
+        car_cache_dir=car_cache_dir,
+        car_max_download_mb=max(1.0, float(os.environ.get("CAR_MAX_DOWNLOAD_MB", "300"))),
+        car_max_aoi_ha=max(1.0, float(os.environ.get("CAR_MAX_AOI_HA", "50000"))),
+        car_allow_full_state_download=_env_bool("CAR_ALLOW_FULL_STATE_DOWNLOAD", default=False),
+        current_image_provider_enabled=_env_bool("CURRENT_IMAGE_PROVIDER_ENABLED", default=True),
+        current_image_source_priority=tuple(
+            item.strip().lower()
+            for item in os.environ.get("CURRENT_IMAGE_SOURCE_PRIORITY", "meuimovel,buscageo,dynamic_world,manual").split(",")
+            if item.strip()
+        ),
+        current_image_nir_band=max(1, int(os.environ.get("CURRENT_IMAGE_NIR_BAND", "4"))),
+        current_image_red_band=max(1, int(os.environ.get("CURRENT_IMAGE_RED_BAND", "3"))),
+        dynamic_world_enabled=_env_bool("DYNAMIC_WORLD_ENABLED", default=False),
+        dynamic_world_min_probability=min(1.0, max(0.0, float(os.environ.get("DYNAMIC_WORLD_MIN_PROBABILITY", "0.55")))),
+        ndvi_vegetation_threshold=min(1.0, max(-1.0, float(os.environ.get("NDVI_VEGETATION_THRESHOLD", "0.35")))),
+        vegetation_model_provider=os.environ.get("VEGETATION_MODEL_PROVIDER", "rule_based_ndvi").strip().lower(),
+        vegetation_segmenter_provider=os.environ.get("VEGETATION_SEGMENTER_PROVIDER", "").strip().lower(),
+        geoai_enabled=_env_bool("GEOAI_ENABLED", default=False),
+        custom_vegetation_model_enabled=_env_bool("CUSTOM_VEGETATION_MODEL_ENABLED", default=False),
+        custom_vegetation_model_path=os.environ.get("CUSTOM_VEGETATION_MODEL_PATH", "").strip(),
+        custom_vegetation_model_version=os.environ.get("CUSTOM_VEGETATION_MODEL_VERSION", "").strip(),
         poll_enabled=_env_bool("ANALISE_AMBIENTAL_POLL_ENABLED", default=False),
         poll_interval_seconds=max(10, int(os.environ.get("ANALISE_AMBIENTAL_POLL_INTERVAL_SECONDS", "60"))),
         poll_limit=max(1, int(os.environ.get("ANALISE_AMBIENTAL_POLL_LIMIT", "3"))),

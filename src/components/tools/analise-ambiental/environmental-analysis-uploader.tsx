@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { AlertTriangle, Download, Loader2, Play, RefreshCw, Upload } from "lucide-react";
+import { AlertTriangle, Check, Download, Loader2, Play, RefreshCw, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -13,6 +13,10 @@ export type EnvironmentalJob = {
   created_at: string;
   input_size_bytes?: number | null;
   requested_layers?: string[] | null;
+  requested_sources?: string[] | null;
+  source_options?: Record<string, unknown> | null;
+  current_image_source?: string | null;
+  current_image_storage_path?: string | null;
   area_ha?: number | string | null;
   bbox?: unknown;
   result_summary?: Record<string, unknown> | null;
@@ -22,6 +26,8 @@ export type EnvironmentalJob = {
   finished_at?: string | null;
   progress?: number | null;
   input_raster_storage_path?: string | null;
+  fusion_summary?: Record<string, unknown> | null;
+  training_summary?: Record<string, unknown> | null;
 };
 
 type SignedOutput = {
@@ -60,15 +66,24 @@ type HidroProviderStatus = {
   version: string;
 };
 
+type SourceProviderStatus = {
+  carConfigured: boolean;
+  currentImageConfigured: boolean;
+  dynamicWorldConfigured: boolean;
+};
+
 export function EnvironmentalAnalysisUploader({
   initialJobs,
   hidroProvider,
+  sourceProviders,
 }: {
   initialJobs: EnvironmentalJob[];
   hidroProvider: HidroProviderStatus;
+  sourceProviders: SourceProviderStatus;
 }) {
   const [jobs, setJobs] = useState(initialJobs);
   const [layers, setLayers] = useState(["vegetacao_nativa", "agropecuaria", "agua"]);
+  const [sources, setSources] = useState(["mapbiomas"]);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [processingJobId, setProcessingJobId] = useState<string | null>(null);
@@ -76,6 +91,10 @@ export function EnvironmentalAnalysisUploader({
   const [message, setMessage] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const rasterRef = useRef<HTMLInputElement>(null);
+  const currentImageRef = useRef<HTMLInputElement>(null);
+  const carUfRef = useRef<HTMLInputElement>(null);
+  const carYearRef = useRef<HTMLInputElement>(null);
+  const carMunicipalityRef = useRef<HTMLInputElement>(null);
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -88,7 +107,19 @@ export function EnvironmentalAnalysisUploader({
       formData.set("file", file);
       const rasterFile = rasterRef.current?.files?.[0];
       if (rasterFile) formData.set("rasterFile", rasterFile);
+      const currentImageFile = currentImageRef.current?.files?.[0];
+      if (currentImageFile) formData.set("currentImageFile", currentImageFile);
       layers.forEach((layer) => formData.append("layers", layer));
+      sources.forEach((source) => formData.append("sources", source));
+      if (sources.includes("car")) {
+        formData.set("carUf", carUfRef.current?.value ?? "");
+        formData.set("carYear", carYearRef.current?.value ?? "");
+        formData.set("carMunicipalityCode", carMunicipalityRef.current?.value ?? "");
+      }
+      if (sources.includes("current_image")) {
+        formData.set("currentImageMode", currentImageFile ? "manual" : sourceProviders.dynamicWorldConfigured ? "dynamic_world" : "auto");
+        formData.set("currentImageSource", currentImageFile ? "manual" : "buscageo");
+      }
 
       const response = await fetch("/api/tools/analise-ambiental/jobs", {
         method: "POST",
@@ -99,6 +130,7 @@ export function EnvironmentalAnalysisUploader({
       setJobs((current) => [data.job!, ...current]);
       if (fileRef.current) fileRef.current.value = "";
       if (rasterRef.current) rasterRef.current.value = "";
+      if (currentImageRef.current) currentImageRef.current.value = "";
       setMessage(data.worker?.message || "Job criado. O processamento real depende do worker Python ambiental.");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Erro ao criar job ambiental.");
@@ -111,6 +143,11 @@ export function EnvironmentalAnalysisUploader({
     setLayers((current) =>
       current.includes(layer) ? current.filter((item) => item !== layer) : [...current, layer],
     );
+  }
+
+  function toggleSource(source: string) {
+    if (source === "mapbiomas") return;
+    setSources((current) => current.includes(source) ? current.filter((item) => item !== source) : [...current, source]);
   }
 
   async function refreshJobs() {
@@ -181,6 +218,34 @@ export function EnvironmentalAnalysisUploader({
                 </span>
               </label>
             </details>
+            <div className="space-y-2 rounded-md border p-3">
+              <div>
+                <p className="text-sm font-medium">Fontes da análise</p>
+                <p className="text-xs text-muted-foreground">MapBiomas observa cobertura; CAR é declaratório; ANA é oficial; imagem atual valida mudanças recentes.</p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button type="button" size="sm" variant="default" disabled>MapBiomas</Button>
+                <Button type="button" size="sm" variant={sources.includes("car") ? "default" : "outline"} disabled={!sourceProviders.carConfigured} onClick={() => toggleSource("car")}>CAR/SICAR/SIGCAR{sourceProviders.carConfigured ? "" : " · configurar manifest"}</Button>
+                <Button type="button" size="sm" variant={sources.includes("ana") ? "default" : "outline"} disabled={!hidroProvider.configured} onClick={() => toggleSource("ana")}>ANA/BHO6{hidroProvider.configured ? "" : " · não configurado"}</Button>
+                <Button type="button" size="sm" variant={sources.includes("current_image") ? "default" : "outline"} disabled={!sourceProviders.currentImageConfigured} onClick={() => toggleSource("current_image")}>Imagem atual</Button>
+              </div>
+              {sources.includes("car") ? (
+                <div className="grid gap-2 sm:grid-cols-3">
+                  <Input ref={carUfRef} aria-label="UF do CAR" placeholder="UF, ex.: GO" maxLength={2} />
+                  <Input ref={carYearRef} aria-label="Ano da base CAR" placeholder="Ano, ex.: 2024" inputMode="numeric" />
+                  <Input ref={carMunicipalityRef} aria-label="Código IBGE do município" placeholder="Código IBGE" inputMode="numeric" />
+                </div>
+              ) : null}
+              {sources.includes("current_image") ? (
+                <label className="block space-y-1 text-sm">
+                  <span>GeoTIFF atual (opcional)</span>
+                  <Input ref={currentImageRef} type="file" accept=".tif,.tiff,.geotiff" />
+                  <span className="block text-xs text-muted-foreground">
+                    Sem upload, o worker procura um GeoTIFF recente do BuscaGEO. Dynamic World: {sourceProviders.dynamicWorldConfigured ? "configurado" : "preparado, não ativo"}.
+                  </span>
+                </label>
+              ) : null}
+            </div>
             <div className="space-y-2">
               <p className="text-sm font-medium">Camadas solicitadas</p>
               <div className="flex flex-wrap gap-2">
@@ -260,6 +325,7 @@ export function EnvironmentalAnalysisUploader({
                   Área: {formatArea(job.area_ha)} · Camadas:{" "}
                   {(job.requested_layers ?? []).join(", ") || "vegetacao, agua, drenagem"}
                 </p>
+                <p className="text-xs text-muted-foreground">Fontes: {(job.requested_sources ?? ["mapbiomas"]).join(", ")}</p>
                 <ProviderNotice job={job} outputs={outputsByJob[job.id] ?? []} />
                 {isLimitOnly(job, outputsByJob[job.id] ?? []) ? (
                   <p className="mt-2 rounded-md bg-amber-100 p-2 text-xs text-amber-900">
@@ -284,7 +350,7 @@ export function EnvironmentalAnalysisUploader({
                   </Button>
                 </div>
                 {outputsByJob[job.id]?.length ? (
-                  <LayerOutputs outputs={outputsByJob[job.id]} areaHa={job.area_ha} />
+                  <LayerOutputs outputs={outputsByJob[job.id]} areaHa={job.area_ha} jobId={job.id} />
                 ) : null}
               </div>
             ))
@@ -299,12 +365,58 @@ export function EnvironmentalAnalysisUploader({
   );
 }
 
-function LayerOutputs({ outputs, areaHa }: { outputs: SignedOutput[]; areaHa?: EnvironmentalJob["area_ha"] }) {
+const OUTPUT_TABS = [
+  ["final", "Resultado final"], ["mapbiomas", "MapBiomas"], ["car", "CAR"], ["ana", "ANA"],
+  ["current", "Imagem atual"], ["divergence", "Divergências"], ["report", "Relatório"],
+] as const;
+
+function LayerOutputs({ outputs, areaHa, jobId }: { outputs: SignedOutput[]; areaHa?: EnvironmentalJob["area_ha"]; jobId: string }) {
+  const [activeTab, setActiveTab] = useState<(typeof OUTPUT_TABS)[number][0]>("final");
+  const [validationMessage, setValidationMessage] = useState<string | null>(null);
   const packageOutput = outputs.find((output) => output.layer_key === "pacote");
-  const layerGroups = groupOutputsByLayer(outputs.filter((output) => !["pacote", "relatorio"].includes(output.layer_key ?? "")));
+  const reportOutput = outputs.find((output) => output.layer_key === "relatorio_multifonte") ?? outputs.find((output) => output.layer_key === "relatorio");
+  const layerGroups = groupOutputsByLayer(outputs.filter((output) => !["pacote", "relatorio", "relatorio_multifonte"].includes(output.layer_key ?? "")))
+    .filter((group) => outputTab(group.layerKey, group.provider) === activeTab);
+
+  async function validateLayer(layerKey: string, action: "approve" | "correct" | "dispute") {
+    setValidationMessage(null);
+    const samplesResponse = await fetch(`/api/tools/analise-ambiental/jobs/${jobId}/training-samples`);
+    const samplesData = (await samplesResponse.json()) as { samples?: Array<{ id: string; source_layer: string }>; error?: string };
+    if (!samplesResponse.ok) {
+      setValidationMessage(samplesData.error || "Não foi possível carregar a amostra.");
+      return;
+    }
+    const sample = samplesData.samples?.find((item) => item.source_layer === layerKey);
+    if (!sample) {
+      setValidationMessage("Esta camada ainda não gerou amostra de treinamento.");
+      return;
+    }
+    let correctedClass: string | undefined;
+    if (action === "correct") {
+      correctedClass = window.prompt("Classe correta: vegetacao, agropecuaria, agua, solo_exposto ou outro")?.trim();
+      if (!correctedClass) return;
+    }
+    const response = await fetch(`/api/tools/analise-ambiental/jobs/${jobId}/training-samples`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sampleId: sample.id, action, correctedClass }),
+    });
+    const data = (await response.json()) as { error?: string };
+    setValidationMessage(response.ok ? "Validação salva na base de treino da organização." : data.error || "Falha ao validar amostra.");
+  }
 
   return (
     <div className="mt-3 space-y-3">
+      <div className="flex gap-1 overflow-x-auto pb-1" role="tablist" aria-label="Fonte dos resultados">
+        {OUTPUT_TABS.map(([value, label]) => (
+          <Button key={value} type="button" size="sm" variant={activeTab === value ? "default" : "outline"} onClick={() => setActiveTab(value)}>{label}</Button>
+        ))}
+      </div>
+      {activeTab === "report" ? (
+        <div className="rounded-md border p-3 text-xs">
+          <div className="flex items-center justify-between gap-3"><span className="font-medium">Relatório multifonte</span><OutputLink output={reportOutput} label="Baixar JSON" /></div>
+        </div>
+      ) : null}
       {layerGroups.map((group) => (
         <div key={group.layerKey} className="rounded-md bg-secondary p-3 text-xs">
           <div className="grid gap-3 md:grid-cols-[minmax(180px,1.2fr)_minmax(120px,0.8fr)_minmax(90px,0.5fr)_auto] md:items-center">
@@ -325,8 +437,18 @@ function LayerOutputs({ outputs, areaHa }: { outputs: SignedOutput[]; areaHa?: E
               ))}
             </div>
           </div>
+          {group.provider === "fusion_engine" ? (
+            <div className="mt-2 flex flex-wrap gap-2 border-t pt-2">
+              <Button type="button" size="sm" variant="outline" onClick={() => validateLayer(group.layerKey, "approve")}><Check aria-hidden="true" />Validar resultado</Button>
+              <Button type="button" size="sm" variant="outline" onClick={() => validateLayer(group.layerKey, "correct")}>Corrigir classe</Button>
+              <Button type="button" size="sm" variant="outline" onClick={() => validateLayer(group.layerKey, "dispute")}>Marcar como divergente</Button>
+              <Button type="button" size="sm" variant="outline" onClick={() => validateLayer(group.layerKey, "approve")}>Enviar para base de treino</Button>
+            </div>
+          ) : null}
         </div>
       ))}
+      {activeTab !== "report" && !layerGroups.length ? <p className="rounded-md border p-3 text-xs text-muted-foreground">Nenhuma camada gerada nesta fonte.</p> : null}
+      {validationMessage ? <p className="rounded-md bg-secondary p-2 text-xs">{validationMessage}</p> : null}
       {packageOutput ? (
         <div className="rounded-md border border-primary/30 bg-primary/5 p-3 text-xs">
           <div className="flex items-center justify-between gap-3">
@@ -337,6 +459,16 @@ function LayerOutputs({ outputs, areaHa }: { outputs: SignedOutput[]; areaHa?: E
       ) : null}
     </div>
   );
+}
+
+function outputTab(layerKey: string, provider?: string | null): (typeof OUTPUT_TABS)[number][0] {
+  if (["vegetacao_final", "vegetacao_alta_confianca", "vegetacao_media_confianca", "agua_alta_confianca"].includes(layerKey)) return "final";
+  if (layerKey.includes("divergencia") || layerKey.includes("conflito") || layerKey.includes("ausente")) return "divergence";
+  if (layerKey.includes("mapbiomas") || provider?.includes("mapbiomas")) return "mapbiomas";
+  if (layerKey.includes("_car") || provider?.startsWith("car")) return "car";
+  if (layerKey.includes("ana") || provider?.includes("ana")) return "ana";
+  if (layerKey.includes("imagem_atual") || provider === "rule_based_ndvi" || provider === "dynamic_world") return "current";
+  return provider === "fusion_engine" ? "final" : "mapbiomas";
 }
 
 function OutputLink({ output, label }: { output?: SignedOutput; label: string }) {
@@ -407,6 +539,11 @@ function isLimitOnly(job: EnvironmentalJob, outputs: SignedOutput[]) {
     "area_nao_vegetada",
     "drenagem_corrego",
     "hidrografia_oficial",
+    "hidrografia_ana_oficial",
+    "vegetacao_final",
+    "vegetacao_mapbiomas",
+    "vegetacao_car_declarada",
+    "vegetacao_imagem_atual",
   ];
   return job.status === "concluido" && layerKeys.has("limite") && !environmentalLayerKeys.some((key) => layerKeys.has(key));
 }
@@ -415,7 +552,7 @@ function ProviderNotice({ job, outputs }: { job: EnvironmentalJob; outputs: Sign
   const summary = job.result_summary ?? {};
   const provider = String(summary.provider || outputs.find((output) => output.provider)?.provider || "");
   const simulated = provider === "dev_fixture" || job.status === "simulado" || summary.official_data === false;
-  const realProviders = ["mapbiomas_gee", "mapbiomas_manual_raster", "mapbiomas_public_raster", "mapbiomas_real", "ana_hidrografia_oficial", "multi_provider"];
+  const realProviders = ["mapbiomas_gee", "mapbiomas_manual_raster", "mapbiomas_public_raster", "mapbiomas_real", "ana_hidrografia_oficial", "car_manifest", "rule_based_ndvi", "fusion_engine", "multi_provider"];
   const real = realProviders.includes(provider) || outputs.some((output) => realProviders.includes(output.provider || ""));
 
   if (simulated) {
@@ -446,6 +583,9 @@ function formatProvider(provider?: string | null, officialData?: boolean | null)
   if (provider === "mapbiomas_public_raster") return "MapBiomas raster público";
   if (provider === "mapbiomas_real") return officialData ? "Real MapBiomas" : "MapBiomas";
   if (provider === "ana_hidrografia_oficial") return "ANA/SNIRH BHO 6";
+  if (provider === "car_manifest") return "CAR/SICAR/SIGCAR declaratório";
+  if (provider === "rule_based_ndvi") return "Imagem atual/NDVI";
+  if (provider === "fusion_engine") return "Fusão multifonte";
   if (provider === "multi_provider") return "fontes oficiais";
   if (provider === "dev_fixture") return "Simulado";
   return provider || "pendente";
@@ -483,6 +623,16 @@ function layerColor(layerKey: string) {
     vegetacao_existente: "#7c3aed",
     drenagem_corrego: "#2563eb",
     hidrografia_oficial: "#2563eb",
+    hidrografia_ana_oficial: "#2563eb",
+    vegetacao_mapbiomas: "#2ca25f",
+    vegetacao_car_declarada: "#65a30d",
+    vegetacao_imagem_atual: "#16a34a",
+    vegetacao_final: "#047857",
+    vegetacao_alta_confianca: "#065f46",
+    vegetacao_media_confianca: "#84cc16",
+    vegetacao_divergencia: "#f97316",
+    conflito_ambiental: "#dc2626",
+    possivel_app_hidrica_ausente: "#f59e0b",
     limite: "#111827",
   };
   return colors[layerKey] || "#64748b";

@@ -5,8 +5,10 @@ import { PageHeader } from "@/components/layout/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
+import { UniversalDocumentsSection } from "@/components/platform/universal-documents-section";
 import { requireUser } from "@/lib/auth";
 import { getCurrentOrganizationForUser } from "@/lib/organization";
+import { getCurrentPlatformDeveloper } from "@/lib/platform/platform-auth";
 import { createServerSupabase } from "@/lib/supabase/server";
 import { formatDate } from "@/lib/utils";
 
@@ -14,6 +16,7 @@ export default async function AttachmentsPage() {
   const supabase = await createServerSupabase();
   const user = await requireUser(supabase);
   const organization = await getCurrentOrganizationForUser(supabase, user.id);
+  const platform = await getCurrentPlatformDeveloper(supabase, user);
   const [
     clientsResult,
     proposalsResult,
@@ -97,6 +100,7 @@ export default async function AttachmentsPage() {
             )}
           </CardContent>
         </Card>
+        <UniversalDocumentsSection category="anexos" isPlatformDeveloper={platform.isPlatformDeveloper} />
       </div>
     </div>
   );

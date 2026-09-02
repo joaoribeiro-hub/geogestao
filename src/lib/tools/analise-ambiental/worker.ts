@@ -21,6 +21,17 @@ export type EnvironmentalWorkerHealth = {
       source?: string;
       version?: string;
     };
+    car?: {
+      configured?: boolean;
+      provider?: string;
+      mode?: string;
+      manifest?: boolean;
+    };
+    current_image?: {
+      configured?: boolean;
+      provider?: string;
+      dynamic_world?: boolean;
+    };
   };
 };
 

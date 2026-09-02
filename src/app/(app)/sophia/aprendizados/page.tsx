@@ -2,14 +2,13 @@ import { redirect } from "next/navigation";
 import { PageHeader } from "@/components/layout/page-header";
 import { SophiaLearningPanel } from "@/components/sophia/sophia-learning-panel";
 import { requireUser } from "@/lib/auth";
-import { requireOrganization } from "@/lib/organization";
+import { getCurrentPlatformDeveloper } from "@/lib/platform/platform-auth";
 import { createServerSupabase } from "@/lib/supabase/server";
 
 export default async function SophiaLearningPage() {
   const supabase = await createServerSupabase();
   const user = await requireUser(supabase);
-  const { organization, membership } = await requireOrganization(supabase, user.id);
-  if (!organization || membership?.role !== "owner") redirect("/inicio");
-  return <div><PageHeader title="Aprendizados da Sophia" description="Revise reflexoes e aprove regras operacionais antes que entrem na memoria da empresa." /><SophiaLearningPanel /></div>;
+  const platform = await getCurrentPlatformDeveloper(supabase, user);
+  if (!platform.isPlatformDeveloper) redirect("/inicio");
+  return <div><PageHeader title="Aprendizados universais da Sophia" description="Revise somente regras abstratas e sanitizadas antes de publica-las para toda a plataforma." /><SophiaLearningPanel /></div>;
 }
-

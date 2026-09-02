@@ -32,12 +32,26 @@ export async function persistSophiaV4Memory(input: {
 
 export async function retrieveSophiaV4Memories(context: SophiaContext, query: string, limit = 12) {
   const database = context.supabase as unknown as MemoryDatabase;
+  const globalDatabase = context.supabase as unknown as GlobalRuleDatabase;
   const safe = query.replace(/[%_,()]/g, " ").trim();
   let request = database.from("sophia_memories").select("id,scope,title,content,memory_type,metadata,importance,updated_at").eq("organization_id", context.organizationId).is("deleted_at", null).order("importance", { ascending: false }).limit(limit);
   if (safe) request = request.or(`title.ilike.%${safe}%,content.ilike.%${safe}%`);
-  const { data, error } = await request;
-  if (error) return [];
-  return data ?? [];
+  const [{ data, error }, globalRules] = await Promise.all([
+    request,
+    globalDatabase.from("platform_sophia_rules").select("id,rule_key,sanitized_content,evidence_count,updated_at").eq("status", "active").order("updated_at", { ascending: false }).limit(5),
+  ]);
+  const universal = (globalRules.data ?? []).map((rule) => ({
+    id: rule.id,
+    scope: "global_template",
+    title: rule.rule_key,
+    content: rule.sanitized_content,
+    memory_type: "procedural",
+    metadata: { evidence_count: rule.evidence_count },
+    importance: 5,
+    updated_at: rule.updated_at,
+  }));
+  if (error) return universal;
+  return [...universal, ...(data ?? [])].slice(0, limit);
 }
 
 type MemoryQuery = PromiseLike<{ data: Array<Record<string, unknown>> | null; error: { message: string } | null }> & {
@@ -52,3 +66,9 @@ type MemoryTable = {
   insert(value: Record<string, unknown>): { select(columns: string): { maybeSingle(): Promise<{ data: { id?: string } | null; error: { message: string } | null }> } };
 };
 type MemoryDatabase = { from(table: string): MemoryTable };
+type GlobalRuleQuery = PromiseLike<{ data: Array<{ id: string; rule_key: string; sanitized_content: string; evidence_count: number; updated_at: string }> | null; error: { message: string } | null }> & {
+  eq(column: string, value: string): GlobalRuleQuery;
+  order(column: string, options: { ascending: boolean }): GlobalRuleQuery;
+  limit(value: number): GlobalRuleQuery;
+};
+type GlobalRuleDatabase = { from(table: "platform_sophia_rules"): { select(columns: string): GlobalRuleQuery } };

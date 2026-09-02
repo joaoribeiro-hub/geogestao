@@ -21,7 +21,7 @@ const allowedExtensions = [".kml", ".kmz", ".zip"];
 const allowedRasterExtensions = [".tif", ".tiff", ".geotiff"];
 
 const jobSelect =
-  "id,status,original_filename,created_at,input_size_bytes,requested_layers,area_ha,bbox,result_summary,warnings,output_storage_paths,error_message,finished_at,progress,input_raster_storage_path";
+  "id,status,original_filename,created_at,input_size_bytes,requested_layers,requested_sources,source_options,current_image_source,current_image_storage_path,area_ha,bbox,result_summary,fusion_summary,training_summary,warnings,output_storage_paths,error_message,finished_at,progress,input_raster_storage_path";
 
 const defaultRequestedLayers = ["vegetacao_nativa", "agropecuaria", "agua"];
 
@@ -70,6 +70,7 @@ export async function POST(request: Request) {
   }
 
   const requestedLayers = formData.getAll("layers").map(String).filter(Boolean);
+  const requestedSources = formData.getAll("sources").map(String).filter(Boolean);
   const rasterFile = formData.get("rasterFile");
   if (rasterFile instanceof File && rasterFile.size > 0) {
     const rasterValidation = validateRasterFile(rasterFile);
@@ -77,11 +78,19 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: rasterValidation.reason }, { status: 400 });
     }
   }
+  const currentImageFile = formData.get("currentImageFile");
+  if (currentImageFile instanceof File && currentImageFile.size > 0) {
+    const currentImageValidation = validateRasterFile(currentImageFile);
+    if (!currentImageValidation.ok) {
+      return NextResponse.json({ error: currentImageValidation.reason }, { status: 400 });
+    }
+  }
 
   const jobId = randomUUID();
   const safeName = sanitizeDocumentFileName(file.name);
   const storagePath = `organizations/${organization.id}/tools/analise-ambiental/${jobId}/input/${safeName}`;
   let rasterStoragePath: string | null = null;
+  let currentImageStoragePath: string | null = null;
 
   const upload = await supabase.storage.from(DOCUMENTS_BUCKET).upload(storagePath, file, {
     upsert: false,
@@ -105,6 +114,27 @@ export async function POST(request: Request) {
     }
   }
 
+  if (currentImageFile instanceof File && currentImageFile.size > 0) {
+    const safeCurrentImageName = sanitizeDocumentFileName(currentImageFile.name);
+    currentImageStoragePath = `organizations/${organization.id}/tools/analise-ambiental/${jobId}/input/current-${safeCurrentImageName}`;
+    const currentImageUpload = await supabase.storage.from(DOCUMENTS_BUCKET).upload(currentImageStoragePath, currentImageFile, {
+      upsert: false,
+      contentType: "image/tiff",
+    });
+    if (currentImageUpload.error) {
+      await supabase.storage.from(DOCUMENTS_BUCKET).remove([storagePath, rasterStoragePath].filter(Boolean) as string[]);
+      return NextResponse.json({ error: currentImageUpload.error.message }, { status: 500 });
+    }
+  }
+
+  const sourceOptions = {
+    car_uf: String(formData.get("carUf") ?? "").trim().toLowerCase(),
+    car_year: String(formData.get("carYear") ?? "").trim(),
+    car_municipality_code: String(formData.get("carMunicipalityCode") ?? "").trim(),
+    current_image_mode: String(formData.get("currentImageMode") ?? (currentImageStoragePath ? "manual" : "auto")),
+    current_image_source: String(formData.get("currentImageSource") ?? (currentImageStoragePath ? "manual" : "buscageo")),
+  };
+
   const db = asUntypedSupabase(supabase);
   const { data: job, error } = await db
     .from("module_environmental_analysis_jobs")
@@ -116,9 +146,13 @@ export async function POST(request: Request) {
       original_filename: file.name,
       input_storage_path: storagePath,
       input_raster_storage_path: rasterStoragePath,
+      current_image_storage_path: currentImageStoragePath,
+      current_image_source: sourceOptions.current_image_source,
       input_mime_type: file.type || "application/octet-stream",
       input_size_bytes: file.size,
       requested_layers: requestedLayers.length ? requestedLayers : defaultRequestedLayers,
+      requested_sources: requestedSources.length ? requestedSources : ["mapbiomas"],
+      source_options: sourceOptions,
       logs: [
         {
           at: new Date().toISOString(),
@@ -130,7 +164,7 @@ export async function POST(request: Request) {
     .single();
 
   if (error) {
-    await supabase.storage.from(DOCUMENTS_BUCKET).remove([storagePath, rasterStoragePath].filter(Boolean) as string[]);
+    await supabase.storage.from(DOCUMENTS_BUCKET).remove([storagePath, rasterStoragePath, currentImageStoragePath].filter(Boolean) as string[]);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 

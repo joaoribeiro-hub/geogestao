@@ -100,17 +100,18 @@ describe("SOPHIA-4 adaptive agent core", () => {
     const approval = readFileSync(join(process.cwd(), "src/app/api/sophia/reflections/[id]/route.ts"), "utf8");
     expect(feedback).toContain("evidenceCount >= threshold");
     expect(feedback).toContain('from("sophia_eval_cases")');
-    expect(approval).toContain('memory_type: "organization_rule"');
-    expect(approval).toContain('membership?.role !== "owner"');
+    expect(approval).toContain('from("platform_sophia_rules")');
+    expect(approval).toContain("requirePlatformDeveloper");
   });
 
-  it("implementa painel lateral acessivel e botoes flutuantes maiores", () => {
+  it("implementa painel lateral acessivel e botoes flutuantes compactos", () => {
     const panel = readFileSync(join(process.cwd(), "src/components/sophia/sophia-side-panel.tsx"), "utf8");
     const css = readFileSync(join(process.cwd(), "src/app/globals.css"), "utf8");
     expect(panel).toContain('role="dialog"');
     expect(panel).toContain('event.key === "Escape"');
     expect(css).toContain("translateX(100%)");
-    expect(css).toContain("width: 92px");
+    expect(css).toContain("width: 56px");
+    expect(css).toContain("min-width: 44px");
     expect(css).toContain("prefers-reduced-motion");
   });
 });
