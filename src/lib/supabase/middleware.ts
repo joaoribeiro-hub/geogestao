@@ -3,7 +3,12 @@ import { createServerClient } from "@supabase/ssr";
 import type { Database } from "@/types/database";
 import { getSupabaseEnv } from "@/lib/supabase/env";
 
-const publicRoutes = ["/login", "/reset-password", "/api/auth/request-password-reset"];
+const publicRoutes = [
+  "/login",
+  "/reset-password",
+  "/api/auth/request-password-reset",
+  "/api/modules/buscageo/worker/callback",
+];
 
 export async function updateSession(request: NextRequest) {
   const requestHeaders = new Headers(request.headers);
