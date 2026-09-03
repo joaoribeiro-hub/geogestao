@@ -4,20 +4,30 @@ from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import urljoin
 import json
-import os
 import re
 import urllib.request
 
 import numpy as np
-from osgeo import gdal
 from PIL import Image
+import rasterio
+from rasterio.enums import Resampling
+from rasterio.warp import transform_bounds
+from rasterio.windows import Window, from_bounds
+
+try:
+    from osgeo import gdal
+except ImportError:  # Rasterio remains available in lightweight local environments.
+    gdal = None
 
 from .settings import CBERS_COLLECTION, DEFAULT_START_DATETIME, URL_ROOT, URL_SEARCH
 
-gdal.UseExceptions()
+if gdal is not None:
+    gdal.UseExceptions()
 
 
 def configure_gdal_http() -> None:
+    if gdal is None:
+        return
     gdal.SetConfigOption("GDAL_HTTP_MAX_RETRY", "5")
     gdal.SetConfigOption("GDAL_HTTP_RETRY_DELAY", "10")
     gdal.SetConfigOption("GDAL_DISABLE_READDIR_ON_OPEN", "EMPTY_DIR")
@@ -100,12 +110,78 @@ def crop_remote_cbers_image(
     bbox: tuple[float, float, float, float],
     output_path: Path,
 ) -> Path:
-    configure_gdal_http()
     output_path.parent.mkdir(parents=True, exist_ok=True)
+    errors: list[str] = []
 
-    if output_path.exists():
-        output_path.unlink()
+    if gdal is not None:
+        try:
+            _crop_with_gdal(href, bbox, output_path)
+            if validate_geotiff(output_path):
+                return output_path
+            raise RuntimeError("GDAL gerou um GeoTIFF invalido")
+        except Exception as exc:
+            errors.append(f"GDAL: {exc}")
+            output_path.unlink(missing_ok=True)
 
+    try:
+        _crop_with_rasterio(href, bbox, output_path)
+        if not validate_geotiff(output_path):
+            raise RuntimeError("Rasterio gerou um GeoTIFF invalido")
+        return output_path
+    except Exception as exc:
+        output_path.unlink(missing_ok=True)
+        errors.append(f"Rasterio: {exc}")
+        raise RuntimeError("; ".join(errors)) from exc
+
+
+def validate_geotiff(path: Path) -> bool:
+    try:
+        with rasterio.open(path) as dataset:
+            if dataset.count < 1 or dataset.width < 1 or dataset.height < 1:
+                return False
+            sample = Window(0, 0, min(256, dataset.width), min(256, dataset.height))
+            dataset.read(window=sample)
+        return True
+    except Exception:
+        return False
+
+
+def create_preview(original_tif: Path, preview_path: Path, scale: float = 0.25) -> Path:
+    with rasterio.open(original_tif) as dataset:
+        width = max(1, int(dataset.width * scale))
+        height = max(1, int(dataset.height * scale))
+        band_count = min(3, dataset.count)
+
+        if band_count < 1:
+            raise RuntimeError("Imagem sem bandas para preview.")
+
+        arrays: list[np.ndarray] = []
+        for band_index in range(1, band_count + 1):
+            array = dataset.read(
+                band_index,
+                out_shape=(height, width),
+                resampling=Resampling.bilinear,
+                masked=True,
+            ).astype(np.float32)
+            arrays.append(_stretch_to_byte(array.filled(np.nan)))
+
+    while len(arrays) < 3:
+        arrays.append(arrays[-1])
+
+    preview = np.dstack(arrays[:3])
+    preview_path.parent.mkdir(parents=True, exist_ok=True)
+    Image.fromarray(preview, mode="RGB").save(preview_path, format="PNG", optimize=True)
+    return preview_path
+
+
+def _crop_with_gdal(
+    href: str,
+    bbox: tuple[float, float, float, float],
+    output_path: Path,
+) -> None:
+    if gdal is None:
+        raise RuntimeError("bindings Python do GDAL indisponiveis")
+    configure_gdal_http()
     options = gdal.WarpOptions(
         format="GTiff",
         outputBounds=list(bbox),
@@ -114,74 +190,63 @@ def crop_remote_cbers_image(
         multithread=False,
         creationOptions=["COMPRESS=LZW", "TILED=YES", "BIGTIFF=IF_SAFER"],
     )
-
     dataset = gdal.Warp(str(output_path), _to_vsi_url(href), options=options)
     if dataset is None:
-        raise RuntimeError("Erro ao gerar o recorte.")
-
+        raise RuntimeError("erro ao gerar o recorte")
     dataset.FlushCache()
     dataset = None
-    return output_path
 
 
-def validate_geotiff(path: Path) -> bool:
-    try:
-        dataset = gdal.Open(str(path))
-        if dataset is None or dataset.RasterCount < 1:
-            return False
+def _crop_with_rasterio(
+    href: str,
+    bbox: tuple[float, float, float, float],
+    output_path: Path,
+) -> None:
+    location = urljoin(URL_ROOT, href)
+    with rasterio.Env(
+        GDAL_DISABLE_READDIR_ON_OPEN="EMPTY_DIR",
+        GDAL_HTTP_MAX_RETRY="5",
+        GDAL_HTTP_RETRY_DELAY="10",
+    ):
+        with rasterio.open(location) as source:
+            if source.crs is None:
+                raise RuntimeError("cena CBERS sem CRS")
+            native_bounds = transform_bounds("EPSG:4326", source.crs, *bbox, densify_pts=21)
+            left = max(native_bounds[0], source.bounds.left)
+            bottom = max(native_bounds[1], source.bounds.bottom)
+            right = min(native_bounds[2], source.bounds.right)
+            top = min(native_bounds[3], source.bounds.top)
+            if left >= right or bottom >= top:
+                raise RuntimeError("cena CBERS nao intersecta a area solicitada")
 
-        for index in range(1, dataset.RasterCount + 1):
-            band = dataset.GetRasterBand(index)
-            band.ReadRaster(
-                0,
-                0,
-                min(256, dataset.RasterXSize),
-                min(256, dataset.RasterYSize),
+            source_window = from_bounds(left, bottom, right, top, source.transform)
+            source_window = source_window.round_offsets().round_lengths()
+            source_window = source_window.intersection(Window(0, 0, source.width, source.height))
+            width = max(1, int(source_window.width))
+            height = max(1, int(source_window.height))
+
+            profile = source.profile.copy()
+            profile.update(
+                driver="GTiff",
+                width=width,
+                height=height,
+                transform=source.window_transform(source_window),
+                compress="deflate",
+                tiled=width >= 16 and height >= 16,
+                BIGTIFF="IF_SAFER",
             )
+            profile.pop("blockxsize", None)
+            profile.pop("blockysize", None)
 
-        dataset = None
-        return True
-    except Exception:
-        return False
-
-
-def create_preview(original_tif: Path, preview_path: Path, scale: float = 0.25) -> Path:
-    dataset = gdal.Open(str(original_tif))
-    if dataset is None:
-        raise RuntimeError("Erro ao gerar a pre-visualizacao.")
-
-    width = max(1, int(dataset.RasterXSize * scale))
-    height = max(1, int(dataset.RasterYSize * scale))
-    band_count = min(3, dataset.RasterCount)
-
-    if band_count < 1:
-        raise RuntimeError("Imagem sem bandas para preview.")
-
-    arrays: list[np.ndarray] = []
-    for band_index in range(1, band_count + 1):
-        band = dataset.GetRasterBand(band_index)
-        array = band.ReadAsArray(
-            0,
-            0,
-            dataset.RasterXSize,
-            dataset.RasterYSize,
-            buf_xsize=width,
-            buf_ysize=height,
-        ).astype(np.float32)
-
-        nodata = band.GetNoDataValue()
-        if nodata is not None:
-            array[array == nodata] = np.nan
-        arrays.append(_stretch_to_byte(array))
-
-    while len(arrays) < 3:
-        arrays.append(arrays[-1])
-
-    preview = np.dstack(arrays[:3])
-    preview_path.parent.mkdir(parents=True, exist_ok=True)
-    Image.fromarray(preview, mode="RGB").save(preview_path, format="PNG", optimize=True)
-    dataset = None
-    return preview_path
+            with rasterio.open(output_path, "w", **profile) as target:
+                for _, target_window in target.block_windows(1):
+                    read_window = Window(
+                        source_window.col_off + target_window.col_off,
+                        source_window.row_off + target_window.row_off,
+                        target_window.width,
+                        target_window.height,
+                    )
+                    target.write(source.read(window=read_window), window=target_window)
 
 
 def safe_filename(value: str) -> str:

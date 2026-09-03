@@ -56,6 +56,7 @@ def search_scenes(payload: WorkerPayload) -> None:
                 raise ValueError("Nenhuma imagem CBERS encontrada para esta area.")
 
             scenes: list[dict[str, Any]] = []
+            candidate_errors: list[str] = []
             originals_dir = tmp_path / "originals"
             previews_dir = tmp_path / "previews"
             for candidate in candidates:
@@ -70,8 +71,11 @@ def search_scenes(payload: WorkerPayload) -> None:
                         continue
                     preview_path = previews_dir / f"{image_id}.png"
                     create_preview(original_path, preview_path, scale=0.25)
-                except Exception:
+                except Exception as exc:
                     traceback.print_exc()
+                    candidate_errors.append(
+                        f"{candidate.get('id') or 'cena sem id'}: {type(exc).__name__}: {str(exc)[:300]}"
+                    )
                     continue
 
                 original_storage_path = _storage_path(payload, "output/originals", original_path.name)
@@ -92,7 +96,9 @@ def search_scenes(payload: WorkerPayload) -> None:
                 _send(payload, status="searching_scenes", progress=40 + int((len(scenes) / MAX_PREVIEW_SCENES) * 45), message="Recortando cenas CBERS.")
 
             if not scenes:
-                raise ValueError("Nao foi possivel gerar recortes validos para esta area.")
+                details = " | ".join(candidate_errors[:3])
+                suffix = f" Detalhes: {details}" if details else ""
+                raise ValueError(f"Nao foi possivel gerar recortes validos para esta area.{suffix}")
 
             _send(
                 payload,
